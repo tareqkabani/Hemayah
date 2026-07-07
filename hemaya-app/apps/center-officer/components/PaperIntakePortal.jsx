@@ -15,12 +15,6 @@ const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => 
 const Field = ({ label, hint, req, children }) => (
   <div className="rf-fld"><label className="rf-label">{label}{req && <span className="rf-req">*</span>}{hint && <span className="rf-hint">{hint}</span>}</label>{children}</div>
 );
-// حقل موروث مقفل (من طلب طالب الحماية — نفاذ/سبل/الموارد البشرية)
-const Locked = ({ label, value, src }) => (
-  <div className="rf-fld"><label className="rf-label">{label}</label>
-    <div className="rf-locked"><span className="rf-locked-v">{value}</span><span className="rf-src"><I name="verified" size={14} fill color="var(--color-primary)" /> {src}</span></div>
-  </div>
-);
 const Choice = ({ value, set, options, danger }) => (
   <div className="rf-chips">{options.map((o) => {
     const v = typeof o === 'string' ? o : o.v;
@@ -63,9 +57,10 @@ function RecommendationForm({ rec, onApprove, onBack }) {
   const linked = rec.linked !== false; // مرتبط بطلب طالب حماية (مسار ١)
   const ent = ENTITIES[rec.entity] || ENTITIES.prosecution; // الجهة المختصة ومسمّياتها
   const [f, setF] = useState({
-    // قسم ١ — يدخله المحقق (الباقي موروث مقفل)
+    // قسم ١ — الهوية تُدخَل يدوياً من الطلب الورقيّ (لا وراثة من نفاذ في الاستقبال الورقيّ)
     psychHistory: '', health: '', healthNote: '', criminal: 'لا يوجد', criminalNote: '',
-    reveal: '', role: rec.cat || '', obName: '', obNid: '', obPhone: '',
+    reveal: '', role: rec.cat || '',
+    obName: '', obNid: '', obPhone: '', obGender: '', obNationality: '', obMarital: '', obResidence: '', obEmployer: '', obEducation: '',
     // قسم ٢ و ٣
     reasons: '', caseNo: rec.caseNo || '', caseSummary: '', caseStage: '', applicantRole: '',
     // قسم ٤ — مهيكل
@@ -97,9 +92,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
       </div>
 
       <InlineAlert kind="info" title="مصدر البيانات" style={{ marginBottom: 18 }}>
-        {linked
-          ? <>هوية مقدم الطلب وعنوانه وعمله <b>موروثة موثّقة</b> من طلبه (نفاذ · سبل · الموارد البشرية) — مقفلة للقراءة. أنت تُكمل ما تعرفه الجهة وحدها (القضية، التقييم، المسوّغات).</>
-          : <>هذا طلب تنشئه الجهة <b>نيابةً عن الشخص</b> دون طلب سابق — تُدخل الجهة بياناته كاملة، ويُنشأ له حساب لاحقاً.</>}
+        استقبالٌ ورقيّ: تُدخَل بيانات مقدّم الطلب (الهوية والعنوان والعمل) <b>يدوياً</b> من الطلب الورقيّ وتُرفق صورته — <b>غير موثّقة</b> بعد، وتُفعَّل عبر نفاذ حين يدخل الشخص بحسابه لاحقاً (لازمٌ للاتفاقية م11 والتظلّم م21). ثمّ تُكمِل الجهة القضية والتقييم والمسوّغات.
       </InlineAlert>
 
       {/* بطاقة ضابط الاتصال المسؤول */}
@@ -115,35 +108,27 @@ function RecommendationForm({ rec, onApprove, onBack }) {
         </div>
       </div>
       <Sec n="١" title="بيانات مقدم الطلب">
-        {linked ? (
-          <>
-            <div className="rf-grid2">
-              <Locked label="الاسم الرباعي" value="•••• •••• •••• ••••" src="نفاذ" />
-              <Locked label="رقم الهوية" value="•••••••••• " src="نفاذ" />
-              <Locked label="الجنس" value="••••" src="نفاذ" />
-              <Locked label="الجنسية" value="•••••••" src="نفاذ" />
-              <Locked label="الحالة الاجتماعية" value="••••••" src="نفاذ" />
-              <Locked label="مقر الإقامة" value="•••• — العنوان الوطني" src="سبل" />
-              <Locked label="جهة العمل" value="••••••••" src="الموارد البشرية" />
-              <Locked label="المستوى التعليمي" value="••••••" src="الموارد البشرية" />
-            </div>
-            <div className="rf-divider"><I name="edit_note" size={16} color="var(--text-secondary)" /> ما تُدخله الجهة (يخصّ القضية والتقييم)</div>
-          </>
-        ) : noId ? (
+        {noId ? (
           <div className="rf-fetch unverified">
             <div className="row" style={{ gap: 9, marginBottom: 6 }}><I name="running_with_errors" size={20} color="var(--color-warning)" fill /><b style={{ fontSize: 15, color: 'var(--text-strong)' }}>بيانات غير موثّقة — بانتظار التحقّق</b></div>
             <p className="muted" style={{ margin: '0 0 12px' }}>الشخص لا يملك هوية أو إقامة أو جواز (حالة مخالفي نظام الإقامة). تُدخل البيانات يدوياً وتُوسم للتحقّق اللاحق.</p>
             <InlineAlert kind="warning" title="نقطة معلّقة">آلية التحقّق لهذه الحالة <b>قيد النقاش مع الجهات المختصة</b>؛ تُعامل مؤقتاً كبيانات غير مؤكّدة.</InlineAlert>
-            <button className="link" style={{ marginTop: 10 }} onClick={() => setNoId(false)}><I name="arrow_forward" size={16} /> عودة إلى الجلب بالهوية</button>
+            <button className="link" style={{ marginTop: 10 }} onClick={() => setNoId(false)}><I name="arrow_forward" size={16} /> عودة إلى الإدخال بالهوية</button>
           </div>
         ) : (
           <div className="rf-fetch unverified">
-            <div className="row" style={{ gap: 9, marginBottom: 6 }}><I name="running_with_errors" size={20} color="var(--color-warning)" fill /><b style={{ fontSize: 15, color: 'var(--text-strong)' }}>بيانات تُدخلها الجهة — غير موثّقة بعد</b></div>
-            <p className="muted" style={{ margin: '0 0 12px' }}>تُدخل الجهة بيانات الشخص وترفق صورة هويته وكل المتطلبات؛ ويأخذ الطلب مجراه فوراً. تُوثّق الهوية حين يدخل الشخص بحسابه عبر نفاذ ويُفعّل الطلب.</p>
+            <div className="row" style={{ gap: 9, marginBottom: 6 }}><I name="running_with_errors" size={20} color="var(--color-warning)" fill /><b style={{ fontSize: 15, color: 'var(--text-strong)' }}>بيانات تُدخَل يدوياً من الطلب الورقيّ — غير موثّقة بعد</b></div>
+            <p className="muted" style={{ margin: '0 0 12px' }}>يُدخل موظف المركز بيانات الشخص من الطلب الورقيّ وترفق صورة هويته وكل المتطلبات؛ ويأخذ الطلب مجراه فوراً. تُوثّق الهوية حين يدخل الشخص بحسابه عبر نفاذ ويُفعّل الطلب.</p>
             <div className="rf-grid2">
-              <Field label="الاسم الرباعي" req><input value={f.obName} onChange={(e) => set('obName', e.target.value)} dir="auto" /></Field>
+              <Field label="الاسم الرباعي" req><input value={f.obName} onChange={(e) => set('obName', e.target.value)} dir="auto" placeholder="كما في الطلب الورقيّ" /></Field>
               <Field label="رقم الهوية / الإقامة" req><input value={f.obNid} onChange={(e) => set('obNid', e.target.value.replace(/\D/g, '').slice(0, 10))} className="mono" inputMode="numeric" placeholder="1XXXXXXXXX" dir="ltr" /></Field>
               <Field label="رقم الجوال" req hint="(للإشعار بتفعيل الحساب)"><input value={f.obPhone} onChange={(e) => set('obPhone', e.target.value.replace(/\D/g, '').slice(0, 10))} className="mono" inputMode="numeric" placeholder="05XXXXXXXX" dir="ltr" /></Field>
+              <Field label="الجنس"><Choice value={f.obGender} set={(v) => set('obGender', v)} options={['ذكر', 'أنثى']} /></Field>
+              <Field label="الجنسية"><input value={f.obNationality} onChange={(e) => set('obNationality', e.target.value)} dir="auto" placeholder="مثال: سعودي" /></Field>
+              <Field label="الحالة الاجتماعية"><input value={f.obMarital} onChange={(e) => set('obMarital', e.target.value)} dir="auto" placeholder="أعزب / متزوّج…" /></Field>
+              <Field label="مقر الإقامة" hint="(العنوان الوطني)"><input value={f.obResidence} onChange={(e) => set('obResidence', e.target.value)} dir="auto" placeholder="المدينة — الحي" /></Field>
+              <Field label="جهة العمل"><input value={f.obEmployer} onChange={(e) => set('obEmployer', e.target.value)} dir="auto" /></Field>
+              <Field label="المستوى التعليمي"><input value={f.obEducation} onChange={(e) => set('obEducation', e.target.value)} dir="auto" /></Field>
             </div>
             <InlineAlert kind="info" title="التفعيل عبر نفاذ لاحقاً">يدخل الشخص بحسابه في نفاذ ويُفعّل الطلب — وهو لازمٌ لتوقيع اتفاقية الحماية عند القبول، ولرفع التظلّم عند الاعتراض على أنواع الحماية أو قرار الرفض.</InlineAlert>
             <button className="link" style={{ marginTop: 10 }} onClick={() => setNoId(true)}><I name="help" size={16} /> الشخص لا يملك هوية / إقامة / جواز؟</button>
@@ -377,6 +362,12 @@ function Intake() {
     // التفاصيل المهيكلة الكاملة — تُخزَّن في protection_requests.details وتُعرض للدارس/المقيّم.
     // مسار الجهة (نموذج التوصية) يحمل التقييم الكامل؛ مسار الطالب يحمل المتاح منه.
     const details = { paper_source: src, entity_mode: src === 'entity' ? entMode : undefined };
+    // الهوية المُدخَلة يدوياً من الطلب الورقيّ (غير موثّقة — تُفعّل عبر نفاذ لاحقاً).
+    details.identity = src === 'entity'
+      ? { name: d.obName || '', nid: d.obNid || '', phone: d.obPhone || '', gender: d.obGender || '',
+          nationality: d.obNationality || '', marital: d.obMarital || '', residence: d.obResidence || '',
+          employer: d.obEmployer || '', education: d.obEducation || '', verified: false }
+      : { name: d.name || '', nid: d.nid || '', phone: d.phone || '', verified: false };
     if (src === 'entity') {
       details.recommendation = d.provide || null; // توفير | عدم توفير (توصية الجهة الفعليّة)
       details.assess = {
