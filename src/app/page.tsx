@@ -1,65 +1,71 @@
 import Image from "next/image";
+import Link from "next/link";
+import styles from "./page.module.css";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <div className={styles.page}>
+      <header className={styles.govbar}>
         <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
+          src="/brand/logo-center.png"
+          alt="مركز حماية الشهود والمبلّغين والخبراء والضحايا — النيابة العامة"
+          width={256}
+          height={100}
           priority
+          className={styles.logoCenter}
+          style={{ height: 70, width: "auto" }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        <Image
+          src="/brand/logo-2030.png"
+          alt="رؤية السعودية 2030"
+          width={96}
+          height={96}
+          className={styles.logo2030}
+          style={{ height: 62, width: "auto" }}
+        />
+      </header>
+
+      <main className={styles.wrap}>
+        <span className={styles.eyebrow}>
+          النيابة العامة · المملكة العربية السعودية
+        </span>
+        <h1 className={styles.hero}>منصّة «حماية»</h1>
+        <p className={styles.sub}>
+          مركز حماية الشهود والمبلّغين والخبراء والضحايا — رقمنةٌ كاملة لرحلة طلب
+          الحماية، وفق نظام حماية الشهود والمبلّغين والخبراء والضحايا ولائحته
+          التنفيذية.
+        </p>
+
+        <section aria-label="بوابات المنصّة" className={styles.grid}>
+          <Link href="/seeker" className={`${styles.card} ${styles.cardPrimary}`}>
+            <span className={styles.kicker}>الباب الأمامي · الدفعة الأولى</span>
+            <span className={styles.cardTitle}>بوابة طالب الحماية</span>
+            <span className={styles.cardDesc}>
+              تقديم طلب الحماية · متابعة الحالة حيّاً · المراسلة مع المركز ·
+              التظلّم · توقيع الاتفاقية — بالدخول عبر «نفاذ».
+            </span>
+            <span className={styles.cta}>ابدأ الدخول ←</span>
+          </Link>
+
+          <div className={`${styles.card} ${styles.cardSoon}`} aria-disabled="true">
+            <span className={styles.kicker}>قيد الإعداد</span>
+            <span className={styles.cardTitle}>بوابات المركز والجهات</span>
+            <span className={styles.cardDesc}>
+              الفرز · الدراسة والتقييم · القرار · التنفيذ — تُبنى في دفعاتٍ لاحقة
+              وفق خطة المعالم.
+            </span>
+            <span className={`${styles.cta} ${styles.ctaMuted}`}>لاحقاً</span>
+          </div>
+        </section>
       </main>
+
+      <footer className={styles.foot}>
+        <span>
+          مبنيّ على نظام «كود» (هيئة الحكومة الرقمية) · عربيٌّ RTL · الهوية تُعرض
+          بالرمز السرّي.
+        </span>
+        <span className={styles.footVision}>رؤية 2030</span>
+      </footer>
     </div>
   );
 }

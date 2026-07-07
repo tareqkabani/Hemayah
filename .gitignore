@@ -1,41 +1,54 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# ============================================================
+#  قائمة سماح (allowlist): تجاهل كل شيء في الجذر ما عدا تطبيق Next.js
+#  السبب: «Send to Claude Code» يبذر ~150 ملف تصميم عربيّ في الجذر باستمرار.
+#  مواد التصميم محفوظة محلياً تحت design-reference/ لكنها لا تُتعقَّب.
+# ============================================================
+/*
 
-# testing
-/coverage
+# استثنِ ملفات تطبيق Next.js وإعداداته
+!/.gitignore
+!/package.json
+!/package-lock.json
+!/next.config.ts
+!/next-env.d.ts
+!/tsconfig.json
+!/postcss.config.mjs
+!/eslint.config.mjs
+!/README.md
+!/AGENTS.md
+!/CLAUDE.md
+!/src/
+!/public/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# تجاهلات معتادة داخل المستثنَيات
 .DS_Store
 *.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
 *.tsbuildinfo
-next-env.d.ts
+npm-debug.log*
+.env*
+/.next/
+/out/
+/build
+/coverage
+
+# ============================================================
+#  المونوريبو الإنتاجيّ hemaya-app — يُتعقَّب (كان مُتجاهَلاً بالكامل).
+#  نتتبّع المصدر فقط، ونتجاهل التبعات والمخرجات وملفات البيئة السرّية.
+#  ملاحظة: الأنماط بلا «/» بادئة تنطبق على أيّ عمق داخل المستودع.
+# ============================================================
+!/hemaya-app/
+node_modules/
+.next/
+.turbo/
+dist/
+# أبقِ قوالب البيئة متعقَّبة (لا تحوي أسراراً)، بخلاف .env و .env.local
+!.env.example
+
+# ============================================================
+#  ترحيلات قاعدة البيانات (supabase/) — تُتعقَّب: تاريخ المخطّط بأكمله بنيةٌ حرِجة.
+#  المجلّد فيه .gitignore خاصّ به يتجاهل أوقات التشغيل (.branches/.temp/.env).
+# ============================================================
+!/supabase/
+*.bak

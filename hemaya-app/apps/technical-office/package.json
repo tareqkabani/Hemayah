@@ -1,0 +1,11 @@
+{
+  "name": "@hemaya/technical-office",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": { "dev": "next dev -p 3008", "build": "next build", "start": "next start -p 3008", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@hemaya/ui": "workspace:*", "@hemaya/supabase": "workspace:*", "@hemaya/auth": "workspace:*", "@hemaya/domain": "workspace:*",
+    "next": "14.2.15", "react": "18.3.1", "react-dom": "18.3.1"
+  },
+  "devDependencies": { "typescript": "^5.5.4", "@types/node": "^20.14.10", "@types/react": "^18.3.3", "@types/react-dom": "^18.3.0" }
+}

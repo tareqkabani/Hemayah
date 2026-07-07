@@ -1,0 +1,32 @@
+import type { Metadata } from "next";
+import Script from "next/script";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "منصّة «حماية» — البوّابة الرئيسية · النيابة العامة",
+  description:
+    "الشاشة الموحّدة لمنصّة حماية المبلّغين والشهود والخبراء والضحايا — الدخول عبر نفاذ وتوجيهٌ آليٌّ إلى بوّابتك حسب صلاحياتك.",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ar" dir="rtl" data-variant="stately" data-accent="teal">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="page gw">
+        {children}
+        <Script src="/gateway-core.js" strategy="afterInteractive" />
+      </body>
+    </html>
+  );
+}
