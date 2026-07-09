@@ -8,6 +8,7 @@ import {
   SubmitCaseSchema, TriageSchema, StudyAssessmentSchema,
   CouncilDraftSchema, CouncilSubmitSchema, CouncilReturnSchema,
   CouncilVoteSchema, CouncilIssueSchema, ContactLogSchema,
+  MessageSendSchema, GrievanceFileSchema, MESSAGE_THREADS,
 } from "../schemas";
 import { validationHook } from "../middleware/validation";
 import { requireScope, requireUser } from "../middleware/scope";
@@ -242,4 +243,84 @@ cases.post("/:ref/contact-logs", requireUser, zValidator("json", ContactLogSchem
     .insert({ case_id: caseId, officer_id: officerId, channel: input.channel, summary: input.summary });
   if (error) throw error;
   return c.json({ data: { ok: true } }, 201);
+});
+
+// ── المستفيد: تفصيلٌ موحّد + مراسلات + تظلّمات ───────────────────────────
+
+/** عرضٌ موحّد لقضيّة المستفيد (قضية + قرارٌ مُصدَر + آخر تظلّم) — RPC seeker_case_view.
+ *  يكسر فجوة RLS التي تحجب council_decisions عن المستفيد (يُكشَف القرار بعد الإصدار فقط). */
+cases.get("/:ref/view", requireUser, async (c) => {
+  const view = await callRpc<{ case: unknown; decision: unknown; grievance: unknown } | null>(
+    c.get("db"), "seeker_case_view", { _ref: c.req.param("ref") },
+  );
+  if (!view) {
+    return c.json(
+      { error: { code: "not_found", message: "القضية غير موجودة.", requestId: c.get("requestId") ?? null } },
+      404,
+    );
+  }
+  return c.json({ data: view });
+});
+
+const MESSAGE_FIELDS = "id, case_id, thread, direction, body, sender_label, created_at";
+
+/** مراسلات القضية — قراءة (RLS: seeker_msg_read/staff_msg_read). فلترة اختيارية بالخيط. */
+cases.get("/:ref/messages", requireUser, async (c) => {
+  const caseId = await resolveCaseId(c);
+  const thread = c.req.query("thread");
+  if (thread && !MESSAGE_THREADS.includes(thread as (typeof MESSAGE_THREADS)[number])) {
+    throw new HTTPException(400, { message: "خيط المراسلة غير صالح." });
+  }
+  let query = c.get("db")
+    .from("messages")
+    .select(MESSAGE_FIELDS)
+    .eq("case_id", caseId)
+    .order("created_at", { ascending: true })
+    .limit(500);
+  if (thread) query = query.eq("thread", thread as (typeof MESSAGE_THREADS)[number]);
+  const { data, error } = await query;
+  if (error) throw error;
+  return c.json({ data });
+});
+
+/** ردّ المستفيد على المركز/الجهة — إدراجٌ باتّجاه out (تفرضه RLS: seeker_msg_reply). */
+cases.post("/:ref/messages", requireUser, zValidator("json", MessageSendSchema, validationHook), async (c) => {
+  const caseId = await resolveCaseId(c);
+  const input = c.req.valid("json");
+  const { data, error } = await c.get("db")
+    .from("messages")
+    .insert({ case_id: caseId, thread: input.thread, direction: "out", body: input.body, sender_label: "طالب الحماية" })
+    .select(MESSAGE_FIELDS)
+    .single();
+  if (error) throw error;
+  return c.json({ data }, 201);
+});
+
+/** تظلّمات القضية — قراءة (RLS: grievance_seeker_read = owns_case). */
+cases.get("/:ref/grievances", requireUser, async (c) => {
+  const caseId = await resolveCaseId(c);
+  const { data, error } = await c.get("db")
+    .from("grievances")
+    .select("id, case_id, against, status, outcome, filed_at, decision_due, tech_opinion")
+    .eq("case_id", caseId)
+    .order("filed_at", { ascending: false });
+  if (error) throw error;
+  return c.json({ data });
+});
+
+/** رفع تظلّم أمام النائب العام — إدراجٌ في grievances (RLS: grievance_seeker_insert).
+ *  يُشغّل مُشغّل القاعدة لإشعار المكتب الفنّي. المهلة النظاميّة (10) أيام. */
+cases.post("/:ref/grievances", requireUser, zValidator("json", GrievanceFileSchema, validationHook), async (c) => {
+  const caseId = await resolveCaseId(c);
+  const input = c.req.valid("json");
+  const against = [input.scope, input.reason].filter((s) => s && s.trim()).join(" — ");
+  const now = new Date();
+  const due = new Date(now.getTime() + 10 * 86_400_000).toISOString();
+  const { data, error } = await c.get("db")
+    .from("grievances")
+    .insert({ case_id: caseId, against, status: "filed", filed_at: now.toISOString(), decision_due: due })
+    .select("id, case_id, against, status, filed_at, decision_due")
+    .single();
+  if (error) throw error;
+  return c.json({ data }, 201);
 });
