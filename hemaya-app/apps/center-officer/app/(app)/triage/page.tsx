@@ -20,7 +20,7 @@ function daysAgo(iso: string): string {
 }
 
 export default async function Page() {
-  await requireRole("case_officer" as any, { loginPath: "/login", denyPath: "/403" });
+  await requireRole("case_officer" as any, { denyPath: "/403" });
 
   // القضايا الفعليّة في طابور الفرز (RLS: co_triage_inbox — case_officer + status='triage').
   const supabase = createServerClient();

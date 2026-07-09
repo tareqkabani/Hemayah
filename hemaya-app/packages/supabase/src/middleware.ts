@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./types";
+import { GATEWAY_URL } from "./gateway";
 
-/** يُدوّر جلسة Supabase على كل طلب ويحرس الدخول (يُوجّه غير المُصادَق إلى loginPath). */
-export async function updateSession(request: NextRequest, loginPath = "/login") {
+/** يُدوّر جلسة Supabase على كل طلب ويحرس الدخول (يُوجّه غير المُصادَق إلى البوّابة الموحّدة). */
+export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,11 +22,10 @@ export async function updateSession(request: NextRequest, loginPath = "/login") 
   );
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path === loginPath || path.startsWith("/auth") || path === "/403";
+  const isPublic = path.startsWith("/auth") || path === "/403";
   if (!user && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = loginPath;
-    return NextResponse.redirect(url);
+    // لا شاشة دخول محليّة — يُحوَّل غير المُصادَق إلى البوّابة الموحّدة (نفاذ).
+    return NextResponse.redirect(new URL(GATEWAY_URL));
   }
   return response;
 }
