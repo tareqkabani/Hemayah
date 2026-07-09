@@ -273,7 +273,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
 }
 
 /* ── طلباتي (بيانات حقيقية من Supabase) ── */
-export function RealRequests({ go }: { go?: (id: string) => void }) {
+export function RealRequests({ go, onOpen }: { go?: (id: string) => void; onOpen?: (r: any) => void }) {
   const requests = useContext(RequestsContext);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -301,7 +301,8 @@ export function RealRequests({ go }: { go?: (id: string) => void }) {
           const open = openId === r.id;
           return (
             <div key={r.id} className="card" style={{ overflow: "hidden" }}>
-              <button className="req-card" style={{ border: "none", boxShadow: "none", borderRadius: 0 }} onClick={() => setOpenId(open ? null : r.id)}>
+              <button className="req-card" style={{ border: "none", boxShadow: "none", borderRadius: 0 }}
+                onClick={() => (onOpen ? onOpen(r) : setOpenId(open ? null : r.id))}>
                 <span className="req-ic" style={{ background: "var(--green-10)" }}><Ic name="verified_user" size={22} color="var(--color-primary)" fill /></span>
                 <div style={{ flex: 1 }}>
                   <div className="row" style={{ gap: 8 }}>
@@ -310,9 +311,9 @@ export function RealRequests({ go }: { go?: (id: string) => void }) {
                   </div>
                   <div className="muted mono">{r.ref_no} · {r.secret_code}</div>
                 </div>
-                <Ic name={open ? "expand_more" : "chevron_left"} size={20} color="var(--text-disabled)" />
+                <Ic name={onOpen ? "chevron_left" : (open ? "expand_more" : "chevron_left")} size={20} color="var(--text-disabled)" />
               </button>
-              {open &&
+              {!onOpen && open &&
                 <div style={{ padding: "0 16px 18px" }}>
                   <div className="row" style={{ gap: 10, marginBottom: 12 }}>
                     <SecretCode code={r.secret_code} canReveal={false} />

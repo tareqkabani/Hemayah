@@ -224,10 +224,18 @@ cases.post("/:ref/council/issue", requireUser, zValidator("json", CouncilIssueSc
 
 // ── التنفيذ ومحاضر الاتصال ──────────────────────────────────────────────
 
-/** توقيع اتفاقية الحماية — sign_agreement. */
+/** توقيع اتفاقية الحماية (موظّف المركز) — sign_agreement. */
 cases.post("/:ref/sign-agreement", requireUser, async (c) => {
   const caseId = await resolveCaseId(c);
   const rows = await callRpc<{ status: string }[]>(c.get("db"), "sign_agreement", { _case_id: caseId });
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  return c.json({ data: { status: row?.status ?? null } });
+});
+
+/** توقيع المستفيد لاتفاقيّته بنفسه (عبر نفاذ) — seeker_sign_agreement (owner-scoped). */
+cases.post("/:ref/sign", requireUser, async (c) => {
+  const caseId = await resolveCaseId(c);
+  const rows = await callRpc<{ status: string }[]>(c.get("db"), "seeker_sign_agreement", { _case_id: caseId });
   const row = Array.isArray(rows) ? rows[0] : rows;
   return c.json({ data: { status: row?.status ?? null } });
 });

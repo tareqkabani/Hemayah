@@ -11,6 +11,7 @@ import { createClient } from '@hemaya/supabase/src/browser';
 import { IdentityContext, RequestsContext } from './identity-context';
 import { Profile as ProfileDetailed, NewRequest as NewRequestDetailed, RealRequests } from './screens-detailed';
 import { Messages as MessagesDetailed, Notifications as NotificationsDetailed, RealtimeRefresh } from './realtime-screens';
+import { RealRequestDetail } from './real-detail';
 
 // لوحة التجارب في البروتوتايب مُبطَّلة (القيم الافتراضية تبقى فاعلة).
 const useTweaks = (d) => [d, () => {}];
@@ -692,6 +693,7 @@ function PortalApp() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const ruling = t.prosecutorRuling;
   const [selectedReqId, setSelectedReqId] = useState(null);
+  const [selReal, setSelReal] = useState(null); // الطلب الحقيقيّ المفتوح (من القائمة الحيّة)
   const [states, setStates] = useState({
     r1: { signed: false, grievance: { status: 'none' }, closed: false },
     r2: { signed: false, grievance: { status: 'none' }, closed: false },
@@ -740,7 +742,7 @@ function PortalApp() {
             const needsAction = REQUESTS.some((r) => { const st = states[r.id]; return !st.signed && !st.closed && !(st.grievance.status === 'filed' && ruling === 'reject'); });
             const badge = n.id === 'requests' && (needsAction || completion.status === 'awaiting') ? '!' : n.badge;
             return (
-              <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => { if (n.id === 'requests') setSelectedReqId(null); go(n.id); }}>
+              <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => { if (n.id === 'requests') { setSelectedReqId(null); setSelReal(null); } go(n.id); }}>
                 <I name={n.icon} size={20} /> <span>{n.t}</span>
                 {badge && <span className="nav-badge">{badge}</span>}
               </button>
@@ -766,9 +768,9 @@ function PortalApp() {
             : isGrievance && selReq
             ? <Grievance req={selReq} decision={selReq.decision} grievance={selState.grievance} onFile={fileGrievance} back={() => go('requests')} />
             : active === 'requests'
-            ? (selReq
-                ? <RequestDetail req={selReq} st={selState} ruling={ruling} go={go} toAgreement={() => go('agreement')} toGrievance={() => go('grievance')} onClose={closeReq} back={() => setSelectedReqId(null)} />
-                : <RealRequests go={go} />)
+            ? (selReal
+                ? <RealRequestDetail request={selReal} back={() => setSelReal(null)} go={go} />
+                : <RealRequests go={go} onOpen={setSelReal} />)
             : <Comp go={go} completion={completion} fulfill={fulfill} submitCompletion={submitCompletion} />}
         </main>
       </div>

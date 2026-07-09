@@ -284,7 +284,10 @@ export const openapi = {
         responses: { "200": { description: "النتيجة (accept/reject)" }, "409": { description: "التصويت غير مغلق / سبب الرفض مطلوب" } } },
     },
     "/cases/{ref}/sign-agreement": {
-      post: { summary: "توقيع اتفاقية الحماية", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة" }, "409": { description: "قاعدة عمل" } } },
+      post: { summary: "توقيع اتفاقية الحماية (موظّف المركز)", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة" }, "409": { description: "قاعدة عمل" } } },
+    },
+    "/cases/{ref}/sign": {
+      post: { summary: "توقيع المستفيد لاتفاقيّته (عبر نفاذ)", description: "owner-scoped — صاحب القضية يوقّع اتفاقيّته فتُفعّل الحماية.", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة (active)" }, "403": { description: "ليست قضيّتك" }, "409": { description: "الحالة ليست مقبولةً" } } },
     },
     "/cases/{ref}/contact-logs": {
       post: { summary: "تسجيل محضر اتصال", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
