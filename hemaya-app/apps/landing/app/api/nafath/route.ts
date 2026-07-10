@@ -33,6 +33,10 @@ const DEMO: Record<string, Spec> = {
   "2000000007": { role: "case_officer", portal: ORIGIN.center + "/execution", label: "التنفيذ والتجديد" },
   "2000000008": { role: "board_chair", portal: ORIGIN.center + "/oversight", label: "قيادة المركز — الرئيس" },
   "2000000009": { role: "deputy_chair", portal: ORIGIN.center + "/oversight-deputy", label: "قيادة المركز — النائب" },
+  "2000000061": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000062": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000063": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000064": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
   "3000000001": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة", attrs: { authority: "competent" } },
   "3000000002": { role: "moh_specialist", portal: ORIGIN.health, label: "وزارة الصحة", attrs: { authority: "health" } },
   "3000000003": { role: "hr_specialist", portal: ORIGIN.hr, label: "الموارد البشرية", attrs: { authority: "hr" } },
@@ -44,13 +48,34 @@ const DEMO: Record<string, Spec> = {
 };
 const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب الحماية" };
 
+// توجيه احتياطي بالدور الحقيقي: هوية خارج DEMO لمستخدمٍ قائمٍ تُوجَّه ببوابة دوره
+// المخزّن في user_roles بدل زرع دور subject دخيل له. (بلا attrs كي لا تُمسّ سماته الفعلية)
+const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
+  subject: { portal: ORIGIN.seeker, label: "طالب الحماية" },
+  hotline_operator: { portal: ORIGIN.center + "/paper-intake", label: "الاستقبال الورقيّ" },
+  case_officer: { portal: ORIGIN.center + "/triage", label: "موظف المركز" },
+  studier: { portal: ORIGIN.center + "/study", label: "الدراسة — الدارس" },
+  evaluator: { portal: ORIGIN.center + "/assessment", label: "التقييم — المقيّم" },
+  board_member: { portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  board_chair: { portal: ORIGIN.center + "/oversight", label: "قيادة المركز — الرئيس" },
+  deputy_chair: { portal: ORIGIN.center + "/oversight-deputy", label: "قيادة المركز — النائب" },
+  competent_body: { portal: ORIGIN.competent, label: "الجهات المختصة" },
+  moh_specialist: { portal: ORIGIN.health, label: "وزارة الصحة" },
+  hr_specialist: { portal: ORIGIN.hr, label: "الموارد البشرية" },
+  security_manager: { portal: ORIGIN.security, label: "الإدارة الأمنية" },
+  moi_officer: { portal: ORIGIN.interior, label: "وزارة الداخلية" },
+  prosecutor_general: { portal: ORIGIN.ag, label: "النائب العام" },
+  advisor: { portal: ORIGIN.technical, label: "المستشارون" },
+  tech_manager: { portal: ORIGIN.technical, label: "مدير المكتب الفني" },
+};
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const nid = String(body?.nationalId ?? "").trim();
   if (!/^\d{10}$/.test(nid)) {
     return NextResponse.json({ ok: false, error: "رقم الهوية يجب أن يكون 10 أرقام." }, { status: 400 });
   }
-  const spec = DEMO[nid] ?? DEFAULT;
+  let spec = DEMO[nid];
   const email = emailFor(nid);
 
   try {
@@ -75,6 +100,13 @@ export async function POST(req: Request) {
       userId = list?.users?.find((u) => u.email === email)?.id;
     }
     if (userId) {
+      if (!spec) {
+        // هوية خارج DEMO: افحص الأدوار القائمة أولاً ووجّه بالدور الحقيقي دون أي زرع
+        const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", userId);
+        const real = roles?.map((r) => (r as { role: string }).role).find((role) => ROLE_PORTAL[role]);
+        if (real) spec = { role: real, ...ROLE_PORTAL[real] };
+      }
+      spec ??= DEFAULT;
       const { data: existing } = await admin
         .from("user_roles")
         .select("role")
@@ -87,6 +119,7 @@ export async function POST(req: Request) {
         await admin.from("user_roles").update({ attributes: spec.attrs } as never).eq("user_id", userId).eq("role", spec.role as never);
       }
     }
+    spec ??= DEFAULT;
 
     // 3) تسجيل الدخول — يضبط كوكي جلسة Supabase على localhost (مشتركة بين المنافذ)
     const supabase = createServerClient();
