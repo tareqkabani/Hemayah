@@ -18,7 +18,7 @@ export default async function SeekerPage() {
 
   const { data: cases } = await supabase
     .from("protection_cases")
-    .select("id, ref_no, secret_code, status, category, created_at, protection_requests(details)")
+    .select("id, ref_no, secret_code, status, category, created_at, protection_requests(applicant_role, submitted_at, details)")
     .order("created_at", { ascending: false });
 
   const requests = (cases ?? []).map((c: any) => ({
@@ -28,6 +28,8 @@ export default async function SeekerPage() {
     status: c.status,
     category: c.category,
     created_at: c.created_at,
+    applicant_role: c.protection_requests?.[0]?.applicant_role ?? null,
+    submitted_at: c.protection_requests?.[0]?.submitted_at ?? null,
     details: c.protection_requests?.[0]?.details ?? null,
   }));
 
