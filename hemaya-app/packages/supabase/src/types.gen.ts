@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       api_keys: {
@@ -455,6 +480,148 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_attachments: {
+        Row: {
+          doc_group: string
+          doc_id: string
+          file_name: string | null
+          id: string
+          label: string
+          request_id: string
+          required: boolean
+          storage_path: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          doc_group?: string
+          doc_id: string
+          file_name?: string | null
+          id?: string
+          label: string
+          request_id: string
+          required?: boolean
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          doc_group?: string
+          doc_id?: string
+          file_name?: string | null
+          id?: string
+          label?: string
+          request_id?: string
+          required?: boolean
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_attachments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "decision_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_requests: {
+        Row: {
+          applicant_name: string
+          applicant_nid: string
+          category: string | null
+          created_at: string | null
+          deadline_closed: boolean
+          id: string
+          issued_at: string | null
+          issued_reason: string | null
+          issued_type: string | null
+          package_confirmed: boolean
+          package_confirmed_at: string | null
+          preparer_id: string | null
+          risk: string | null
+          secret_code: string
+          status: string
+          updated_at: string | null
+          voting_started_at: string | null
+        }
+        Insert: {
+          applicant_name: string
+          applicant_nid: string
+          category?: string | null
+          created_at?: string | null
+          deadline_closed?: boolean
+          id?: string
+          issued_at?: string | null
+          issued_reason?: string | null
+          issued_type?: string | null
+          package_confirmed?: boolean
+          package_confirmed_at?: string | null
+          preparer_id?: string | null
+          risk?: string | null
+          secret_code: string
+          status?: string
+          updated_at?: string | null
+          voting_started_at?: string | null
+        }
+        Update: {
+          applicant_name?: string
+          applicant_nid?: string
+          category?: string | null
+          created_at?: string | null
+          deadline_closed?: boolean
+          id?: string
+          issued_at?: string | null
+          issued_reason?: string | null
+          issued_type?: string | null
+          package_confirmed?: boolean
+          package_confirmed_at?: string | null
+          preparer_id?: string | null
+          risk?: string | null
+          secret_code?: string
+          status?: string
+          updated_at?: string | null
+          voting_started_at?: string | null
+        }
+        Relationships: []
+      }
+      decision_votes: {
+        Row: {
+          choice: string
+          id: string
+          note: string | null
+          request_id: string
+          voted_at: string | null
+          voter_id: string
+        }
+        Insert: {
+          choice: string
+          id?: string
+          note?: string | null
+          request_id: string
+          voted_at?: string | null
+          voter_id: string
+        }
+        Update: {
+          choice?: string
+          id?: string
+          note?: string | null
+          request_id?: string
+          voted_at?: string | null
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_votes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "decision_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -1133,42 +1300,54 @@ export type Database = {
           approval_status: string | null
           branch_id: string | null
           case_id: string
+          channel: string | null
           created_at: string | null
           decision: string | null
           due_at: string | null
           factors9: Json | null
           id: string
+          notes: string | null
           proposed_duration: string | null
           proposed_type: Json | null
           raised_at: string | null
+          received_at: string | null
+          recorded_by: string | null
           source_body: string | null
         }
         Insert: {
           approval_status?: string | null
           branch_id?: string | null
           case_id: string
+          channel?: string | null
           created_at?: string | null
           decision?: string | null
           due_at?: string | null
           factors9?: Json | null
           id?: string
+          notes?: string | null
           proposed_duration?: string | null
           proposed_type?: Json | null
           raised_at?: string | null
+          received_at?: string | null
+          recorded_by?: string | null
           source_body?: string | null
         }
         Update: {
           approval_status?: string | null
           branch_id?: string | null
           case_id?: string
+          channel?: string | null
           created_at?: string | null
           decision?: string | null
           due_at?: string | null
           factors9?: Json | null
           id?: string
+          notes?: string | null
           proposed_duration?: string | null
           proposed_type?: Json | null
           raised_at?: string | null
+          received_at?: string | null
+          recorded_by?: string | null
           source_body?: string | null
         }
         Relationships: [
@@ -1483,6 +1662,7 @@ export type Database = {
         Returns: undefined
       }
       case_has_grievance: { Args: { _case_id: string }; Returns: boolean }
+      case_in_decision: { Args: { _case_id: string }; Returns: boolean }
       cb_branch: { Args: never; Returns: string }
       cb_entity: {
         Args: never
@@ -1542,6 +1722,54 @@ export type Database = {
         Returns: undefined
       }
       current_officer_caseids: { Args: never; Returns: string[] }
+      dec_cast_vote: {
+        Args: { _choice: string; _note: string; _request_id: string }
+        Returns: undefined
+      }
+      dec_close_deadline: { Args: { _request_id: string }; Returns: undefined }
+      dec_create_request: {
+        Args: { _name: string; _nid: string }
+        Returns: {
+          id: string
+          secret_code: string
+        }[]
+      }
+      dec_issue: {
+        Args: { _reason: string; _request_id: string; _type: string }
+        Returns: undefined
+      }
+      dec_remove_attachment: {
+        Args: { _doc_id: string; _request_id: string }
+        Returns: undefined
+      }
+      dec_req_visible: {
+        Args: { _request_id: string; _uid: string }
+        Returns: boolean
+      }
+      dec_set_attachment: {
+        Args: {
+          _doc_id: string
+          _file_name: string
+          _group: string
+          _label: string
+          _request_id: string
+          _required: boolean
+          _storage_path: string
+        }
+        Returns: undefined
+      }
+      dec_submit_voting: { Args: { _request_id: string }; Returns: undefined }
+      dec_tally: {
+        Args: { _request_id: string }
+        Returns: {
+          accept: number
+          cast_n: number
+          closed: boolean
+          outcome: string
+          pending: number
+          reject: number
+        }[]
+      }
       has_authority: {
         Args: { _authority: Database["public"]["Enums"]["referral_authority"] }
         Returns: boolean
@@ -1551,6 +1779,7 @@ export type Database = {
         Args: { _role: Database["public"]["Enums"]["app_role"]; _user: string }
         Returns: boolean
       }
+      is_council: { Args: { _uid: string }; Returns: boolean }
       notify_foreign: {
         Args: { _decision: string; _id: string }
         Returns: {
@@ -1607,6 +1836,20 @@ export type Database = {
       raise_urgent: {
         Args: { _case_id: string; _escalation: Json }
         Returns: string
+      }
+      record_recommendation: {
+        Args: {
+          _case_id: string
+          _channel: string
+          _decision: string
+          _factors9?: Json
+          _notes?: string
+          _proposed_duration?: string
+          _proposed_type?: Json
+        }
+        Returns: {
+          status: Database["public"]["Enums"]["case_status"]
+        }[]
       }
       referral_update: {
         Args: {
@@ -1665,6 +1908,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      seeker_case_view: { Args: { _ref: string }; Returns: Json }
+      seeker_sign_agreement: {
+        Args: { _case_id: string }
+        Returns: {
+          status: Database["public"]["Enums"]["case_status"]
+        }[]
       }
       send_to_decision: {
         Args: { _case_id: string }
@@ -1976,6 +2226,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_category: ["reporter", "witness", "expert", "victim", "related"],

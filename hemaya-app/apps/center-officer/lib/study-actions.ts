@@ -7,13 +7,14 @@ export type AuthorInput = {
   proposedType: string[]; durationDays: number | null; notes: string;
 };
 
-async function submit(rpc: string, caseId: string, i: AuthorInput) {
+async function submit(rpc: "submit_study" | "submit_assessment", caseId: string, i: AuthorInput) {
   const supabase = createServerClient();
   const { error, data } = await supabase.rpc(rpc, {
     _case_id: caseId, _recommendation: i.recommendation,
     _reject_reasons: i.rejectReasons, _proposed_type: i.proposedType,
-    _proposed_duration: i.durationDays ? `${i.durationDays} days` : null,
-    _notes: i.notes || null,
+    // الدالة تقبل NULL فعلياً في المدة والملاحظات
+    _proposed_duration: (i.durationDays ? `${i.durationDays} days` : null) as string,
+    _notes: (i.notes || null) as string,
   });
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const, id: (Array.isArray(data) ? data[0] : data)?.id };

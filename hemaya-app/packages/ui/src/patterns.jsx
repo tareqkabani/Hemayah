@@ -13,7 +13,7 @@ const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => 
 );
 
 /* ───────────────── 1. الرمز السري بدل الاسم (م2، م15، م16) ───────────────── */
-export function SecretCode({ code = 'C-2026-0481', name = 'محمد بن ع. الشهري', canReveal = true, onReveal }) {
+export function SecretCode({ code = 'C-2026-0481', name = 'محمد بن ع. الشهري', canReveal = true, onReveal = null }) {
   const [shown, setShown] = useState(false);
   const reveal = () => { setShown(true); onReveal && onReveal(code); };
   return (
