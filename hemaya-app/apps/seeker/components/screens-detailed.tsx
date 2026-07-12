@@ -6,11 +6,11 @@
 import React, { useState, useContext, useTransition } from "react";
 import { Card, Tag, InlineAlert } from "@hemaya/ui";
 import { SecretCode } from "@hemaya/ui";
-import { IdentityContext, RequestsContext } from "./identity-context";
+import { IdentityContext, RequestsContext, maskId } from "./identity-context";
 import { submitRequest } from "../lib/seeker-actions";
 
-const CATEGORY_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
-const STATUS_AR: Record<string, { t: string; tone: string }> = {
+export const CATEGORY_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
+export const STATUS_AR: Record<string, { t: string; tone: string }> = {
   submitted: { t: "مُستلَم", tone: "info" }, triage: { t: "قيد الفرز المبدئي", tone: "warning" },
   referred: { t: "محال للجهة المختصة", tone: "info" }, under_study: { t: "قيد الدراسة والتقييم", tone: "info" },
   classified: { t: "مُصنَّف", tone: "info" }, in_decision: { t: "قيد القرار", tone: "warning" },
@@ -22,9 +22,6 @@ const STATUS_AR: Record<string, { t: string; tone: string }> = {
 
 const Ic = ({ name, size = 20, fill = false, color = "currentColor", style = {} }: any) => (
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>
-);
-const Ref = ({ children }: any) => (
-  <span className="ref"><span className="material-symbols-rounded" style={{ fontSize: 11 }}>gavel</span>{children}</span>
 );
 
 type Mode = "live" | "manual";
@@ -63,8 +60,8 @@ function RO({ label, source, mode, value }: { label: string; source: string; mod
       <span className="fld-label">{label}</span>
       <div className="ro">
         <span className="ro-val">
-          {value ? <span className={label === "رقم الهوية" ? "mono" : ""}>{value}</span> : <>•••• </>}
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>({source})</span>
+          {value ? <span className={label === "رقم الهوية" ? "mono" : ""} dir={label === "رقم الهوية" ? "ltr" : undefined}>{value}</span> : <>•••• </>}
+          <span className="mono" style={{ fontSize: 11, color: "var(--text-secondary)" }}>({source})</span>
         </span>
         <Ic name="lock" size={17} style={{ color: "var(--text-disabled)" }} />
       </div>
@@ -80,7 +77,7 @@ export function Profile() {
   const toggle = (k: "nafath" | "spl" | "hrdf") => setIntg((s) => ({ ...s, [k]: s[k] === "live" ? "manual" : "live" }));
   return (
     <div className="seeker-form" style={{ display: "grid", gap: 16 }}>
-      <InlineAlert kind="info" title="ملف شخصي موثّق">بياناتك مجلوبة من المصادر الوطنية ولا تُعدَّل هنا؛ تُستخدم تلقائياً عند تقديم أي طلب دون إعادة إدخال.</InlineAlert>
+      <InlineAlert kind="info" title="ملف شخصي موثّق">بياناتك مجلوبة من المصادر الوطنية وتظهر لك وحدك (مالك الحساب) بقيمها الفعلية، ولا تُعدَّل من البوابة؛ تُستخدم تلقائياً عند تقديم أي طلب دون إعادة إدخال.</InlineAlert>
       <div className="intg-bar">
         <Ic name="cable" size={18} color="var(--text-secondary)" />
         <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-strong)" }}>حالة الربط (محاكاة):</span>
@@ -94,7 +91,7 @@ export function Profile() {
       <Section icon="badge" iconBg="var(--info-10)" iconColor="var(--color-info)" title="بيانات مقدم الطلب" note="موثّقة — غير قابلة للتعديل" source="نفاذ" mode={m("نفاذ")}>
         <div className="grid2">
           <RO label="الاسم" source="نفاذ" mode={m("نفاذ")} value={id.name} />
-          <RO label="رقم الهوية" source="نفاذ" mode={m("نفاذ")} value={id.nationalId} />
+          <RO label="رقم الهوية" source="نفاذ" mode={m("نفاذ")} value={maskId(id.nationalId)} />
           <RO label="الجنس" source="نفاذ" mode={m("نفاذ")} />
           <RO label="تاريخ الميلاد" source="نفاذ" mode={m("نفاذ")} />
           <RO label="رقم الهاتف" source="نفاذ" mode={m("نفاذ")} />
@@ -180,18 +177,16 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
         <span>هويتك موثّقة عبر <b>نفاذ</b> — تُرفق تلقائياً بالطلب دون إعادة إدخال.</span>
         <button className="link-btn" onClick={() => go && go("profile")}>عرض الملف الشخصي</button>
       </div>
-      <InlineAlert kind="info" title="خصوصية وسرية">لن يظهر اسمك في الشاشات العامة؛ يُستبدل برمز سري عند التسجيل، ويُسجَّل كل اطّلاع في سجل التدقيق (م2، م15).</InlineAlert>
 
       <Section icon="assignment" iconBg="var(--green-10)" iconColor="var(--color-primary)" title="بيانات الطلب" note="الرجاء إدخال البيانات المطلوبة">
-        <InlineAlert kind="success" title="طلب جديد" style={{ marginBottom: 16 }}>هذه الشاشة لتقديم طلب حماية جديد فقط؛ والتظلّم على طلب سابق مرفوض خدمة منفصلة تماماً.</InlineAlert>
         <div className="grid2">
           <div className="fld">
-            <span className="fld-label">صفة مقدم الطلب <span className="req">*</span> <Ref>م7/1 · لائحة م5/1</Ref></span>
+            <span className="fld-label">صفة مقدم الطلب <span className="req">*</span></span>
             <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{["أصيل (المشمول)", "وليّ", "وصيّ", "وكيل", "محامٍ"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
             {onBehalf && <span className="hint">تقدّم نيابةً عن المشمول — أدخل بياناته الأساسية أدناه.</span>}
           </div>
           <div className="fld">
-            <span className="fld-label">دور مقدم الطلب <span className="req">*</span> <Ref>م1 — فئات الحماية</Ref></span>
+            <span className="fld-label">دور مقدم الطلب <span className="req">*</span></span>
             <select value={f.category} onChange={set("category")}><option value="">الرجاء اختيار عنصر</option>{["شاهد", "مبلّغ", "خبير", "ضحية"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
           </div>
           <div className="fld">
@@ -210,20 +205,20 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
               </div>
             </div>}
           <div className="fld">
-            <span className="fld-label">اسم الجهة المختصة <span className="req">*</span> <Ref>م1/5 · جهة التحقيق أو المحاكمة</Ref></span>
+            <span className="fld-label">اسم الجهة المختصة <span className="req">*</span></span>
             <select value={f.entity} onChange={set("entity")}><option value="">الرجاء اختيار الجهة</option>{["النيابة العامة", "رئاسة أمن الدولة", "وزارة الداخلية", "هيئة الرقابة ومكافحة الفساد", "وزارة العدل"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
           </div>
           <div className="fld full">
-            <span className="fld-label">نوع الجريمة محل الحماية <span className="req">*</span> <Ref>م1 — الجرائم الكبيرة</Ref></span>
+            <span className="fld-label">نوع الجريمة محل الحماية <span className="req">*</span></span>
             <textarea value={f.crime} onChange={set("crime")} placeholder="وصف موجز لطبيعة الجريمة المشمولة بالنظام…" dir="auto" />
           </div>
           <div className="fld full">
-            <span className="fld-label">سبب طلب الحماية ومسوّغاته <span className="req">*</span> <Ref>طلب مسبّب — م7/1</Ref></span>
+            <span className="fld-label">سبب طلب الحماية ومسوّغاته <span className="req">*</span></span>
             <textarea value={f.reason} onChange={set("reason")} placeholder="اذكر طبيعة الخطر والمسوّغات التي تستدعي توفير الحماية…" dir="auto" />
           </div>
-          <div className="fld">
+          <div className="fld full">
             <span className="fld-label">رقم القضية <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>(إن وجد)</span></span>
-            <input value={f.caseNo} onChange={set("caseNo")} placeholder="مثال: 1447/…" dir="auto" />
+            <input value={f.caseNo} onChange={set("caseNo")} placeholder="مثال: 1447/…" dir="auto" style={{ maxWidth: 420 }} />
           </div>
           <div className="fld full">
             <span className="fld-label">المرفقات <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>(PDF — يمكن إرفاق أكثر من ملف)</span></span>

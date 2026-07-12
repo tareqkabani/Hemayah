@@ -4,12 +4,12 @@
    محوّل آلياً: ربط window → استيراد ES، والملف الشخصي/تقديم الطلب
    يُستبدلان بالنسختين التفصيليّتين. لوحة التجارب (Tweaks) مُبطَّلة.
    ============================================================ */
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Card, Tag, InlineAlert } from '@hemaya/ui';
 import { SecretCode, DeadlineTimer } from '@hemaya/ui';
 import { createClient } from '@hemaya/supabase/src/browser';
-import { IdentityContext, RequestsContext } from './identity-context';
-import { Profile as ProfileDetailed, NewRequest as NewRequestDetailed, RealRequests } from './screens-detailed';
+import { IdentityContext, RequestsContext, maskId } from './identity-context';
+import { Profile as ProfileDetailed, NewRequest as NewRequestDetailed, RealRequests, STATUS_AR, CATEGORY_AR } from './screens-detailed';
 import { Messages as MessagesDetailed, Notifications as NotificationsDetailed, RealtimeRefresh } from './realtime-screens';
 
 // لوحة التجارب في البروتوتايب مُبطَّلة (القيم الافتراضية تبقى فاعلة).
@@ -480,20 +480,21 @@ function NotificationsSimple({ go }) {
   );
 }
 
-// ===== الملف الشخصي (موجز موثّق) =====
+// ===== الملف الشخصي (موجز موثّق — يظهر لمالك الحساب بقيمه الفعلية) =====
 function ProfileSimple() {
+  const id = useContext(IdentityContext);
   const fields = [
-    ['الاسم', 'نفاذ'], ['رقم الهوية', 'نفاذ'], ['الجنس', 'نفاذ'], ['تاريخ الميلاد', 'نفاذ'],
-    ['الجنسية', 'نفاذ'], ['الحالة الاجتماعية', 'نفاذ'], ['العنوان الوطني', 'سبل'], ['بيانات العمل', 'الموارد البشرية'],
+    ['الاسم', id.name, 'نفاذ'], ['رقم الهوية', <span className="mono" dir="ltr">{maskId(id.nationalId)}</span>, 'نفاذ'], ['الجنس', null, 'نفاذ'], ['تاريخ الميلاد', null, 'نفاذ'],
+    ['الجنسية', null, 'نفاذ'], ['الحالة الاجتماعية', null, 'نفاذ'], ['العنوان الوطني', null, 'سبل'], ['بيانات العمل', null, 'الموارد البشرية'],
   ];
   return (
-    <Screen title="الملف الشخصي" lede="بياناتك موثّقة من المصادر الوطنية، منفصلة عن الطلب، وتُستخدم تلقائياً دون إعادة إدخال.">
+    <Screen title="الملف الشخصي" lede="بياناتك موثّقة من المصادر الوطنية، تظهر لك وحدك (مالك الحساب) وغير قابلة للتعديل، وتُستخدم تلقائياً دون إعادة إدخال.">
       <Card className="card pad" style={{ marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {fields.map(([l, src], i) => (
+          {fields.map(([l, v, src], i) => (
             <div className="ro-field" key={i}>
               <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-strong)' }}>{l}</span>
-              <span className="row" style={{ gap: 6 }}><span className="mono muted">•••• ({src})</span><I name="lock" size={15} style={{ color: 'var(--text-disabled)' }} /></span>
+              <span className="row" style={{ gap: 6 }}><span style={{ fontSize: 13, color: 'var(--text-body)' }}>{v || '••••'}</span><span className="mono muted" style={{ fontSize: 11 }}>({src})</span><I name="lock" size={15} style={{ color: 'var(--text-disabled)' }} /></span>
             </div>
           ))}
         </div>
@@ -670,7 +671,105 @@ function Grievance({ decision, grievance, onFile, back }) {
   );
 }
 
+// ===== لوحة المعلومات =====
+// حقل قراءة موجز: القيمة الفعلية لمالك الحساب + شارة المصدر + قفل (غير قابل للتعديل)
+function DashField({ label, value, source }) {
+  return (
+    <div className="ro-field">
+      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-strong)' }}>{label}</span>
+      <span className="row" style={{ gap: 6 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-body)' }}>{value || '••••'}</span>
+        <span className="mono muted" style={{ fontSize: 11 }}>({source})</span>
+        <I name="lock" size={15} style={{ color: 'var(--text-disabled)' }} />
+      </span>
+    </div>
+  );
+}
+
+const DASH_ICON = { success: 'verified', error: 'cancel', warning: 'draw', info: 'assignment', neutral: 'lock' };
+const NEEDS_ACTION_STATUSES = ['accepted', 'rejected']; // بانتظار توقيع أو تظلّم
+
+function Dashboard({ go }) {
+  const identity = useContext(IdentityContext);
+  const requests = useContext(RequestsContext);
+  const supabase = useRef(createClient()).current;
+  const [counts, setCounts] = useState({ msgs: null, notifs: null });
+  useEffect(() => {
+    let on = true;
+    Promise.all([
+      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('direction', 'in'),
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('read', false),
+    ]).then(([m, n]) => { if (on) setCounts({ msgs: m.count ?? 0, notifs: n.count ?? 0 }); });
+    return () => { on = false; };
+  }, [supabase]);
+  const req = requests[0] || null;
+  const st = req ? (STATUS_AR[req.status] || { t: req.status, tone: 'info' }) : null;
+  const tone = st ? (TONE_RGB[st.tone] || TONE_RGB.info) : null;
+  const needsAction = requests.filter((r) => NEEDS_ACTION_STATUSES.includes(r.status)).length;
+  return (
+    <Screen title="لوحة المعلومات" lede="نظرة سريعة على طلباتك ومراسلاتك وبياناتك — كل ما يتطلّب إجراءً منك يظهر هنا أولاً.">
+      <Card className="card pad" style={{ marginBottom: 16 }}>
+        {req ? (
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div className="row" style={{ gap: 12 }}>
+              <span className="req-ic" style={{ background: 'color-mix(in srgb, ' + tone + ' 12%, transparent)', color: tone }}><I name={DASH_ICON[st.tone] || 'assignment'} size={22} fill /></span>
+              <span>
+                <span className="row" style={{ gap: 8, marginBottom: 4 }}>
+                  <b style={{ fontSize: 15, color: 'var(--text-strong)' }}>طلبك النشط</b>
+                  <Tag tone={st.tone === 'neutral' ? 'info' : st.tone} size="sm">{st.t}</Tag>
+                </span>
+                <span className="muted" style={{ display: 'block' }}>مرجع <span className="mono">{req.ref_no}</span> · {CATEGORY_AR[req.category] || req.category} · قُدِّم {new Date(req.created_at).toLocaleDateString('ar-SA', { dateStyle: 'medium' })}</span>
+              </span>
+            </div>
+            <button className="btn btn-primary" onClick={() => go('requests')}><I name="visibility" size={18} /> عرض الطلب</button>
+          </div>
+        ) : (
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div className="row" style={{ gap: 12 }}>
+              <span className="req-ic" style={{ background: 'var(--green-10)', color: 'var(--color-primary)' }}><I name="note_add" size={22} /></span>
+              <span>
+                <b style={{ fontSize: 15, color: 'var(--text-strong)', display: 'block', marginBottom: 4 }}>لا يوجد طلب نشط</b>
+                <span className="muted">عند تقديم طلب حماية ستظهر حالته هنا أولاً بأول.</span>
+              </span>
+            </div>
+            <button className="btn btn-primary" onClick={() => go('new')}><I name="note_add" size={18} /> تقديم طلب جديد</button>
+          </div>
+        )}
+      </Card>
+      <div className="dash-stats">
+        <button className="dash-stat" onClick={() => go('requests')}>
+          <span className="ntf-ico" style={{ background: 'var(--green-10)', color: 'var(--color-primary)' }}><I name="assignment" size={20} fill /></span>
+          <span><span className="dash-num">{requests.length}</span><span className="dash-lbl" style={{ display: 'block' }}>الطلبات — {needsAction} يتطلّب إجراء</span></span>
+        </button>
+        <button className="dash-stat" onClick={() => go('messages')}>
+          <span className="ntf-ico" style={{ background: 'var(--info-10)', color: 'var(--color-info)' }}><I name="forum" size={20} fill /></span>
+          <span><span className="dash-num">{counts.msgs ?? '…'}</span><span className="dash-lbl" style={{ display: 'block' }}>رسائل واردة</span></span>
+        </button>
+        <button className="dash-stat" onClick={() => go('notifications')}>
+          <span className="ntf-ico" style={{ background: 'var(--warning-10)', color: 'var(--color-warning)' }}><I name="notifications" size={20} fill /></span>
+          <span><span className="dash-num">{counts.notifs ?? '…'}</span><span className="dash-lbl" style={{ display: 'block' }}>إشعارات جديدة</span></span>
+        </button>
+      </div>
+      <Card className="card pad">
+        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
+          <div className="row"><I name="account_circle" size={20} color="var(--color-primary)" /><b style={{ color: 'var(--text-strong)' }}>ملفّك الشخصي</b></div>
+          <Tag tone="info" size="sm" iconLeft={<I name="lock" size={13} />}>للاطلاع فقط — غير قابل للتعديل</Tag>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <DashField label="الاسم" value={identity.name} source="نفاذ" />
+          <DashField label="رقم الهوية" value={<span className="mono" dir="ltr">{maskId(identity.nationalId)}</span>} source="نفاذ" />
+          <DashField label="العنوان الوطني" value={null} source="سبل" />
+          <DashField label="بيانات العمل" value={null} source="الموارد البشرية" />
+        </div>
+        <p className="muted" style={{ margin: '0 0 12px' }}>بياناتك موثّقة من المصادر الوطنية وتظهر لك وحدك (مالك الحساب)، ولا يمكن تعديلها من البوابة.</p>
+        <button className="btn btn-ghost" onClick={() => go('profile')}><I name="open_in_new" size={17} /> عرض الملف الشخصي كاملاً</button>
+      </Card>
+    </Screen>
+  );
+}
+
 const NAV = [
+  { id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard', C: Dashboard },
   { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle', C: ProfileDetailed },
   { id: 'new', t: 'تقديم طلب جديد', icon: 'note_add', C: NewRequestDetailed },
   { id: 'requests', t: 'طلباتي', icon: 'assignment', C: null },
@@ -682,8 +781,13 @@ function PortalApp() {
   const identity = useContext(IdentityContext);
   const realRequests = useContext(RequestsContext);
   const supabase = useRef(createClient()).current;
-  const [active, setActive] = useState('requests');
+  const [active, setActive] = useState('dashboard');
   const [open, setOpen] = useState(false);
+  // حالة الطيّ محلية وتُحفظ في تفضيلات المتصفح (تُقرأ بعد التركيب تفادياً لاختلاف الترطيب)
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('seeker.side.collapsed') === '1') setCollapsed(true); } catch { /* خصوصية المتصفح */ } }, []);
+  const toggleCollapsed = () => setCollapsed((c) => { try { localStorage.setItem('seeker.side.collapsed', c ? '0' : '1'); } catch { /* خصوصية المتصفح */ } return !c; });
+  const signOut = () => { fetch('/auth/signout', { method: 'POST' }).finally(() => { window.location.href = 'http://localhost:3000/'; }); };
   const [completion, setCompletion] = useState({
     status: 'awaiting',
     submitted: false,
@@ -727,26 +831,34 @@ function PortalApp() {
   const Comp = cur.C;
   return (
     <div className="shell">
-      <aside className={'side' + (open ? ' open' : '')}>
+      <aside className={'side' + (open ? ' open' : '') + (collapsed ? ' collapsed' : '')}>
         <div className="brand">
           <div className="brand-mark"><I name="shield_person" size={22} fill color="#fff" /></div>
-          <div>
+          <div className="brand-txt">
             <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text-strong)', lineHeight: 1.2 }}>بوابة طالب الحماية</div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>النيابة العامة</div>
           </div>
+          <button className="collapse-btn" onClick={toggleCollapsed} title={collapsed ? 'توسيع القائمة' : 'طيّ القائمة'} aria-label={collapsed ? 'توسيع القائمة' : 'طيّ القائمة'}>
+            <I name={collapsed ? 'left_panel_open' : 'left_panel_close'} size={20} />
+          </button>
         </div>
         <nav className="nav">
           {NAV.map((n) => {
             const needsAction = REQUESTS.some((r) => { const st = states[r.id]; return !st.signed && !st.closed && !(st.grievance.status === 'filed' && ruling === 'reject'); });
             const badge = n.id === 'requests' && (needsAction || completion.status === 'awaiting') ? '!' : n.badge;
             return (
-              <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => { if (n.id === 'requests') setSelectedReqId(null); go(n.id); }}>
-                <I name={n.icon} size={20} /> <span>{n.t}</span>
+              <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} title={collapsed ? n.t : undefined} onClick={() => { if (n.id === 'requests') setSelectedReqId(null); go(n.id); }}>
+                <I name={n.icon} size={20} /> <span className="nav-lbl">{n.t}</span>
                 {badge && <span className="nav-badge">{badge}</span>}
               </button>
             );
           })}
         </nav>
+        <div className="side-bottom">
+          <button className="logout-btn" title="تسجيل الخروج" onClick={signOut}>
+            <I name="logout" size={19} /> <span className="nav-lbl">تسجيل الخروج</span>
+          </button>
+        </div>
         <div className="side-foot">مبنية على نظام Platforms Code — هيئة الحكومة الرقمية. الهوية تُعرض بالرمز السري.</div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
@@ -757,7 +869,6 @@ function PortalApp() {
           <span className="row" style={{ marginInlineStart: 'auto', gap: 8 }}>
             <Tag tone="error" size="sm" iconLeft={<I name="lock" size={13} />}>سري للغاية</Tag>
             <SecretCode code={selReq ? selReq.secret : (identity.secretCode || CASE.secret)} canReveal={false} />
-            <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
           </span>
         </header>
         <main className="content">

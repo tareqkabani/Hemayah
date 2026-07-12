@@ -26,3 +26,9 @@ export type SeekerRequest = {
 };
 
 export const RequestsContext = createContext<SeekerRequest[]>([]);
+
+/** إخفاء جزئي لرقم الهوية: `1••••••482` — يظهر أول خانة وآخر ثلاث. */
+export function maskId(id: string | null | undefined): string {
+  if (!id || id.length < 5) return id || "—";
+  return id[0] + "••••••" + id.slice(-3);
+}
