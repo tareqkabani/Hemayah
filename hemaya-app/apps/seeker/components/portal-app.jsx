@@ -723,6 +723,8 @@ function PortalApp() {
   const openReq = (id) => { setSelectedReqId(id); setActive('requests'); setOpen(false); };
   const isAgreement = active === 'agreement';
   const isGrievance = active === 'grievance';
+  // الرمز السري في الشريط: من الطلب المختار أو من هوية المستخدم الحقيقية — لا قيمة تجريبية احتياطية
+  const topbarSecret = selReq ? selReq.secret : identity.secretCode;
   const cur = NAV.find((n) => n.id === active) || NAV[2];
   const Comp = cur.C;
   return (
@@ -737,8 +739,8 @@ function PortalApp() {
         </div>
         <nav className="nav">
           {NAV.map((n) => {
-            const needsAction = REQUESTS.some((r) => { const st = states[r.id]; return !st.signed && !st.closed && !(st.grievance.status === 'filed' && ruling === 'reject'); });
-            const badge = n.id === 'requests' && (needsAction || completion.status === 'awaiting') ? '!' : n.badge;
+            // شارة «!» كانت تُحسب من REQUESTS/COMPLETION_ITEMS التجريبية فتظهر لكل مستخدم حقيقي — أُزيلت
+            const badge = n.badge;
             return (
               <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => { if (n.id === 'requests') setSelectedReqId(null); go(n.id); }}>
                 <I name={n.icon} size={20} /> <span>{n.t}</span>
@@ -756,7 +758,7 @@ function PortalApp() {
           <span className="topbar-title">{isAgreement ? 'اتفاقية الحماية' : isGrievance ? 'التظلّم' : cur.t}</span>
           <span className="row" style={{ marginInlineStart: 'auto', gap: 8 }}>
             <Tag tone="error" size="sm" iconLeft={<I name="lock" size={13} />}>سري للغاية</Tag>
-            <SecretCode code={selReq ? selReq.secret : (identity.secretCode || CASE.secret)} canReveal={false} />
+            {topbarSecret && <SecretCode code={topbarSecret} canReveal={false} />}
             <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
           </span>
         </header>
