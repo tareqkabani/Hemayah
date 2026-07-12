@@ -447,7 +447,7 @@ function Intake() {
   }
   return (<div className="pi-wrap">
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-      <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600 }}><I name="logout" size={17} /> تسجيل الخروج</button>
+      <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600 }}><I name="logout" size={17} /> تسجيل الخروج</button>
     </div>
     <div className="rm"><I name="schedule" size={18} /><span><b>وحدةٌ مؤقّتة لفترة التحوّل الرقميّ.</b> تُدخِل الطلبات الواردة ورقياً حتى يكتمل التقديم الرقميّ عبر البوابات — ومصمَّمةٌ لتُستغنى عنها لاحقاً بحذف هذه الوحدة وحدها دون أثرٍ على بقية النظام.</span></div>
     <div className="kick">بوابة موظف المركز · الاستقبال</div>

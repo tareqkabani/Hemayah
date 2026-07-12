@@ -38,7 +38,7 @@
   /* ---- البوّابات الفرعية (كلٌّ بوّابة مستقلّة بصلاحيتها) ---- */
   var PORTALS = {
     'seeker-main':      { role: 'seeker',    label: 'بوّابة طالب الحماية',      href: APP.seeker },
-    'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker + '/requests/new' },
+    'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker },
     'center-intake':    { role: 'center',    label: 'الاستقبال الورقيّ',        href: APP.center },
     'center-triage':    { role: 'center',    label: 'الفرز المبدئي',            href: APP.center },
     'center-studier':   { role: 'center',    label: 'الدراسة — الدارس',         href: APP.center },

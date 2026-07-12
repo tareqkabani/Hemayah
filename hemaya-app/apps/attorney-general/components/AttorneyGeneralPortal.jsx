@@ -833,7 +833,7 @@ function App() {
             <div className="who">
               <div className="who-meta"><div className="who-name">معالي النائب العام</div><div className="who-role">النيابة العامة</div></div>
               <div className="avatar"><I name="badge" size={18} /></div>
-              <button className="ag-signout" title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ display: 'inline-grid', placeItems: 'center', width: 38, height: 38, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--surface-card)', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}><I name="logout" size={18} /></button>
+              <button className="ag-signout" title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ display: 'inline-grid', placeItems: 'center', width: 38, height: 38, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--surface-card)', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}><I name="logout" size={18} /></button>
             </div>
           </div>
         </header>

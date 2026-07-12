@@ -543,7 +543,7 @@ function App() {
               <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{person.sub}</span>
             </div>
             <div className="avatar"><I name="support_agent" size={18} /></div>
-            <button className="signout-btn" title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }}><I name="logout" size={18} /></button>
+            <button className="signout-btn" title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }}><I name="logout" size={18} /></button>
           </span>
         </header>
         <main className="content">
