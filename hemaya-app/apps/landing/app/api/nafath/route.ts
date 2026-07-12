@@ -9,16 +9,17 @@ import { createServiceClient, createServerClient } from "@hemaya/supabase";
 const DEV_PASSWORD = "nafath-staff-2026";
 const emailFor = (nid: string) => `${nid}@nafath.local`;
 
+// المسارات موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones) — التحويل نسبيّ فيصحّ محلياً وفي الإنتاج
 const ORIGIN = {
-  seeker: "http://localhost:3013",
-  center: "http://localhost:3002",
-  competent: "http://localhost:3006",
-  ag: "http://localhost:3007",
-  technical: "http://localhost:3008",
-  health: "http://localhost:3009",
-  hr: "http://localhost:3010",
-  interior: "http://localhost:3011",
-  security: "http://localhost:3012",
+  seeker: "/seeker",
+  center: "/center",
+  competent: "/entities",
+  ag: "/ag",
+  technical: "/technical",
+  health: "/health",
+  hr: "/hr",
+  interior: "/interior",
+  security: "/security",
 };
 
 type Spec = { role: string; portal: string; label: string; attrs?: Record<string, unknown> };
