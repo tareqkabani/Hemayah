@@ -69,7 +69,7 @@ export async function getCouncilData() {
       caseFile: {
         entity: d.entity || "—", caseNo: d.case_no || "—", crime: d.crime || "—",
         waqia: d.waqia || "—",
-        threat: d.threat || RISK_AR[c.classification] || "—",
+        threat: d.threat || RISK_AR[c.classification ?? "high"] || "—",
         extends: d.extends || d.risk_extends || "—", adapt: "—",
         proposed: "—", duration: cd?.duration || "—",
       },
