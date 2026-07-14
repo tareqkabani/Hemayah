@@ -6,7 +6,7 @@ import { createServiceClient, createServerClient } from "@hemaya/supabase";
 // (الكوكي مشتركةٌ بين منافذ التطوير) فتقبلها البوّابة الوجهة دون طلب دخولٍ ثانٍ.
 // خريطة الهوية→الدور نموذجٌ تجريبيّ يُستبدل بـRBAC من القاعدة في الإنتاج.
 
-const DEV_PASSWORD = "nafath-staff-2026";
+const DEV_PASSWORD = process.env.NAFATH_BRIDGE_PASSWORD ?? "nafath-staff-2026";
 const emailFor = (nid: string) => `${nid}@nafath.local`;
 
 // المسارات موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones) — التحويل نسبيّ فيصحّ محلياً وفي الإنتاج

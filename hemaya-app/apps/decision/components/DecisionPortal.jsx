@@ -330,7 +330,7 @@ const App = (function () {
     const openCase = (q, mode) => { setSel({ q, mode }); scrollTop(); };
     const openCreate = () => { setSel({ q: null, mode: "create" }); scrollTop(); };
     const cur = nav.find((n) => n.id === active) || nav[0];
-    const signout = () => { fetch("/auth/signout", { method: "POST" }).then(() => { window.location.href = "http://localhost:3000/"; }); };
+    const signout = () => { fetch("/auth/signout", { method: "POST" }).then(() => { window.location.href = "/"; }); };
     let body, title;
     if (sel && sel.mode === "create") { body = <CreateRequest me={me} onCreated={(s) => { setSel({ q: HD.queueBySecret(s), mode: "prepare" }); scrollTop(); }} back={() => setSel(null)} />; title = "إنشاء طلب حماية"; }
     else if (sel && sel.mode === "prepare") { body = <PrepareDecision q={sel.q} back={() => { setSel(null); setActive("cases"); }} />; title = "إعداد قرار المركز"; }
