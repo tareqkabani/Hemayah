@@ -52,3 +52,5 @@ dist/
 # ============================================================
 !/supabase/
 *.bak
+deploy/staging/.bridge-password
+!/deploy/
