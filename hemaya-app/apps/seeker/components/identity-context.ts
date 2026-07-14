@@ -22,8 +22,15 @@ export type SeekerRequest = {
   status: string;
   category: string;
   created_at: string;
+  applicant_role?: string | null;
+  submitted_at?: string | null;
   details: Record<string, unknown> | null;
 };
+
+/** «طلب قائم»: كل حالة لم تُغلق ولم تُرفض نهائياً — تمنع تقديم طلب جديد (قاعدة الطلب الواحد). */
+export function isOpenRequest(r: Pick<SeekerRequest, "status">): boolean {
+  return !["closed", "rejected"].includes(r.status);
+}
 
 export const RequestsContext = createContext<SeekerRequest[]>([]);
 
