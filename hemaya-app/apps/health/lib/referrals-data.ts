@@ -1,4 +1,5 @@
 import { createServerClient } from "@hemaya/supabase";
+import type { ReferralAuthority } from "@hemaya/supabase";
 
 const CAT_AR: Record<string, string> = { witness: "شاهد", victim: "ضحية", reporter: "مبلّغ", expert: "خبير", related: "ذو صلة" };
 const RISK_AR: Record<string, string> = { low: "منخفض", medium: "متوسط", high: "عالٍ", critical: "حرِج" };
@@ -16,7 +17,7 @@ export async function getReferrals(authority = "health") {
   const { data, error } = await s
     .from("referrals")
     .select("id, ref, service, authority, status, assignee, result, summary, created_at, case_id, protection_cases(secret_code, category, classification, case_region)")
-    .eq("authority", authority)
+    .eq("authority", authority as ReferralAuthority)
     .order("created_at", { ascending: true });
   if (error || !data) return [] as any[];
   return data.map((r: any) => {
