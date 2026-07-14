@@ -1,8 +1,8 @@
 /* ============================================================
    منصّة «حماية» — الشاشة الموحّدة (Gateway) · المنطق التفاعلي
    نفاذ مبنيٌّ على الهوية → توجيهٌ إلى بوّابة المستخدم حسب الصلاحيات (لا اختيار).
-   منقول من design/الواجهة الرئيسية/gateway-core.js — روابط البوّابات مربوطة
-   بمنافذ المونوريبو المحليّة (في الإنتاج: نطاقات/مسارات موحّدة + RBAC من قاعدة البيانات).
+   منقول من design/الواجهة الرئيسية/gateway-core.js — روابط البوّابات مسارات
+   موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones؛ في الإنتاج: RBAC من قاعدة البيانات).
    بلا أطر — JS عاديّ. الحالة في localStorage.
    ============================================================ */
 (function () {
@@ -11,17 +11,17 @@
   var STORE = 'hemayaGatewaySession';
   var HEADER_OFFSET = 84;
 
-  /* ---- منافذ تطبيقات المونوريبو ---- */
+  /* ---- مسارات البوّابات — موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones) ---- */
   var APP = {
-    seeker:    'http://localhost:3013',
-    center:    'http://localhost:3002',   // بوّابة موظف المركز — تعرض البوّابة الفرعية حسب دور المستخدم
-    entities:  'http://localhost:3006',
-    health:    'http://localhost:3009',
-    hr:        'http://localhost:3010',
-    interior:  'http://localhost:3011',
-    security:  'http://localhost:3012',
-    ag:        'http://localhost:3007',
-    technical: 'http://localhost:3008'    // المكتب الفني — المستشارون/المدير حسب الدور
+    seeker:    '/seeker',
+    center:    '/center',      // بوّابة موظف المركز — تعرض البوّابة الفرعية حسب دور المستخدم
+    entities:  '/entities',
+    health:    '/health',
+    hr:        '/hr',
+    interior:  '/interior',
+    security:  '/security',
+    ag:        '/ag',
+    technical: '/technical'    // المكتب الفني — المستشارون/المدير حسب الدور
   };
 
   /* ---- المجموعات (الفاعل الأعلى) ---- */
@@ -38,7 +38,7 @@
   /* ---- البوّابات الفرعية (كلٌّ بوّابة مستقلّة بصلاحيتها) ---- */
   var PORTALS = {
     'seeker-main':      { role: 'seeker',    label: 'بوّابة طالب الحماية',      href: APP.seeker },
-    'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker + '/requests/new' },
+    'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker },
     'center-intake':    { role: 'center',    label: 'الاستقبال الورقيّ',        href: APP.center },
     'center-triage':    { role: 'center',    label: 'الفرز المبدئي',            href: APP.center },
     'center-studier':   { role: 'center',    label: 'الدراسة — الدارس',         href: APP.center },

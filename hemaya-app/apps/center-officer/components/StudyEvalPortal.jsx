@@ -464,7 +464,7 @@ function App({ role, onSignOut = null, initialRows }) {
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cfg.person.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{cfg.label} · {cfg.person.emp}</div>
             </div>
-            <button className="link" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} title="خروج"><I name="logout" size={18} /></button>
+            <button className="link" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} title="خروج"><I name="logout" size={18} /></button>
           </div>
         </div>
         <div className="side-foot">عزل تامّ بين الأقران — كل {cfg.peerOne} يعمل مستقلاً؛ التجميع للمجلس آليّ منعاً للميل.</div>

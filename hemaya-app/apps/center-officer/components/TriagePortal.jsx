@@ -923,7 +923,7 @@ function App({ mode, initialRows }) {
             <Tag tone={viewOnly ? 'info' : 'error'} size="sm" iconLeft={<I name={viewOnly ? 'visibility' : 'lock'} size={13} />}>{viewOnly ? 'اطّلاع وإشراف' : 'سري للغاية'}</Tag>
             <div className="avatar"><I name="person" size={20} /></div>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{who.short}</span>
-            <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
+            <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
           </span>
         </header>
         <main className="content">{body}</main>

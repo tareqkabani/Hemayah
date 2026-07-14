@@ -183,7 +183,7 @@ function PortalApp() {
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('seeker.side.collapsed') === '1') setCollapsed(true); } catch { /* خصوصية المتصفح */ } }, []);
   const toggleCollapsed = () => setCollapsed((c) => { try { localStorage.setItem('seeker.side.collapsed', c ? '0' : '1'); } catch { /* خصوصية المتصفح */ } return !c; });
-  const signOut = () => { fetch('/auth/signout', { method: 'POST' }).finally(() => { window.location.href = 'http://localhost:3000/'; }); };
+  const signOut = () => { fetch('/auth/signout', { method: 'POST' }).finally(() => { window.location.href = '/'; }); };
 
   // نسخة القشرة من الإشعارات: تُغذّي الشارات والعدّادات وبطاقة «آخر التحديثات» (القراءة محفوظة في القاعدة)
   const [notifs, setNotifs] = useState([]);

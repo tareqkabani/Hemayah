@@ -636,7 +636,7 @@ const NAV = [
 ];
 
 function signOut() {
-  fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; });
+  fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; });
 }
 
 function App() {

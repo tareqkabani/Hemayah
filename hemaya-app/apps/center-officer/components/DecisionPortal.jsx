@@ -498,7 +498,7 @@ const { App, DecisionLeadership } = (function () {
                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--surface-subtle)', display: 'grid', placeItems: 'center' }}><I name="person" size={18} color="var(--color-primary)" /></div>
                 <span style={{ textAlign: 'start' }}><span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}>{id.name}</span><span style={{ display: 'block', fontSize: 11, color: 'var(--text-secondary)' }}>{id.t}</span></span>
               </button>}
-              <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
+              <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
             </span>
           </header>
           <main className="content">{body}</main>

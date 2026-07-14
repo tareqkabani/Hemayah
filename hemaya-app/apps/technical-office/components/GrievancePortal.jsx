@@ -339,7 +339,7 @@ function PortalShell({ role, meAdvisor, brandTitle, brandSub, topRight }) {
   );
 }
 
-function signOutTO() { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = 'http://localhost:3000/'; }).catch(() => { window.location.href = 'http://localhost:3000/'; }); }
+function signOutTO() { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }
 
 // الدور من المستخدم المسجَّل (الخادم). المستشار والمدير كلاهما من المكتب الفني (authority='technical')،
 // ويطّلعان على التظلّمات الحقيقيّة نفسها ويبتّان فيها؛ التمييز في العرض والتوسيم فقط.

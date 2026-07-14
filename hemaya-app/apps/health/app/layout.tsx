@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "بوابة موظف المركز — منصّة حماية",
+  title: "بوابة وزارة الصحة — منصّة حماية",
   description: "مركز حماية الشهود والمبلّغين والخبراء والضحايا — النيابة العامة",
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
