@@ -50,26 +50,26 @@ export async function getCouncilData() {
     for (const s of (c.studies ?? []) as any[]) {
       if (!s.submitted_at) continue;
       recs.push({ who: "دراسة", spec: "قانوني", rec: s.recommendation || "—",
-        tone: REC_TONE[s.recommendation] || "info", level: RISK_AR[c.classification] || "عالٍ",
+        tone: REC_TONE[s.recommendation] || "info", level: RISK_AR[c.classification ?? "high"] || "عالٍ",
         opinion: s.notes || "لا ملاحظات إضافية.", attachments: ["تقرير الدراسة"] });
     }
     for (const a of (c.assessments ?? []) as any[]) {
       if (!a.submitted_at) continue;
       recs.push({ who: "تقييم", spec: "نفسي/اجتماعي", rec: a.recommendation || "—",
-        tone: REC_TONE[a.recommendation] || "info", level: RISK_AR[c.classification] || "عالٍ",
+        tone: REC_TONE[a.recommendation] || "info", level: RISK_AR[c.classification ?? "high"] || "عالٍ",
         opinion: a.notes || "لا ملاحظات إضافية.", attachments: ["تقرير التقييم"] });
     }
 
     queue.push({
       secret, caseId: c.id, real: true,
       cat: CAT_AR[c.category] || "شاهد",
-      risk: RISK_AR[c.classification] || "عالٍ",
+      risk: RISK_AR[c.classification ?? "high"] || "عالٍ",
       studyDays: 1,
       preparer: "prep1",
       caseFile: {
         entity: d.entity || "—", caseNo: d.case_no || "—", crime: d.crime || "—",
         waqia: d.waqia || "—",
-        threat: d.threat || RISK_AR[c.classification] || "—",
+        threat: d.threat || RISK_AR[c.classification ?? "high"] || "—",
         extends: d.extends || d.risk_extends || "—", adapt: "—",
         proposed: "—", duration: cd?.duration || "—",
       },

@@ -7,7 +7,8 @@ import { createServerClient } from "@hemaya/supabase";
 
 async function rpc(name: string, args: Record<string, unknown>) {
   const supabase = createServerClient();
-  const { data, error } = await supabase.rpc(name, args);
+  // الاسم ديناميكي هنا فنتجاوز اتحاد الأسماء المولّد؛ القاعدة تفرض الصلاحيات والحالة.
+  const { data, error } = await supabase.rpc(name as never, args as never);
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
   return { ok: true as const, row };

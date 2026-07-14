@@ -416,7 +416,7 @@ function MessagesScreen({ cfg, rows }) {
   </div>);
 }
 
-function App({ role, onSignOut, initialRows }) {
+function App({ role, onSignOut = null, initialRows }) {
   const cfg = ROLE[role] || ROLE.studier;
   // القضايا الحقيقيّة فقط (under_study من Supabase) — لا حالات SEED مُلفّقة.
   const [rows, setRows] = useState(() => Array.isArray(initialRows) ? initialRows : []);
@@ -482,6 +482,6 @@ function App({ role, onSignOut, initialRows }) {
   );
 }
 
-export function StudyEvalPortal({ role, onSignOut, initialRows }) {
+export function StudyEvalPortal({ role, onSignOut = null, initialRows }) {
   return <App role={role} onSignOut={onSignOut} initialRows={initialRows} />;
 }
