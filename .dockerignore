@@ -1,0 +1,10 @@
+# بناء صور staging — استبعد كل ما لا يلزم البناء
+**/node_modules
+**/.next
+**/.turbo
+.git
+design-reference
+docs
+*.html
+supabase/.branches
+supabase/.temp

@@ -15,20 +15,24 @@ const portal = (name) => ({
   max_restarts: 5,
 });
 
+const FRONTEND = [
+  // الموجّه الموحّد (3000) — نقطة الدخول الوحيدة للمستخدمين
+  portal("landing"),
+  portal("seeker"),            // 3013
+  portal("center-officer"),    // 3002
+  portal("competent-entities"),// 3006
+  portal("attorney-general"),  // 3007
+  portal("technical-office"),  // 3008
+  portal("health"),            // 3009
+  portal("hr"),                // 3010
+  portal("interior"),          // 3011
+  portal("security-admin"),    // 3012
+  portal("decision"),          // 3014
+];
+const API = [portal("api")];   // 3020 (Hono REST)
+
+// HEMAYA_ROLE يحدّد ما يعمل على هذا العتاد: frontend | api | all (افتراضي — سيرفر واحد)
+const role = process.env.HEMAYA_ROLE || "all";
 module.exports = {
-  apps: [
-    // الموجّه الموحّد (3000) — نقطة الدخول الوحيدة للمستخدمين
-    portal("landing"),
-    portal("seeker"),            // 3013
-    portal("center-officer"),    // 3002
-    portal("competent-entities"),// 3006
-    portal("attorney-general"),  // 3007
-    portal("technical-office"),  // 3008
-    portal("health"),            // 3009
-    portal("hr"),                // 3010
-    portal("interior"),          // 3011
-    portal("security-admin"),    // 3012
-    portal("decision"),          // 3014
-    portal("api"),               // 3020 (Hono REST)
-  ],
+  apps: role === "frontend" ? FRONTEND : role === "api" ? API : [...FRONTEND, ...API],
 };
