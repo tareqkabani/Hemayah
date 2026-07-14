@@ -87,6 +87,23 @@ export const ContactLogSchema = z.object({
 });
 export type ContactLogInput = z.infer<typeof ContactLogSchema>;
 
+/** خيوط المراسلة (تعداد msg_thread في القاعدة): المركز أو الجهة المختصة. */
+export const MESSAGE_THREADS = ["center", "body"] as const;
+
+/** جسم POST /v1/cases/{ref}/messages — ردّ المستفيد (الاتّجاه out تفرضه القاعدة). */
+export const MessageSendSchema = z.object({
+  thread: z.enum(MESSAGE_THREADS).default("center"),
+  body: z.string().trim().min(1, "نصّ الرسالة مطلوب."),
+});
+export type MessageSendInput = z.infer<typeof MessageSendSchema>;
+
+/** جسم POST /v1/cases/{ref}/grievances — رفع تظلّم المستفيد أمام النائب العام. */
+export const GrievanceFileSchema = z.object({
+  scope: z.string().trim().optional(),          // محلّ الاعتراض (وسم اختياريّ)
+  reason: z.string().trim().min(1, "سبب التظلّم مطلوب."),
+});
+export type GrievanceFileInput = z.infer<typeof GrievanceFileSchema>;
+
 /** قيم مطابقة لتعداد referral_authority في القاعدة. */
 export const REFERRAL_AUTHORITIES = ["hr", "health", "legal", "security", "moi", "ag", "technical", "competent"] as const;
 

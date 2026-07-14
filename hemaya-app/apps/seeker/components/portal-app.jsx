@@ -16,6 +16,7 @@ import {
   STATUS_AR, CATEGORY_AR, STAGES, STAGE_INDEX, realNextAction,
 } from './screens-detailed';
 import { Messages as MessagesDetailed, Notifications as NotificationsDetailed, RealtimeRefresh, NOTIF_META, NOTIF_TONES } from './realtime-screens';
+import { RealRequestDetail } from './real-detail';
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
 
@@ -64,7 +65,7 @@ function deadlineFor(req) {
 }
 
 // ===== لوحة المعلومات =====
-function Dashboard({ go, unreadNotifs, unreadMsgs, latestNotifs }) {
+function Dashboard({ go, openReq, unreadNotifs, unreadMsgs, latestNotifs }) {
   const requests = useContext(RequestsContext);
   const req = requests.find(isOpenRequest) || requests[0] || null;
   const st = req ? (STATUS_AR[req.status] || { t: req.status, tone: 'info' }) : null;
@@ -89,7 +90,7 @@ function Dashboard({ go, unreadNotifs, unreadMsgs, latestNotifs }) {
                   <span className="muted" style={{ display: 'block' }}>مرجع <span className="mono">{req.ref_no}</span> · {CATEGORY_AR[req.category] || req.category} · قُدِّم {new Date(req.created_at).toLocaleDateString('ar-SA', { dateStyle: 'medium' })}</span>
                 </span>
               </div>
-              <button className="btn btn-primary" onClick={() => go('requests')}>
+              <button className="btn btn-primary" onClick={() => (openReq ? openReq(req) : go('requests'))}>
                 <I name={act ? 'touch_app' : 'visibility'} size={18} /> {act ? 'اتّخذ الإجراء' : 'عرض الطلب'}
               </button>
             </div>
@@ -231,7 +232,10 @@ function PortalApp() {
 
   const hasActive = requests.some(isOpenRequest);
   const needsAction = requests.some((r) => realNextAction(r));
-  const go = (id) => { setActive(id); setOpen(false); };
+  // الطلب المفتوح في شاشة التفاصيل الحقيقية (seeker_case_view)
+  const [selReq, setSelReq] = useState(null);
+  const go = (id) => { setActive(id); setOpen(false); if (id === 'requests') setSelReq(null); };
+  const openReq = (r) => { setSelReq(r); setActive('requests'); setOpen(false); };
   const cur = NAV.find((n) => n.id === active) || NAV[0];
   const Comp = cur.C;
   const secret = (requests.find(isOpenRequest) || requests[0] || {}).secret_code;
@@ -294,8 +298,11 @@ function PortalApp() {
           </span>
         </header>
         <main className="content">
-          <Comp go={go} unreadNotifs={unreadNotifs} unreadMsgs={unreadMsgs} latestNotifs={latestNotifs}
-            msgs={msgs} sendMsg={sendMsg} msgReadIds={msgReadIds} markThreadRead={markThreadRead} />
+          {active === 'requests' && selReq
+            ? <RealRequestDetail request={selReq} back={() => setSelReq(null)} go={go} />
+            : <Comp go={go} openReq={openReq} onOpen={active === 'requests' ? openReq : undefined}
+                unreadNotifs={unreadNotifs} unreadMsgs={unreadMsgs} latestNotifs={latestNotifs}
+                msgs={msgs} sendMsg={sendMsg} msgReadIds={msgReadIds} markThreadRead={markThreadRead} />}
         </main>
       </div>
       {sos && (

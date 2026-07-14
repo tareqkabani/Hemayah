@@ -284,17 +284,73 @@ export const openapi = {
         responses: { "200": { description: "النتيجة (accept/reject)" }, "409": { description: "التصويت غير مغلق / سبب الرفض مطلوب" } } },
     },
     "/cases/{ref}/sign-agreement": {
-      post: { summary: "توقيع اتفاقية الحماية", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة" }, "409": { description: "قاعدة عمل" } } },
+      post: { summary: "توقيع اتفاقية الحماية (موظّف المركز)", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة" }, "409": { description: "قاعدة عمل" } } },
+    },
+    "/cases/{ref}/sign": {
+      post: { summary: "توقيع المستفيد لاتفاقيّته (عبر نفاذ)", description: "owner-scoped — صاحب القضية يوقّع اتفاقيّته فتُفعّل الحماية.", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "الحالة الجديدة (active)" }, "403": { description: "ليست قضيّتك" }, "409": { description: "الحالة ليست مقبولةً" } } },
     },
     "/cases/{ref}/contact-logs": {
       post: { summary: "تسجيل محضر اتصال", parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
         requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["channel", "summary"], properties: { channel: { type: "string" }, summary: { type: "string" } } } } } },
         responses: { "201": { description: "سُجّل المحضر" }, "422": { description: "مدخلات ناقصة" } } },
     },
+    "/cases/{ref}/view": {
+      get: {
+        summary: "عرضٌ موحّد لقضيّة المستفيد (قضية + قرارٌ مُصدَر + آخر تظلّم)",
+        description: "للمستفيد فقط — يكشف القرار (قبول/رفض · الأنواع · المدّة) بعد الإصدار، دون مداولات المجلس.",
+        parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "{ case, decision, grievance }" },
+          "404": { description: "غير موجودة أو ليست للمستفيد", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } },
+        },
+      },
+    },
+    "/cases/{ref}/messages": {
+      get: {
+        summary: "مراسلات القضية (قراءة)",
+        parameters: [
+          { name: "ref", in: "path", required: true, schema: { type: "string" } },
+          { name: "thread", in: "query", required: false, schema: { type: "string", enum: ["center", "body"] }, description: "فلترة بالخيط: المركز أو الجهة المختصة." },
+        ],
+        responses: { "200": { description: "قائمة الرسائل زمنيّاً" }, "404": { description: "غير موجودة" } },
+      },
+      post: {
+        summary: "ردّ المستفيد (المركز/الجهة)",
+        parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", required: ["body"], properties: { thread: { type: "string", enum: ["center", "body"], default: "center" }, body: { type: "string" } } } } },
+        },
+        responses: { "201": { description: "أُرسلت الرسالة" }, "403": { description: "القناة غير مفتوحة / لا صلاحيّة" }, "422": { description: "نصّ ناقص" } },
+      },
+    },
+    "/cases/{ref}/grievances": {
+      get: {
+        summary: "تظلّمات القضية (قراءة)",
+        parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "قائمة التظلّمات وحالاتها ونتائجها" }, "404": { description: "غير موجودة" } },
+      },
+      post: {
+        summary: "رفع تظلّم أمام النائب العام",
+        parameters: [{ name: "ref", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", required: ["reason"], properties: { scope: { type: "string", description: "محلّ الاعتراض (اختياريّ)" }, reason: { type: "string" } } } } },
+        },
+        responses: { "201": { description: "رُفع التظلّم" }, "403": { description: "لا صلاحيّة" }, "422": { description: "السبب مطلوب" } },
+      },
+    },
     "/notifications": {
       get: {
         summary: "إشعارات المستخدم",
         responses: { "200": { description: "قائمة الإشعارات" } },
+      },
+    },
+    "/notifications/{id}/read": {
+      post: {
+        summary: "تعليم إشعارٍ كمقروء",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "عُلِّم كمقروء" }, "404": { description: "الإشعار غير موجود" } },
       },
     },
   },

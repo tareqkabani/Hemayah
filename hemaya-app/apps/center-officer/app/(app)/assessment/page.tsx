@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const CAT_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
 
 export default async function Page() {
-  await requireRole("evaluator" as any, { loginPath: "/login", denyPath: "/403" });
+  await requireRole("evaluator" as any, { denyPath: "/403" });
 
   // حالات التقييم الفعليّة (RLS: studier_under_study يشمل evaluator — status='under_study').
   const supabase = createServerClient();

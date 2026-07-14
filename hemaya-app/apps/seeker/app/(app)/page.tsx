@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerClient } from "@hemaya/supabase";
+import { createServerClient, GATEWAY_URL } from "@hemaya/supabase";
 import { SeekerRoot } from "@/components/portal-app";
 import "@/components/portal.css";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function SeekerPage() {
   const supabase = createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(GATEWAY_URL);
 
   const meta = user.user_metadata ?? {};
 

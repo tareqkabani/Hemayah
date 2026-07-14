@@ -1,7 +1,7 @@
 /* ============================================================
    مخزن مرحلة القرار والإشعار — منقول من decision-store.js
    IIFE(window.HemayaDecision) → وحدة ES تُصدّر HemayaDecision.
-   آلة حالة القرار: preparing → pending_deputy → pending_chair → voting → issued
+   آلة حالة القرار: preparing → voting → issued (إرسال مباشر؛ للقيادة إعادة للمعدّ أثناء التصويت)
    يعتمد localStorage (محروس للـSSR). تُستبدَل الطبقة بـ Supabase لاحقاً.
    ============================================================ */
 import { councilSave, councilSubmit, councilApprove, councilReturn, councilVote, councilClose, councilIssue } from "@/lib/council-actions";
@@ -139,7 +139,8 @@ export const HemayaDecision = (function () {
       var d = ensureDecision(secret);
       d.types = patch.types; d.duration = patch.duration; d.reasoning = patch.reasoning;
       d.approvals = { deputy: null, chair: null };
-      d.status = 'pending_deputy';
+      d.status = 'voting';                 // إرسال مباشر للتصويت (اختصار المسار)
+      d.votingStartedAt = nowLabel();
       d.submittedAt = nowLabel();
       commit();
       if (d.caseId) councilSubmit(d.caseId, patch.types || [], patch.duration || '', patch.reasoning || '').then(logErr('submit'));
@@ -158,12 +159,16 @@ export const HemayaDecision = (function () {
       commit();
       if (d.caseId) councilApprove(d.caseId).then(logErr('approve'));
     },
+    // إعادة القرار للمعدّ — من الاعتماد (خامل) أو أثناء التصويت (صمّام أمان): تُصفَّر الأصوات.
     rejectApproval: function (secret, who, note) {
       var d = ensureDecision(secret);
       d.rejections = d.rejections || [];
       d.rejections.push({ by: who, when: nowLabel(), note: note || '' });
       d.approvals = { deputy: null, chair: null };
       d.status = 'preparing';
+      d.votingStartedAt = null;
+      d.deadlineClosed = false;
+      delete store.votes[secret];          // تصفير أصوات القضية لإعادة تصويتٍ نظيف
       commit();
       if (d.caseId) councilReturn(d.caseId, note || '').then(logErr('return'));
     },

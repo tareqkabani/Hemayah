@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const CAT_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
 
 export default async function Page() {
-  await requireRole("case_officer" as any, { loginPath: "/login", denyPath: "/403" });
+  await requireRole("case_officer" as any, { denyPath: "/403" });
 
   // القضايا التي صدر قبولها (تتدفّق للتنفيذ) — RLS: co_execution_read.
   const supabase = createServerClient();

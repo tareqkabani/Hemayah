@@ -387,7 +387,7 @@ function Section({ icon, iconBg, iconColor, title, note, children }: any) {
 const STATUS_ICON: Record<string, string> = { success: "verified", error: "cancel", warning: "draw", info: "assignment", neutral: "lock" };
 const TONE_VAR: Record<string, string> = { success: "var(--color-success)", error: "var(--color-error)", warning: "var(--color-warning)", info: "var(--color-info)", neutral: "var(--text-secondary)" };
 
-export function RealRequests({ go }: { go?: (id: string) => void }) {
+export function RealRequests({ go, onOpen }: { go?: (id: string) => void; onOpen?: (r: any) => void }) {
   const requests = useContext(RequestsContext);
   const [openId, setOpenId] = useState<string | null>(null);
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
@@ -422,7 +422,8 @@ export function RealRequests({ go }: { go?: (id: string) => void }) {
           const submitted = r.submitted_at || r.created_at;
           return (
             <div key={r.id} className="card" style={{ overflow: "hidden" }}>
-              <button className="req-card" style={{ border: "none", boxShadow: "none", borderRadius: 0 }} onClick={() => setOpenId(open ? null : r.id)}>
+              <button className="req-card" style={{ border: "none", boxShadow: "none", borderRadius: 0 }}
+                onClick={() => (onOpen ? onOpen(r) : setOpenId(open ? null : r.id))}>
                 <span className="req-ic" style={{ background: "color-mix(in srgb, " + tone + " 12%, transparent)", color: tone }}><Ic name={STATUS_ICON[st.tone] || "assignment"} size={22} fill /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="row" style={{ gap: 8, marginBottom: 4 }}>
@@ -433,9 +434,9 @@ export function RealRequests({ go }: { go?: (id: string) => void }) {
                   <span className="muted mono" style={{ display: "block" }}>{r.ref_no} · {r.secret_code}</span>
                   {act && <span style={{ display: "block", marginTop: 5, fontSize: 12.5, fontWeight: 600, color: "var(--warning-70)" }}><Ic name="arrow_left_alt" size={13} style={{ verticalAlign: "-2px" }} /> الإجراء المطلوب منك: {act}</span>}
                 </span>
-                <Ic name={open ? "expand_more" : "chevron_left"} size={20} color="var(--text-disabled)" />
+                <Ic name={onOpen ? "chevron_left" : (open ? "expand_more" : "chevron_left")} size={20} color="var(--text-disabled)" />
               </button>
-              {open &&
+              {!onOpen && open &&
                 <div style={{ padding: "0 16px 18px" }}>
                   <div className="row" style={{ gap: 10, marginBottom: 12 }}>
                     <SecretCode code={r.secret_code} canReveal={false} />

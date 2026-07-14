@@ -23,12 +23,12 @@ const { App, DecisionLeadership } = (function () {
   const SCOPE_META = {
     preparer:   { sub: 'معد قرار المركز', foot: 'إعدادٌ محايد من الدراسات والتقييمات — بلا توصية ولا تصويت · القرار خالصٌ للمجلس.' },
     members:    { sub: 'أعضاء المجلس',    foot: 'تصويت مستقلّ (قبول/رفض) على قرار المركز المُعَدّ · لا اطّلاع على أصوات الغير · مسجّل في التدقيق.' },
-    leadership: { sub: 'قيادة المجلس',    foot: 'اعتماد القرار المُعَدّ ثم طرحه للتصويت · تصويت كأعضاء · إصدار القرار وإشعار الطرفين (م10).' },
+    leadership: { sub: 'قيادة المجلس',    foot: 'قرار المركز يُطرح للتصويت مباشرةً · تصويت كأعضاء · إصدار القرار وإشعار الطرفين (م10).' },
   };
   const NAV = {
     preparer: [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'cases', t: 'طلبات للإعداد', icon: 'assignment' }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications' }, { id: 'log', t: 'سجل القرارات', icon: 'history' }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }],
     members: [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'cases', t: 'المطروح للتصويت', icon: 'how_to_vote' }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications' }, { id: 'log', t: 'سجل القرارات', icon: 'history' }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }],
-    leadership: [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'approvals', t: 'الاعتمادات', icon: 'approval' }, { id: 'cases', t: 'التصويت والإصدار', icon: 'gavel' }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications' }, { id: 'log', t: 'سجل القرارات', icon: 'history' }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }],
+    leadership: [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'cases', t: 'التصويت والإصدار', icon: 'gavel' }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications' }, { id: 'log', t: 'سجل القرارات', icon: 'history' }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }],
   };
 
   const dOf = (s) => HD.getDecision(s) || { status: 'preparing', preparer: (HD.queueBySecret(s) || {}).preparer, types: [], duration: '', reasoning: '', approvals: { deputy: null, chair: null }, rejections: [] };
@@ -57,7 +57,7 @@ const { App, DecisionLeadership } = (function () {
       {canEdit && lastRej && <InlineAlert kind="warning" title={'أُعيد للتعديل من ' + (SEATS[lastRej.by] ? SEATS[lastRej.by].t : lastRej.by)} style={{ marginBottom: 14 }}>{lastRej.note || 'يُرجى تعديل القرار وإعادة رفعه للاعتماد.'}</InlineAlert>}
       {canEdit ? <Card className="card pad">
         <p className="sec-h"><I name="assignment" size={18} color="var(--color-primary)" /> إعداد قرار المركز</p>
-        <InlineAlert kind="info" title="دورك: إعدادٌ محايد — لا توصية ولا تصويت" style={{ marginBottom: 14 }}>تُجمّع مقترحات الدراسات والتقييمات في قرارٍ واحد يُرفع لاعتماد القيادة ثم يُطرح على المجلس للتصويت. القرار خالصٌ للمجلس (م4/8).</InlineAlert>
+        <InlineAlert kind="info" title="دورك: إعدادٌ محايد — لا توصية ولا تصويت" style={{ marginBottom: 14 }}>تُجمّع طلب الحماية وتوصية الجهة والدراسات والتقييمات مع قرارٍ واحد يُرسَل مباشرةً إلى المجلس للتصويت. القرار خالصٌ للمجلس (م4/8).</InlineAlert>
         <div className="fld"><span className="fld-label">أنواع الحماية المقترحة (المادة 14) — من مقترحات الدراسات</span>
           <div className="chips">{PROTECTION_TYPES.map((t) => <button key={t} className={'chip' + (types.includes(t) ? ' on' : '')} onClick={() => toggle(t)}>{t}{(PROPOSED_TYPES[q.secret] || []).includes(t) && <span style={{ marginInlineStart: 5, fontSize: 10.5, color: 'var(--color-info)' }}>· مقترح</span>}</button>)}</div></div>
         <div className="fld"><span className="fld-label">مدّة الحماية</span>
@@ -65,14 +65,13 @@ const { App, DecisionLeadership } = (function () {
         <div className="fld"><span className="fld-label">حيثيات القرار</span><textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} dir="auto" style={{ minHeight: 110 }} /></div>
         <div className="row" style={{ justifyContent: 'flex-end', gap: 10 }}>
           <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, { types, duration, reasoning }); }}><I name="save" size={17} /> حفظ</button>
-          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, { types, duration, reasoning }); back(); }}><I name="send" size={17} /> رفع القرار لاعتماد القيادة</button>
+          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, { types, duration, reasoning }); back(); }}><I name="how_to_vote" size={17} /> إرسال إلى المجلس للتصويت</button>
         </div>
       </Card> : <React.Fragment>
         <DecisionView decision={d} foreign={q.foreign} />
         <InlineAlert kind={d.status === 'issued' ? 'success' : 'info'} title={STATUS[d.status].t} style={{ marginTop: 16 }}>
-          {d.status === 'pending_deputy' && 'رُفع القرار وهو بانتظار اعتماد النائب، ثم يُعرض على الرئيس.'}
-          {d.status === 'pending_chair' && 'اعتمده النائب، وهو الآن بانتظار اعتماد الرئيس لطرحه للتصويت.'}
-          {d.status === 'voting' && 'اعتمدته القيادة وطُرح على المجلس للتصويت — لا تعديل عليه الآن.'}
+          {(d.status === 'pending_deputy' || d.status === 'pending_chair') && 'رُفع القرار وهو مطروح على المجلس للتصويت.'}
+          {d.status === 'voting' && 'أُرسِل القرار إلى المجلس للتصويت مباشرةً — لا تعديل عليه الآن.'}
           {d.status === 'issued' && 'صدر قرار المركز بناءً على التصويت وأُشعِر الطرفان.'}
         </InlineAlert>
       </React.Fragment>}
@@ -119,6 +118,8 @@ const { App, DecisionLeadership } = (function () {
     const votesFor = HD.getVotes(q.secret);
     const res = HD.resultFor(q.secret, false);
     const [reason, setReason] = useState('');
+    const [returning, setReturning] = useState(false);
+    const [returnNote, setReturnNote] = useState('');
     const isLead = scope === 'leadership';
     const outcome = res.outcome;
     const rejectNotes = VOTING_SEATS.map((s) => votesFor[s]).filter((v) => v && v.choice === 'رفض' && v.note).map((v) => v.note);
@@ -134,10 +135,24 @@ const { App, DecisionLeadership } = (function () {
         <InlineAlert kind={d.issued.type === 'قبول' ? 'success' : 'warning'} title={'صدر قرار المركز: ' + d.issued.type}>صدر القرار بناءً على تصويت المجلس وأُشعِر <b>طالب الحماية والجهة المختصة</b> ({d.issued.when}). {d.issued.type === 'رفض' ? 'مع حقّ التظلّم خلال 10 أيام (م21).' : ''}</InlineAlert>
       </Card> : !isLead ? <React.Fragment>
         {votable ? <VoteBox my={votesFor[me]} canVote={!res.closed} onCast={(c, n) => HD.castVote(q.secret, me, c, n)} subject="قرار المركز المُعَدّ" />
-          : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title="لم يُطرح للتصويت بعد">القرار قيد الإعداد أو الاعتماد؛ يُفتح التصويت بعد اعتماد القيادة.</InlineAlert></Card>}
+          : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title="لم يُطرح للتصويت بعد">القرار قيد الإعداد لدى المعدّ؛ يُطرح للتصويت فور إرساله.</InlineAlert></Card>}
         {votable && res.closed && !votesFor[me] && <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title="انتهت مهلة التصويت">أُغلق باب التصويت على هذا القرار؛ لم يُسجَّل لك صوت خلاله.</InlineAlert></Card>}
       </React.Fragment> : votable ? <React.Fragment>
         <CouncilTally result={res} votesFor={votesFor} seat={me} onCast={(c, n) => HD.castVote(q.secret, me, c, n)} onClose={() => HD.closeByDeadline(q.secret)} />
+        {!res.closed && <Card className="card pad" style={{ marginTop: 14 }}>
+          <p className="sec-h"><I name="undo" size={18} color="var(--color-primary)" /> إعادة القرار للمعدّ</p>
+          {returning ? <React.Fragment>
+            <InlineAlert kind="warning" title="تُلغى الأصوات المُسجّلة" style={{ marginBottom: 12 }}>إعادة القرار للمعدّ تُلغي أصوات هذا القرار ويُعاد التصويت من جديد بعد إعادة رفعه.</InlineAlert>
+            <div className="fld"><span className="fld-label">سبب الإعادة للمعدّ <span style={{ color: 'var(--color-error)' }}>· إلزامي</span></span><textarea value={returnNote} onChange={(e) => setReturnNote(e.target.value)} placeholder="وضّح ما يلزم تعديله في القرار قبل إعادة طرحه…" dir="auto" /></div>
+            <div className="row" style={{ justifyContent: 'flex-end', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => { setReturning(false); setReturnNote(''); }}>تراجع</button>
+              <button className="btn btn-primary" disabled={!returnNote.trim()} onClick={() => { HD.rejectApproval(q.secret, me, returnNote.trim()); back(); }}><I name="undo" size={17} /> إعادة للمعدّ</button>
+            </div>
+          </React.Fragment> : <div className="row" style={{ justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <span className="muted" style={{ fontSize: 12.5 }}>إن كان القرار المُعَدّ ناقصاً، أعِده للمعدّ للتعديل بدل التصويت عليه.</span>
+            <button className="btn btn-ghost" onClick={() => setReturning(true)}><I name="undo" size={17} /> إعادة للمعدّ للتعديل</button>
+          </div>}
+        </Card>}
         {res.closed && <Card className="card pad" style={{ marginTop: 16 }}>
           <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> إصدار قرار المركز</p>
           {q.foreign && outcome === 'مقبول' && <InlineAlert kind="warning" title="مسار أجنبي — تُرفع للنائب العام" style={{ marginBottom: 12 }}>القرار في الطلب الأجنبي توصية تُرفع إلى النائب العام للبتّ النهائي (المادة 6)، ثمّ تُبلَّغ عبر اللجنة الدائمة.</InlineAlert>}
@@ -152,7 +167,7 @@ const { App, DecisionLeadership } = (function () {
             <button className="btn btn-primary" disabled={!reason.trim()} onClick={() => HD.issue(q.secret, { type: outcome === 'مقبول' ? 'قبول' : 'رفض', types: outcome === 'مقبول' ? d.types : [], duration: outcome === 'مقبول' ? d.duration : '', reason })}><I name="verified" size={18} /> إصدار القرار وإشعار الطرفين</button>
           </div>
         </Card>}
-      </React.Fragment> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title={STATUS[d.status].t}>يُطرح للتصويت بعد اكتمال اعتماد النائب والرئيس.</InlineAlert></Card>}
+      </React.Fragment> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title={STATUS[d.status].t}>القرار قيد الإعداد لدى المعدّ؛ يُطرح للتصويت فور إرساله.</InlineAlert></Card>}
     </div>);
   }
 
@@ -236,18 +251,18 @@ const { App, DecisionLeadership } = (function () {
       </div>);
     }
     // leadership
-    const pendingAppr = QUEUE.filter((q) => dOf(q.secret).status === (me === 'deputy' ? 'pending_deputy' : 'pending_chair'));
+    const votingPending = voting.filter((q) => !(q.kind === 'lifecycle' ? HD.getLifecycleVotes(q.secret)[me] : HD.getVotes(q.secret)[me]));
     return (<div>
       <h2 className="h2">لوحة المعلومات</h2>
-      <p className="lede">تعتمد القرار المُعَدّ قبل طرحه للتصويت، وتصوّت كعضو، ثم تُصدر قرار المركز وتُشعِر الطرفين — ضمن مظلّة 3 أيام (م10).</p>
+      <p className="lede">تُطرح قرارات المركز عليك للتصويت مباشرةً؛ تصوّت كعضو ثم تُصدر قرار المركز وتُشعِر الطرفين — ضمن مظلّة 3 أيام (م10). ولك إعادة قرارٍ ناقص للمعدّ عند الحاجة.</p>
       <div className="stats">
-        <Stat icon="approval" v={pendingAppr.length} l="بانتظار اعتمادك" bg="var(--warning-10)" fg="var(--color-warning)" />
-        <Stat icon="how_to_vote" v={voting.length} l="مطروح للتصويت" bg="var(--info-10)" fg="var(--color-info)" />
+        <Stat icon="how_to_vote" v={votingPending.length} l="بانتظار صوتك" bg="var(--warning-10)" fg="var(--color-warning)" />
+        <Stat icon="inbox" v={voting.length} l="مطروح للتصويت" bg="var(--info-10)" fg="var(--color-info)" />
         <Stat icon="gavel" v={DECIDED.length} l="قرارات صدرت" bg="var(--green-10)" fg="var(--color-primary)" />
       </div>
       <Card className="card pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div><b style={{ color: 'var(--text-strong)' }}>{pendingAppr.length} قرارات بانتظار اعتمادك</b><div className="muted" style={{ marginTop: 3 }}>راجع القرار المُعَدّ واعتمده أو أعِده للمعدّ.</div></div>
-        <button className="btn btn-primary" onClick={() => go('approvals')}><I name="approval" size={18} /> الاعتمادات</button>
+        <div><b style={{ color: 'var(--text-strong)' }}>{voting.length} بنود مطروحة للتصويت والإصدار</b><div className="muted" style={{ marginTop: 3 }}>اطّلع على الحزمة، صوّت كعضو، ثم أصدِر القرار بعد إغلاق التصويت.</div></div>
+        <button className="btn btn-primary" onClick={() => go('cases')}><I name="gavel" size={18} /> التصويت والإصدار</button>
       </Card>
     </div>);
   }
@@ -354,8 +369,8 @@ const { App, DecisionLeadership } = (function () {
 
   function Profile({ scope, me }) {
     const id = identOf(scope, me);
-    const note = scope === 'preparer' ? 'دورك إعدادٌ محايد: تُعِدّ قرار المركز من الدراسات والتقييمات دون توصية بالقبول أو الرفض ودون تصويت؛ ويُعتمد من القيادة قبل طرحه على المجلس.' : scope === 'leadership' ? 'تعتمد القرار المُعَدّ (النائب ثم الرئيس)، وتصوّت كعضو، وتُصدر قرار المركز عند اكتمال التصويت وتُشعِر الطرفين. لك ترجيح الجانب عند التعادل.' : 'تصويتك مستقلّ (قبول/رفض) على قرار المركز المُعَدّ ولا تطّلع على أصوات بقية الأعضاء ولا الحصيلة؛ تظهر للنائب والرئيس فقط.';
-    const auth = scope === 'preparer' ? 'إعداد قرار المركز ورفعه للاعتماد (بلا تصويت ولا توصية)' : scope === 'leadership' ? 'اعتماد القرار + التصويت كعضو + إصدار القرار والإشعار' : 'الاطّلاع الكامل + التصويت المستقلّ (قبول/رفض)';
+    const note = scope === 'preparer' ? 'دورك إعدادٌ محايد: تُعِدّ قرار المركز من الدراسات والتقييمات دون توصية بالقبول أو الرفض ودون تصويت؛ ويُرسَل مباشرةً إلى المجلس للتصويت.' : scope === 'leadership' ? 'يُطرح قرار المركز عليك للتصويت مباشرةً، وتصوّت كعضو، وتُصدر قرار المركز عند اكتمال التصويت وتُشعِر الطرفين. ولك إعادة قرارٍ ناقص للمعدّ، وترجيح الجانب عند التعادل.' : 'تصويتك مستقلّ (قبول/رفض) على قرار المركز المُعَدّ ولا تطّلع على أصوات بقية الأعضاء ولا الحصيلة؛ تظهر للنائب والرئيس فقط.';
+    const auth = scope === 'preparer' ? 'إعداد قرار المركز وإرساله للمجلس للتصويت (بلا تصويت ولا توصية)' : scope === 'leadership' ? 'التصويت كعضو + إصدار القرار والإشعار + إعادة للمعدّ عند الحاجة' : 'الاطّلاع الكامل + التصويت المستقلّ (قبول/رفض)';
     const fields = [['الاسم', id.name], ['الصفة', id.t], ['الجهة', id.org], ['نطاق العمل', 'مرحلة القرار — إدارة البرنامج'], ['الصلاحية', auth], ['التوثيق', 'نفاذ + MFA']];
     return (<div>
       <h2 className="h2">الملف الشخصي</h2>

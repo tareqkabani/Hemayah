@@ -21,7 +21,10 @@ import { validationHook } from "../middleware/validation";
 export const auth = new Hono<Env>();
 
 const emailFor = (nid: string) => `${nid}@nafath.local`;
-const BRIDGE_PASSWORD = process.env.NAFATH_BRIDGE_PASSWORD ?? "nafath-mobile-bridge-2026";
+// كلمة سرّ جسر التطوير — **موحّدة** مع البوّابة الموحّدة (landing) والبذور
+// (`nafath-staff-2026`) كي لا يتضارب دخول الويب ودخول الجوّال على المستخدم نفسه
+// (كلٌّ كان يعيد ضبط كلمة السرّ لقيمته فيكسر الآخر). في الإنتاج: نفاذ OIDC، بلا كلمة سرّ.
+const BRIDGE_PASSWORD = process.env.NAFATH_BRIDGE_PASSWORD ?? "nafath-staff-2026";
 
 auth.post("/nafath/start", zValidator("json", NafathStartSchema, validationHook), async (c) => {
   const { nationalId } = c.req.valid("json");
