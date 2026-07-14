@@ -1,9 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createServerClient } from "@hemaya/supabase";
+import type { AppCategory, Json } from "@hemaya/supabase";
 
 // خريطة الفئة العربية → enum app_category.
-const CAT: Record<string, string> = {
+const CAT: Record<string, AppCategory> = {
   "شاهد": "witness",
   "مبلّغ": "reporter",
   "مُبلِّغ": "reporter",
@@ -30,14 +31,14 @@ export async function submitPaperIntake(input: PaperIntakeInput) {
   const supabase = createServerClient();
   const { error, data } = await supabase.rpc("submit_paper_intake", {
     _source: input.source,
-    _applicant_role: input.applicantRole || null,
+    _applicant_role: (input.applicantRole || null) as string, // الدالة تقبل NULL فعلياً
     _category: CAT[input.category?.trim()] || "witness",
-    _entity: input.entity || null,
+    _entity: (input.entity || null) as string,
     _crime: input.crime,
     _reason: input.reason,
     _prior_submit: !!input.priorSubmit,
-    _case_no: input.caseNo || null,
-    _details: input.details || {},
+    _case_no: (input.caseNo || null) as string,
+    _details: (input.details || {}) as Json,
   });
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;

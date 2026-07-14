@@ -1,5 +1,6 @@
 "use server";
 import { createServerClient } from "@hemaya/supabase";
+import type { Enums, Json, ReferralStatus } from "@hemaya/supabase";
 import { getSecurityReferrals } from "./referrals-data";
 
 // إعادة جلب إحالات الأمنية من الخادم (تُستدعى عند كل حدث Realtime لإعادة hydrate).
@@ -17,13 +18,14 @@ export async function referralUpdate(
 ) {
   const supabase = createServerClient();
   const { data, error } = await supabase.rpc("referral_update", {
-    _id: id, _status: status, _assignee: assignee, _result: result, _note: note,
+    // الدالة تقبل NULL فعلياً في المعاملَين الاختياريَّين
+    _id: id, _status: status as ReferralStatus, _assignee: assignee as string, _result: result as Json, _note: note,
   });
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const, row: data };
 }
 
-const REC_MAP: Record<string, string> = { cont: "continue", mod: "modify", close: "close" };
+const REC_MAP: Record<string, Enums<"review_outcome">> = { cont: "continue", mod: "modify", close: "close" };
 
 // رفع توصية دورة الحياة للمجلس (م18) عبر lifecycle_reviews.
 export async function raiseLifecycleReview(caseId: string, recKind: string, rationale: string) {

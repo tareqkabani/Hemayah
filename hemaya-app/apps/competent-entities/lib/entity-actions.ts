@@ -1,7 +1,8 @@
 "use server";
 import { createServerClient } from "@hemaya/supabase";
+import type { AppCategory, Json } from "@hemaya/supabase";
 
-const CAT: Record<string, string> = {
+const CAT: Record<string, AppCategory> = {
   "شاهد": "witness", "مبلّغ": "reporter", "مُبلِّغ": "reporter", "خبير": "expert", "ضحية": "victim",
 };
 
@@ -23,12 +24,12 @@ export async function submitRecommendation(input: RecommendationInput) {
   const { data, error } = await supabase.rpc("submit_entity_recommendation", {
     _applicant_role: "جهة مختصّة",
     _category: CAT[input.role?.trim()] || "witness",
-    _entity: input.entity || null,
+    _entity: (input.entity || null) as string, // الدالة تقبل NULL فعلياً
     _crime: input.crime,
     _reason: input.reason,
-    _case_no: input.caseNo || null,
+    _case_no: (input.caseNo || null) as string,
     _provide: !!input.provide,
-    _details: input.details || {},
+    _details: (input.details || {}) as Json,
   });
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;

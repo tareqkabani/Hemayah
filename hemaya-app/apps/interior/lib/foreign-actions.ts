@@ -4,7 +4,7 @@ import { createServerClient } from "@hemaya/supabase";
 // تسجيل الطلب الأجنبي وإحالته للمركز (م6).
 export async function registerForeign(id: string, basis: string | null) {
   const supabase = createServerClient();
-  const { data, error } = await supabase.rpc("register_foreign", { _id: id, _basis: basis });
+  const { data, error } = await supabase.rpc("register_foreign", { _id: id, _basis: basis as string }); // الدالة تقبل NULL فعلياً
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const, row: data };
 }

@@ -2,8 +2,8 @@ import { createServerClient } from "@hemaya/supabase";
 
 type Track = "study" | "assessment";
 const cfg = (t: Track) => t === "study"
-  ? { table: "studies", author: "studier_id" }
-  : { table: "assessments", author: "evaluator_id" };
+  ? { table: "studies" as const, author: "studier_id" as const }
+  : { table: "assessments" as const, author: "evaluator_id" as const };
 
 /** حالات الدراسة + حالة صفّي (المؤلّف الحاليّ) — العزل الصفّيّ يضمن عدم رؤية صفوف الأقران. */
 export async function listAuthoringCases(track: Track) {
@@ -28,7 +28,8 @@ export async function getAuthoringCase(track: Track, id: string) {
     .select("id, ref_no, secret_code, category, status, protection_requests(details)")
     .eq("id", id).single();
   if (!c) return null;
-  const { data: row } = await supabase.from(table).select("*").eq("case_id", id).eq(author, user!.id).maybeSingle();
+  // author يختلف بين الجدولين فلا يقبله اتحاد الأعمدة المشتركة؛ الاقتران صحيح بالبناء في cfg
+  const { data: row } = await supabase.from(table).select("*").eq("case_id", id).eq(author as never, user!.id).maybeSingle();
   const req: any = (c as any).protection_requests?.[0] ?? {};
   return {
     id: c.id, ref_no: c.ref_no, secret_code: c.secret_code, category: c.category,

@@ -1,5 +1,6 @@
 "use server";
 import { createServerClient } from "@hemaya/supabase";
+import type { Json, ReferralStatus } from "@hemaya/supabase";
 import { getReferrals } from "./referrals-data";
 
 // إعادة جلب إحالات السلطة من الخادم (تُستدعى عند كل حدث Realtime لإعادة hydrate).
@@ -18,9 +19,9 @@ export async function referralUpdate(
   const supabase = createServerClient();
   const { data, error } = await supabase.rpc("referral_update", {
     _id: id,
-    _status: status,
-    _assignee: assignee,
-    _result: result,
+    _status: status as ReferralStatus,
+    _assignee: assignee as string, // الدالة تقبل NULL فعلياً
+    _result: result as Json,
     _note: note,
   });
   if (error) return { ok: false as const, error: error.message };
