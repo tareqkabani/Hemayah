@@ -17,7 +17,7 @@
 
 ```bash
 # المتطلبات: Docker + Supabase CLI
-curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar xz && sudo mv supabase /usr/local/bin/
+mkdir -p ~/supa-cli && curl -sL https://github.com/supabase/cli/releases/download/v2.109.1/supabase_2.109.1_linux_amd64.tar.gz | tar -xzf - -C ~/supa-cli && sudo mv ~/supa-cli/supabase ~/supa-cli/supabase-go /usr/local/bin/ && rm -rf ~/supa-cli && supabase --version
 
 git clone https://github.com/tareqkabani/Hemayah.git && cd Hemayah
 supabase start          # يرفع مكدّس Supabase (Kong على 55321)
