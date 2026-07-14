@@ -4,6 +4,6 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "dependencies": { "@supabase/ssr": "^0.5.1", "@supabase/supabase-js": "^2.45.4" },
+  "dependencies": { "@supabase/ssr": "^0.12.0", "@supabase/supabase-js": "^2.45.4" },
   "peerDependencies": { "next": "^14", "react": "^18" }
 }

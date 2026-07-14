@@ -20,8 +20,8 @@ export async function triageDecide(
 ) {
   const supabase = createServerClient();
   const { error, data } = await supabase.rpc("triage_decide", {
-    _case_id: caseId, _decision: decision, _reason: reason || null,
-    _formal_check: formalCheck, _authority: authority || null,
+    _case_id: caseId, _decision: decision, _reason: (reason || null) as string, // الدالة تقبل NULL فعلياً
+    _formal_check: formalCheck, _authority: authority || undefined,
   });
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/triage");

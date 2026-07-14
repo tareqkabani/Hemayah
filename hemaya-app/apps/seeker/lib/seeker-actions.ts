@@ -1,13 +1,14 @@
 "use server";
 
 import { createServerClient as createClient } from "@hemaya/supabase";
+import type { AppCategory, Json } from "@hemaya/supabase";
 
 /**
  * تقديم طلب حماية (M4) — يستدعي دالة Supabase الآمنة submit_protection_request
  * التي تُنشئ الحالة والطلب والتدقيق وتولّد الرمز السرّي، بهوية المستفيد (RLS/SECURITY DEFINER).
  */
 
-const CATEGORY_MAP: Record<string, string> = {
+const CATEGORY_MAP: Record<string, AppCategory> = {
   "شاهد": "witness",
   "مبلّغ": "reporter",
   "خبير": "expert",
@@ -44,8 +45,8 @@ export async function submitRequest(input: SubmitInput): Promise<SubmitResult> {
     _crime: input.crime,
     _reason: input.reason,
     _prior_submit: input.priorSubmit === "yes",
-    _case_no: input.caseNo || null,
-    _details: input.details ?? {},
+    _case_no: (input.caseNo || null) as string, // الدالة تقبل NULL فعلياً
+    _details: (input.details ?? {}) as Json,
   });
 
   if (error) return { ok: false, error: `تعذّر تقديم الطلب: ${error.message}` };
