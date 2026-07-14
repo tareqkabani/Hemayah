@@ -1,0 +1,18 @@
+# ============================================================
+# Portainer Stack — سيرفر الـ APIs
+# Compose path: deploy/staging/api.stack.yml
+# ============================================================
+services:
+  hemaya-api:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/docker/api.Dockerfile
+    ports:
+      - "3020:3020"
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: "http://${DB_HOST}:55321"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}"
+      NAFATH_BRIDGE_PASSWORD: "${NAFATH_BRIDGE_PASSWORD}"
+      API_PORT: "3020"
+    restart: unless-stopped

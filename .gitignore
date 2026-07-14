@@ -9,6 +9,7 @@
 
 # استثنِ ملفات تطبيق Next.js وإعداداته
 !/.gitignore
+!/.dockerignore
 !/package.json
 !/package-lock.json
 !/next.config.ts
