@@ -1,16 +1,18 @@
 # ============================================================
-# Portainer Stack — سيرفر الواجهات
+# Portainer Stack — سيرفر الواجهات (https عبر اسم نطاق)
 # Stacks ← Add stack ← Repository:
 #   Repository URL: https://github.com/tareqkabani/Hemayah
 #   Compose path:   deploy/staging/frontend.stack.yml
 #
 # المتغيّرات المطلوبة (حقول env في Portainer):
-#   PUBLIC_HOST   عنوان المستخدمين — اسم نطاق داخلي مثل hemayah.pp.gov.sa
-#                 (أو IP:3000 إن لم يتوفر نطاق بعد)
+#   PUBLIC_HOST   اسم النطاق للمستخدمين، مثل: hemayah.pp.gov.sa
 #   FRONT_HOST / DB_HOST / API_HOST / SUPABASE_ANON_KEY /
 #   SUPABASE_SERVICE_ROLE_KEY / NAFATH_BRIDGE_PASSWORD
+# اختياريان (شهادة TLS من الجهة، base64 بسطر واحد؛ وإلا تُولَّد ذاتية التوقيع):
+#   TLS_CERT_B64 / TLS_KEY_B64
 #
-# الوكيل (nginx) يخدم على المنفذ 80 فيختفي :3000 من الرابط.
+# الوكيل يخدم https على 443 (و80 يحوّل إليه)، ويمرّر /supabase/
+# لقاعدة Supabase عبر النطاق نفسه تفادياً لحجب المحتوى المختلط.
 # ============================================================
 services:
   hemaya-frontend:
@@ -18,44 +20,37 @@ services:
       context: ../..
       dockerfile: deploy/staging/docker/frontend.Dockerfile
       args:
-        NEXT_PUBLIC_SUPABASE_URL: "http://${DB_HOST}:55321"
+        # ما يُدمج في شيفرة المتصفح: كل شيء عبر النطاق بـ https
+        NEXT_PUBLIC_SUPABASE_URL: "https://${PUBLIC_HOST}/supabase"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
-        NEXT_PUBLIC_GATEWAY_URL: "http://${PUBLIC_HOST}"
+        NEXT_PUBLIC_GATEWAY_URL: "https://${PUBLIC_HOST}"
     ports:
       - "3000:3000"
     environment:
+      # جانب الخادم يصل القاعدة داخلياً مباشرة (لا يمرّ بالوكيل)
       NEXT_PUBLIC_SUPABASE_URL: "http://${DB_HOST}:55321"
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
       SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}"
-      NEXT_PUBLIC_GATEWAY_URL: "http://${PUBLIC_HOST}"
+      NEXT_PUBLIC_GATEWAY_URL: "https://${PUBLIC_HOST}"
       SERVER_ACTIONS_ALLOWED_ORIGINS: "${PUBLIC_HOST},${FRONT_HOST}:3000"
       NAFATH_BRIDGE_PASSWORD: "${NAFATH_BRIDGE_PASSWORD}"
       ZONE_API_URL: "http://${API_HOST}:3020"
       INTG_MODE: "mock"
     restart: unless-stopped
 
-  # وكيل المنفذ 80: hemayah.pp.gov.sa → البوابة الموحّدة (دون :3000)
+  # وكيل https: hemayah.pp.gov.sa ← البوابة + /supabase/ ← القاعدة
   hemaya-proxy:
-    image: nginx:alpine
+    build:
+      context: ../..
+      dockerfile: deploy/staging/docker/proxy.Dockerfile
     depends_on:
       - hemaya-frontend
     ports:
       - "80:80"
-    command: >
-      sh -c "printf 'server {
-        listen 80;
-        server_name _;
-        client_max_body_size 25m;
-        location / {
-          proxy_pass http://hemaya-frontend:3000;
-          proxy_http_version 1.1;
-          proxy_set_header Host $$host;
-          proxy_set_header X-Real-IP $$remote_addr;
-          proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto http;
-          proxy_set_header Upgrade $$http_upgrade;
-          proxy_set_header Connection $$http_upgrade;
-          proxy_read_timeout 120s;
-        }
-      }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+      - "443:443"
+    environment:
+      PUBLIC_HOST: "${PUBLIC_HOST}"
+      DB_HOST: "${DB_HOST}"
+      TLS_CERT_B64: "${TLS_CERT_B64:-}"
+      TLS_KEY_B64: "${TLS_KEY_B64:-}"
     restart: unless-stopped
