@@ -1,10 +1,12 @@
 'use client';
 /* ============================================================
-   مكتبة الفرز المبدئي — منقولة حرفياً من triage-portal.jsx
+   مكتبة الفرز المبدئي — بقشرة البوابة الموحّدة (تحديث 15 يوليو 2026):
+   شريط جانبي قابل للطيّ + شريط علوي بـSecretChip وعدّادات حيّة +
+   إشعارات مشتقّة من الوارد الحقيقي (فلاتر/تجميع زمني/ثبات قراءة) +
+   لوحة معلومات بدالة nextAction وبطاقة «اتّخذ الإجراء».
    قائمة واردة مشتركة · موظفو الفرز · القيادة (mode: clerks|deputy|chair).
-   window→@hemaya/ui. البيانات لاحقاً من Supabase.
    ============================================================ */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import "./triage-portal.css";
@@ -18,6 +20,33 @@ import "./triage-portal.css";
 
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
+
+// رمز سري مقنّع مع كشف مؤقت — يُخفى آلياً بعد 6 ثوانٍ (للشريط العلوي)
+function SecretChip({ code }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => { if (show) { const tm = setTimeout(() => setShow(false), 6000); return () => clearTimeout(tm); } }, [show]);
+  return (
+    <span className="sec-chip" title="الرمز السري للطلب المفتوح — يحلّ محل الاسم، والكشف مُسجّل في التدقيق ويُخفى آلياً بعد ثوانٍ.">
+      <I name="lock" size={13} color="var(--color-error)" />
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-error)' }}>سري</span>
+      <span className="mono" style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-strong)', minWidth: 86, textAlign: 'center' }} dir="ltr">{show ? code : '••••••••••'}</span>
+      <button className="sec-eye" onClick={() => setShow(!show)} aria-label={show ? 'إخفاء الرمز' : 'كشف الرمز مؤقتاً'}><I name={show ? 'visibility_off' : 'visibility'} size={16} /></button>
+    </span>
+  );
+}
+
+// تجميع زمني للإشعارات: من التاريخ الفعلي (createdAt) وإلا فمن وسم الورود النسبي
+function dayGroupOf(r) {
+  if (r.createdAt) {
+    const d = new Date(r.createdAt);
+    if (!isNaN(d)) {
+      const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+      const diff = Math.round((day(new Date()) - day(d)) / 86400000);
+      return diff <= 0 ? 'اليوم' : diff === 1 ? 'أمس' : 'الأقدم';
+    }
+  }
+  return r.days === 'اليوم' ? 'اليوم' : (r.days === 'أمس' || r.days === 'قبل يوم') ? 'أمس' : 'الأقدم';
+}
 
 // ===== الأشخاص =====
 const CLERKS = {
@@ -556,30 +585,107 @@ function Stub({ title, icon, note }) {
   );
 }
 
-function Dashboard({ rows, viewOnly }) {
+const STAGE_FLOW = ['استلام الطلب', 'الفرز المبدئي', 'الإحالة للجهة', 'الدراسة والتقييم', 'قرار المركز', 'تفعيل الحماية'];
+const stageOf = (r) => r.status === 'study' ? 4 : (r.status === 'pending' || r.status === 'replied') ? 3 : 2;
+// الإجراء المطلوب — دالة واحدة تغذّي البطاقات والعدّادات؛ كل إجراء في مرحلته النظامية حصراً (الاستيفاء في الفرز — م7)
+function nextAction(r, viewOnly) {
+  if (r.status === 'closed' || r.status === 'study') return null;
+  if (viewOnly) {
+    if (r.status === 'pending' && r.sla && r.sla.daysElapsed >= r.sla.totalDays) return { t: 'تجاوزت الجهة مهلة التوصية — راجع التصعيد وقرِّر إعادة الإسناد أو الاستمرار', icon: 'priority_high' };
+    return null;
+  }
+  if (r.status === 'replied') return { t: 'وردت توصية الجهة — اتخاذ قرار الفرز (م10)', icon: 'gavel' };
+  if (r.status === 'triage') return { t: r.paper ? 'ورود ورقيّ (هوية غير موثّقة) — محضر اتصال ثم الفحص الشكلي (م7)' : 'محضر اتصال موثّق ثم الفحص الشكلي فقرار الفرز (م7)', icon: 'fact_check' };
+  return null;
+}
+function Dashboard({ rows, viewOnly, openCase, go, notifs, readIds, markRead }) {
   const n = (f) => rows.filter(f).length;
+  const actionable = rows.map((r) => ({ r, act: nextAction(r, viewOnly) })).filter((x) => x.act);
+  const prio = { replied: 0, triage: 1, pending: 2 };
+  actionable.sort((a, b) => (prio[a.r.status] != null ? prio[a.r.status] : 9) - (prio[b.r.status] != null ? prio[b.r.status] : 9));
+  const hero = actionable[0];
+  const slas = rows.filter((r) => r.status === 'pending' && r.sla);
+  const updates = notifs.slice(0, 4);
   const stats = viewOnly ? [
+    { v: actionable.length, l: 'يتطلّب إجراء', icon: 'bolt', tone: ['var(--error-10)','var(--color-error)'] },
     { v: n((r) => r.status === 'triage'), l: 'بانتظار الفرز', icon: 'fact_check', tone: ['var(--warning-10)','var(--color-warning)'] },
     { v: n((r) => r.status === 'pending' || r.status === 'replied'), l: 'لدى الجهات', icon: 'hourglass_top', tone: ['var(--info-10)','var(--color-info)'] },
     { v: n((r) => r.status === 'study'), l: 'أُحيل للدراسة', icon: 'analytics', tone: ['var(--green-10)','var(--color-primary)'] },
     { v: n((r) => r.status === 'closed'), l: 'محفوظ', icon: 'archive', tone: ['var(--neutral-100)','var(--text-secondary)'] },
   ] : [
+    { v: actionable.length, l: 'يتطلّب إجراءً منك', icon: 'bolt', tone: ['var(--error-10)','var(--color-error)'] },
     { v: n((r) => r.status === 'triage'), l: 'بانتظار الفرز (مشترك)', icon: 'fact_check', tone: ['var(--warning-10)','var(--color-warning)'] },
-    { v: n((r) => r.status === 'study'), l: 'أُحيل للدراسة', icon: 'analytics', tone: ['var(--green-10)','var(--color-primary)'] },
     { v: n((r) => r.status === 'replied'), l: 'وردت توصيتها', icon: 'mark_email_read', tone: ['var(--green-10)','var(--color-primary)'] },
     { v: n((r) => r.status === 'pending'), l: 'بانتظار الجهة', icon: 'hourglass_top', tone: ['var(--info-10)','var(--color-info)'] },
+    { v: n((r) => r.status === 'study'), l: 'أُحيل للدراسة', icon: 'analytics', tone: ['var(--green-10)','var(--color-primary)'] },
   ];
   return (
     <div>
-      <h2 className="h2">{viewOnly ? 'لوحة الإشراف على الفرز' : 'لوحة المتابعة'}</h2>
+      <h2 className="h2">لوحة المعلومات</h2>
       <p className="lede">{viewOnly ? 'نظرة شاملة على أعباء الفرز ومآلات الطلبات عبر موظفي المركز.' : 'نظرة على قائمة الفرز المشتركة ومآلات الطلبات، وكل المؤشرات تحفظ السرية.'}</p>
+      {hero ? (
+        <div className="card pad" style={{ marginBottom: 16 }}>
+          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="pill" style={{ background: 'var(--error-10)', color: 'var(--color-error)' }}><I name="bolt" size={13} fill /> يتطلّب إجراء</span>
+              <span className="mono" style={{ fontWeight: 800, color: 'var(--text-strong)' }}>{hero.r.secret}</span>
+              <Tag tone="info" size="sm">{hero.r.cat}</Tag>
+              <Pill status={hero.r.status} />
+            </div>
+            <span className="muted" style={{ fontSize: 12 }}>{hero.r.days}</span>
+          </div>
+          <p style={{ margin: '0 0 6px', fontSize: 14.5, fontWeight: 600, color: 'var(--text-strong)' }}>الإجراء المطلوب منك: {hero.act.t}</p>
+          <p className="muted" style={{ margin: 0 }}>{[hero.r.crime, hero.r.city].filter(Boolean).join(' · ') || '—'}</p>
+          <div className="stp">{STAGE_FLOW.map((s, i) => <span key={i} className={i < stageOf(hero.r) ? 'on' : ''} title={s} />)}</div>
+          <div className="row" style={{ justifyContent: 'space-between', marginTop: 10 }}>
+            <span className="muted" style={{ fontSize: 12 }}>المرحلة {stageOf(hero.r)} من {STAGE_FLOW.length} — {STAGE_FLOW[stageOf(hero.r) - 1]}</span>
+            <button className="btn btn-primary" onClick={() => openCase(hero.r)}><I name={hero.act.icon} size={18} /> اتّخذ الإجراء</button>
+          </div>
+        </div>
+      ) : (
+        <div className="card pad" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <I name="check_circle" size={22} color="var(--color-success)" fill />
+          <span style={{ fontSize: 14, color: 'var(--text-body)' }}>{viewOnly ? 'لا تصعيدات تتطلّب تدخّلكم الآن.' : 'لا إجراءات معلّقة عليك الآن — القائمة المشتركة مُغطّاة.'}</span>
+        </div>
+      )}
       <div className="stats">
         {stats.map((s, i) => (
-          <div key={i} className="card stat">
+          <button key={i} className="card stat" onClick={() => go('queue')} title="فتح القائمة">
             <div className="stat-ico" style={{ background: s.tone[0], color: s.tone[1] }}><I name={s.icon} size={22} /></div>
             <div><div className="stat-v">{s.v}</div><div className="stat-l">{s.l}</div></div>
-          </div>
+          </button>
         ))}
+      </div>
+      <div className="dash-cols">
+        <div className="card pad">
+          <b style={{ color: 'var(--text-strong)', display: 'block', marginBottom: 12 }}><I name="timer" size={18} color="var(--color-primary)" style={{ verticalAlign: 'middle', marginInlineEnd: 6 }} />المهلة النظامية الجارية</b>
+          {slas.length === 0 ? <p className="muted" style={{ margin: 0 }}>لا مُهل جارية الآن.</p> :
+            <div style={{ display: 'grid', gap: 14 }}>
+              {slas.map((r) => (
+                <div key={r.secret}>
+                  <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span className="mono" style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--text-strong)' }}>{r.secret}</span>
+                    <span className="muted" style={{ fontSize: 11.5 }}>{r.entity}</span>
+                  </div>
+                  <DeadlineTimer label="مهلة توصية الجهة" totalDays={r.sla.totalDays} daysElapsed={r.sla.daysElapsed} articleRef="م5/4" />
+                </div>
+              ))}
+            </div>}
+        </div>
+        <div className="card" style={{ padding: '16px 10px 10px' }}>
+          <b style={{ color: 'var(--text-strong)', display: 'block', margin: '0 8px 8px' }}><I name="update" size={18} color="var(--color-primary)" style={{ verticalAlign: 'middle', marginInlineEnd: 6 }} />آخر التحديثات</b>
+          {updates.length === 0 && <p className="muted" style={{ margin: '4px 8px 10px' }}>لا تحديثات بعد.</p>}
+          {updates.map((u) => (
+            <button key={u.id} className="dash-ntf" onClick={() => { markRead(u.id); go(u.dest); }}>
+              <div className="ntf-ico" style={{ width: 32, height: 32, background: NT[u.tone][0], color: NT[u.tone][1] }}><I name={u.icon} size={17} fill /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{u.t}</div>
+                <div className="muted" style={{ fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.d}</div>
+              </div>
+              {!readIds.includes(u.id) && <span className="dot-unread" style={{ marginTop: 0 }} />}
+            </button>
+          ))}
+        </div>
       </div>
       <Card className="card pad">
         <b style={{ color: 'var(--text-strong)', display: 'block', marginBottom: 12 }}><I name="groups" size={18} color="var(--color-primary)" style={{ verticalAlign: 'middle', marginInlineEnd: 6 }} />توزّع العبء على موظفي الفرز (ترشيح)</b>
@@ -617,20 +723,53 @@ function Profile({ actor, viewOnly }) {
 }
 
 const NT = { primary: ['var(--green-10)', 'var(--color-primary)'], warning: ['var(--warning-10)', 'var(--color-warning)'], info: ['var(--info-10)', 'var(--color-info)'], error: ['var(--error-10)', 'var(--color-error)'] };
-function Notifs({ viewOnly }) {
-  // لا إشعارات مُلفّقة — تُشتقّ من الوارد الحقيقيّ (القضايا الفعليّة) مستقبلاً.
-  const [items, setItems] = useState([]);
+const NOTIF_FILTERS = {
+  clerks: [{ id: 'all', t: 'الكل' }, { id: 'unread', t: 'غير المقروء' }, { id: 'incoming', t: 'الوارد' }, { id: 'reco', t: 'التوصيات والإحالات' }, { id: 'deadline', t: 'المهل' }, { id: 'msg', t: 'الرسائل' }],
+  lead: [{ id: 'all', t: 'الكل' }, { id: 'unread', t: 'غير المقروء' }, { id: 'incoming', t: 'الوارد' }, { id: 'deadline', t: 'المهل' }],
+};
+// الإشعارات تُشتقّ من الوارد الحقيقيّ (لا إشعارات مُلفّقة): بند يتطلّب إجراء · إحالة جارية · تجاوز مهلة (عاجل)
+function notifsOf(rows, viewOnly) {
+  const out = [];
+  rows.forEach((r) => {
+    const over = r.status === 'pending' && r.sla && r.sla.daysElapsed >= r.sla.totalDays;
+    const act = nextAction(r, viewOnly);
+    if (over) out.push({ id: 'dl:' + r.secret, icon: 'hourglass_top', tone: 'error', cat: 'deadline', crit: true, t: viewOnly ? 'تصعيد: تجاوز مهلة الجهة' : 'تجاوز مهلة توصية الجهة', d: r.secret + ' — انقضت مهلة ' + (r.entity || 'الجهة المختصة') + ' (5 أيام عمل) والانتظار مستمر (لا حفظ تلقائي).', time: r.days, group: dayGroupOf(r), dest: 'queue', deadline: { label: 'مهلة توصية الجهة — ' + r.secret, total: r.sla.totalDays, elapsed: r.sla.daysElapsed, ref: 'م5/4' } });
+    if (act && r.status !== 'pending') out.push({ id: 'act:' + r.secret + ':' + r.status, icon: r.status === 'replied' ? 'mark_email_read' : 'inbox', tone: r.status === 'replied' ? 'primary' : 'warning', cat: r.status === 'replied' ? 'reco' : 'incoming', t: r.status === 'replied' ? 'وردت توصية الجهة' : 'طلب وارد جديد', d: r.secret + ' — ' + (r.cat || '') + ' · ' + (r.days || '') + '. الإجراء المطلوب منك: ' + act.t, time: r.days, group: dayGroupOf(r), dest: 'queue' });
+    if (r.status === 'pending' && !over) out.push({ id: 'ref:' + r.secret, icon: 'send', tone: 'info', cat: 'reco', t: 'أُحيل طلب لجهة مختصة', d: r.secret + ' — أُحيل إلى ' + (r.entity || 'الجهة المختصة') + ' لطلب توصية خلال 5 أيام عمل.', time: r.days, group: dayGroupOf(r), dest: 'queue' });
+  });
+  return out;
+}
+function Notifs({ viewOnly, items, readIds, markRead, markAllRead, go }) {
+  const [flt, setFlt] = useState('all');
+  const isUnread = (n) => !readIds.includes(n.id);
+  const filters = NOTIF_FILTERS[viewOnly ? 'lead' : 'clerks'];
+  const countOf = (f) => f === 'all' ? items.length : f === 'unread' ? items.filter(isUnread).length : items.filter((n) => n.cat === f).length;
+  const shown = items.filter((n) => flt === 'all' || (flt === 'unread' ? isUnread(n) : n.cat === flt));
+  const crit = shown.filter((n) => n.crit);
+  const rest = shown.filter((n) => !n.crit);
+  const Item = ({ n }) => { const [bg, fg] = NT[n.tone]; const u = isUnread(n); return (
+    <button className={'ntf' + (u ? ' unread' : '') + (n.crit ? ' crit' : '')} onClick={() => { markRead(n.id); go(n.dest); }}>
+      <div className="ntf-ico" style={{ background: n.crit ? 'var(--error-10)' : bg, color: n.crit ? 'var(--color-error)' : fg }}><I name={n.icon} size={20} fill /></div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="row" style={{ gap: 8 }}><span className="ntf-t">{n.t}</span>{n.crit && <span className="pill" style={{ background: 'var(--color-error)', color: '#fff' }}><I name="priority_high" size={12} fill /> عاجل</span>}</div>
+        <div className="ntf-d">{n.d}</div>
+        {n.deadline && <div style={{ marginTop: 10, maxWidth: 420 }}><DeadlineTimer label={n.deadline.label} totalDays={n.deadline.total} daysElapsed={n.deadline.elapsed} articleRef={n.deadline.ref} /></div>}
+        <div className="row" style={{ gap: 10, marginTop: 6 }}><span className="ntf-time">{n.time}</span><span className="link" style={{ fontSize: 12 }}>فتح الوجهة <I name="arrow_back" size={13} /></span></div>
+      </div>
+      {u && <span className="dot-unread" />}
+    </button>); };
+  const groups = ['اليوم', 'أمس', 'الأقدم'];
   return (<div>
     <h2 className="h2">الإشعارات</h2>
-    <p className="lede">{viewOnly ? 'تنبيهات إجراءات الفرز عبر موظفي المركز.' : 'تنبيهات الوارد المشترك وتوصيات الجهات والمواعيد.'}</p>
-    <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 12 }}><button className="btn btn-ghost" onClick={() => setItems((x) => x.map((n) => ({ ...n, unread: false })))}><I name="done_all" size={18} /> تعليم الكل كمقروء</button></div>
-    {items.length === 0 && <p className="lede" style={{ textAlign: 'center', padding: 24 }}>لا إشعارات بعد.</p>}
-    <div style={{ display: 'grid', gap: 10 }}>{items.map((n, i) => { const [bg, fg] = NT[n.tone]; return (
-      <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 16px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: n.unread ? 'var(--green-10)' : 'var(--surface-card)', alignItems: 'flex-start' }}>
-        <div style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 'var(--radius-md)', display: 'grid', placeItems: 'center', background: bg, color: fg }}><I name={n.icon} size={20} fill /></div>
-        <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>{n.t}</div><div style={{ fontSize: 13, color: 'var(--text-body)', marginTop: 2 }}>{n.d}</div><div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>{n.time}</div></div>
-        {n.unread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', flexShrink: 0, marginTop: 6 }} />}
-      </div>); })}</div>
+    <p className="lede">{viewOnly ? 'تنبيهات إجراءات الفرز عبر موظفي المركز — النقر على الإشعار يفتح وجهته ويعلّمه مقروءاً.' : 'تنبيهات الوارد المشترك وتوصيات الجهات والمهل — النقر على الإشعار يفتح وجهته ويعلّمه مقروءاً.'}</p>
+    <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14, gap: 10 }}>
+      <div className="row" style={{ gap: 6 }}>{filters.map((f) => <button key={f.id} className={'flt' + (flt === f.id ? ' on' : '')} onClick={() => setFlt(f.id)}>{f.t}<span className="flt-n">{countOf(f.id)}</span></button>)}</div>
+      <button className="btn btn-ghost" style={{ height: 36, fontSize: 13 }} onClick={markAllRead} disabled={!items.some(isUnread)}><I name="done_all" size={16} /> تعليم الكل كمقروء</button>
+    </div>
+    {shown.length === 0 && <div className="ntf-empty"><I name="notifications_off" size={34} color="var(--text-disabled)" /><b style={{ color: 'var(--text-strong)' }}>لا إشعارات هنا</b><span style={{ fontSize: 13 }}>{flt === 'unread' ? 'قرأت كل إشعاراتك.' : 'لا إشعارات في هذا التصنيف بعد.'}</span></div>}
+    {crit.length > 0 && <div style={{ display: 'grid', gap: 10, marginBottom: 4 }}>{crit.map((n) => <Item n={n} key={n.id} />)}</div>}
+    {groups.map((g) => { const list = rest.filter((n) => (n.group || 'الأقدم') === g); return list.length === 0 ? null : (
+      <div key={g}><div className="ntf-group">{g}</div><div style={{ display: 'grid', gap: 10 }}>{list.map((n) => <Item n={n} key={n.id} />)}</div></div>); })}
   </div>);
 }
 
@@ -639,10 +778,8 @@ const MSG_PARTY = {
   seeker: { t: 'طالب الحماية', icon: 'person', color: 'var(--color-info)' },
   entity: { t: 'الجهة المختصة', icon: 'account_balance', color: 'var(--gold-70)' },
 };
-const THREADS = []; // لا محادثات مُلفّقة
 const REFERRAL_ENTITIES = ['النيابة العامة', 'رئاسة أمن الدولة', 'وزارة الداخلية', 'هيئة الرقابة ومكافحة الفساد', 'وزارة العدل'];
-function MessagesScreen({ viewOnly }) {
-  const [threads, setThreads] = useState(THREADS);
+function MessagesScreen({ viewOnly, threads, setThreads, rows }) {
   const [sel, setSel] = useState(null);
   const [draft, setDraft] = useState('');
   const [composing, setComposing] = useState(false);
@@ -650,7 +787,7 @@ function MessagesScreen({ viewOnly }) {
   const [cParty, setCParty] = useState('');
   const [cEntity, setCEntity] = useState('');
   const cur = threads.find((t) => t.id === sel);
-  const reqObj = SEED.find((s) => s.secret === cReq);
+  const reqObj = rows.find((s) => s.secret === cReq);
   const reqEntity = reqObj && reqObj.entity;
   const convoEntity = reqEntity || cEntity;
   const startValid = cReq && (cParty === 'seeker' || (cParty === 'entity' && convoEntity));
@@ -673,13 +810,13 @@ function MessagesScreen({ viewOnly }) {
   };
   if (cur) {
     const p = MSG_PARTY[cur.party];
-    const rcCur = SEED.find((s) => s.secret === cur.secret);
+    const rcCur = rows.find((s) => s.secret === cur.secret);
     const reqClosed = !!rcCur && rcCur.status === 'closed';
     return (
       <div>
         <button className="link" onClick={() => setSel(null)} style={{ marginBottom: 12 }}><I name="arrow_forward" size={16} /> رجوع للمراسلات</button>
         {cur.party === 'seeker' ? (() => {
-          const rc = SEED.find((s) => s.secret === cur.secret) || {};
+          const rc = rows.find((s) => s.secret === cur.secret) || {};
           return (
             <Card className="card pad" style={{ marginBottom: 12, borderInlineStart: '3px solid var(--color-info)' }}>
               <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
@@ -697,7 +834,7 @@ function MessagesScreen({ viewOnly }) {
             </Card>
           );
         })() : (() => {
-          const rc = SEED.find((s) => s.secret === cur.secret) || {};
+          const rc = rows.find((s) => s.secret === cur.secret) || {};
           return (
             <Card className="card pad" style={{ marginBottom: 12, borderInlineStart: '3px solid var(--gold-70)' }}>
               <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
@@ -768,7 +905,7 @@ function MessagesScreen({ viewOnly }) {
             <span className="fld-label">الطلب <span style={{ color: 'var(--color-error)' }}>*</span></span>
             <select value={cReq} onChange={(e) => { setCReq(e.target.value); setCParty(''); setCEntity(''); }}>
               <option value="">اختر الطلب النشط…</option>
-              {SEED.filter((s) => s.status !== 'closed').map((s) => <option key={s.secret} value={s.secret}>{s.secret} — {s.cat}</option>)}
+              {rows.filter((s) => s.status !== 'closed').map((s) => <option key={s.secret} value={s.secret}>{s.secret} — {s.cat}</option>)}
             </select>
             <p className="muted" style={{ margin: '6px 2px 0', fontSize: 11.5 }}><I name="info" size={13} style={{ verticalAlign: 'middle' }} /> تُعرض الطلبات النشطة فقط. الطلبات المحفوظة/المقفلة لا تُفتح لها مراسلة جديدة — تُخاطَب بتقديم طلب جديد بمستجدّات.</p>
           </div>
@@ -796,6 +933,7 @@ function MessagesScreen({ viewOnly }) {
           </div>
         </Card>}
 
+      {threads.length === 0 && !composing && <div className="ntf-empty"><I name="forum" size={34} color="var(--text-disabled)" /><b style={{ color: 'var(--text-strong)' }}>لا مراسلات بعد</b><span style={{ fontSize: 13 }}>{viewOnly ? 'تُعرض هنا مراسلات الموظفين على الطلبات للاطّلاع.' : 'ابدأ مراسلة على طلب نشط عند الحاجة.'}</span></div>}
       {(() => {
         const groups = {};
         threads.forEach((t) => { (groups[t.secret] = groups[t.secret] || []).push(t); });
@@ -803,10 +941,10 @@ function MessagesScreen({ viewOnly }) {
           <div style={{ display: 'grid', gap: 18 }}>
             {Object.entries(groups).map(([secret, list]) => (
               <div key={secret}>
-                <div className="msg-group-hd"><I name="folder_shared" size={16} color="var(--color-primary)" /> طلب <span className="mono" style={{ fontWeight: 800 }}>{secret}</span> <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· قناتان كحدّ أقصى: طالب الحماية والجهة</span>{(() => { const rg = SEED.find((s) => s.secret === secret); return rg && rg.status === 'closed' ? <span className="pill" style={{ background: 'var(--neutral-100)', color: 'var(--text-secondary)', marginInlineStart: 6 }}><I name="lock" size={12} fill /> محفوظ — للاطّلاع</span> : null; })()}</div>
+                <div className="msg-group-hd"><I name="folder_shared" size={16} color="var(--color-primary)" /> طلب <span className="mono" style={{ fontWeight: 800 }}>{secret}</span> <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· قناتان كحدّ أقصى: طالب الحماية والجهة</span>{(() => { const rg = rows.find((s) => s.secret === secret); return rg && rg.status === 'closed' ? <span className="pill" style={{ background: 'var(--neutral-100)', color: 'var(--text-secondary)', marginInlineStart: 6 }}><I name="lock" size={12} fill /> محفوظ — للاطّلاع</span> : null; })()}</div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {list.map((t) => { const p = MSG_PARTY[t.party]; const last = t.msgs[t.msgs.length - 1] || { when: '', t: 'مراسلة جديدة' }; return (
-                    <div key={t.id} className="card thread" onClick={() => setSel(t.id)}>
+                    <div key={t.id} className="card thread" onClick={() => { setSel(t.id); setThreads((ts) => ts.map((x) => x.id === t.id ? { ...x, unread: 0 } : x)); }}>
                       <div className="avatar" style={{ background: 'var(--surface-subtle)', color: p.color, flexShrink: 0 }}><I name={p.icon} size={20} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
@@ -831,11 +969,21 @@ function MessagesScreen({ viewOnly }) {
 // ===== التطبيق =====
 function App({ mode, initialRows }) {
   const viewOnly = mode === 'deputy' || mode === 'chair';
-  const [acct, setAcct] = useState(viewOnly ? mode : 'c1');
-  const [active, setActive] = useState(viewOnly ? 'dashboard' : 'queue');
+  const [acct] = useState(viewOnly ? mode : 'c1');
+  const [active, setActive] = useState('dashboard');
   const [sel, setSel] = useState(null);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const [confirmOut, setConfirmOut] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [readIds, setReadIds] = useState([]);
+  const [threads, setThreads] = useState([]); // خيوط المراسلات — لا محادثات مُلفّقة
+  const readKey = 'triageNotifRead-' + mode + '-v1';
+  // تحميل ثبات الطيّ والقراءة بعد الترسية (SSR-safe — لا فرق خادم/عميل عند أول رسم)
+  useEffect(() => { try { setCollapsed(localStorage.getItem('triageSb-v1') === '1'); } catch (e) {} }, []);
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem(readKey) || 'null'); if (Array.isArray(s)) setReadIds(s); } catch (e) {} }, [readKey]);
+  const toggleSide = () => setCollapsed((c) => { try { localStorage.setItem('triageSb-v1', c ? '0' : '1'); } catch (e) {} return !c; });
+  const persistRead = (ids) => { setReadIds(ids); try { localStorage.setItem(readKey, JSON.stringify(ids)); } catch (e) {} };
 
   // القضايا الفعليّة من Supabase (initialRows) تتصدّر القائمة؛ حالات SEED تبقى للعرض التوضيحيّ.
   const [rows, setRows] = useState(() => {
@@ -843,6 +991,13 @@ function App({ mode, initialRows }) {
     const seen = new Set(real.map((r) => r.secret));
     return [...real, ...SEED.filter((r) => !seen.has(r.secret))];
   }); // قائمة مشتركة يراها الجميع — الحقيقيّة أولاً ثم SEED
+
+  // إشعارات مشتقّة من الوارد الحقيقيّ + عدّادات حيّة موحّدة (الشارات والبطاقات من المصدر نفسه)
+  const notifs = notifsOf(rows, viewOnly);
+  const markRead = (id) => { if (!readIds.includes(id)) persistRead([...readIds, id]); };
+  const markAllRead = () => persistRead(Array.from(new Set([...readIds, ...notifs.map((x) => x.id)])));
+  const unreadNotifs = notifs.filter((x) => !readIds.includes(x.id)).length;
+  const unreadMsgs = threads.reduce((a, t) => a + (t.unread || 0), 0);
   const goNav = (id) => { setActive(id); setSel(null); setOpen(false); };
   const onResolve = async (rec, decision, extra, checks) => {
     const map = { reassign: 'أُعيد إسناد الطلب لموظف آخر', accept: 'قُبل الطلب وأُسند للدراسة والتقييم', refer: 'أُحيل لجهة مختصة لطلب توصية', closeReq: 'حُفظ الطلب بطلب من طالب الحماية', closeNoReply: 'حُفظ الطلب — لعدم الرد على التواصل', closePrior: 'حُفظ الطلب — لوجود طلب/قرار سابق', closeJuris: 'حُفظ الطلب — لعدم الاختصاص', closeNocase: 'حُفظ الطلب — لا قضية قائمة', reverse: 'أُلغي القرار وأُعيد الطلب للمعالجة' };
@@ -869,65 +1024,84 @@ function App({ mode, initialRows }) {
     setTimeout(() => setToast(''), 3200);
   };
 
+  const openCase = (r) => { setActive('queue'); setSel(r); setOpen(false); };
+  const needCount = rows.filter((r) => nextAction(r, viewOnly)).length;
   const NAV = viewOnly
-    ? [{ id: 'dashboard', t: 'لوحة الإشراف', icon: 'dashboard' }, { id: 'queue', t: 'سجلّ الفرز', icon: 'inbox' }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications', badge: 2 }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }]
-    : [{ id: 'dashboard', t: 'لوحة المتابعة', icon: 'dashboard' }, { id: 'queue', t: 'الطلبات الواردة', icon: 'inbox', badge: rows.filter((r) => r.status === 'triage').length || null }, { id: 'messages', t: 'المراسلات', icon: 'forum' }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications', badge: 2 }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }];
-  const cur = NAV.find((n) => n.id === active) || NAV[0];
+    ? [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'queue', t: 'سجلّ الفرز', icon: 'inbox', badge: needCount || null }, { id: 'messages', t: 'المراسلات', icon: 'forum', badge: unreadMsgs || null }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications', badge: unreadNotifs || null }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }]
+    : [{ id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' }, { id: 'queue', t: 'الطلبات الواردة', icon: 'inbox', badge: rows.filter((r) => r.status === 'triage').length || null }, { id: 'messages', t: 'المراسلات', icon: 'forum', badge: unreadMsgs || null }, { id: 'notifications', t: 'الإشعارات', icon: 'notifications', badge: unreadNotifs || null }, { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' }];
+
+  const signout = () => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); };
 
   let body;
   if (active === 'queue') body = sel ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} /> : <Queue rows={rows} open={setSel} viewOnly={viewOnly} acct={acct} />;
-  else if (active === 'dashboard') body = <Dashboard rows={rows} viewOnly={viewOnly} />;
+  else if (active === 'dashboard') body = <Dashboard rows={rows} viewOnly={viewOnly} openCase={openCase} go={goNav} notifs={notifs} readIds={readIds} markRead={markRead} />;
   else if (active === 'profile') body = <Profile actor={acct} viewOnly={viewOnly} />;
-  else if (active === 'notifications') body = <Notifs viewOnly={viewOnly} />;
-  else if (active === 'messages') body = <MessagesScreen viewOnly={viewOnly} />;
+  else if (active === 'notifications') body = <Notifs viewOnly={viewOnly} items={notifs} readIds={readIds} markRead={markRead} markAllRead={markAllRead} go={goNav} />;
+  else if (active === 'messages') body = <MessagesScreen viewOnly={viewOnly} threads={threads} setThreads={setThreads} rows={rows} />;
   else body = <Stub title="المراسلات" icon="forum" note="خيوط التواصل مع طالب الحماية والجهة المختصة." />;
 
   const who = viewOnly ? LEAD[acct] : CLERKS[acct];
   return (
     <div className="shell">
-      <aside className={'side' + (open ? ' open' : '')}>
+      <aside className={'side' + (open ? ' open' : '') + (collapsed ? ' collapsed' : '')}>
         <div className="brand">
           <div className="brand-mark"><I name="shield_person" size={22} fill color="#fff" /></div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-strong)', lineHeight: 1.2 }}>الفرز المبدئي</div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{viewOnly ? 'إشراف القيادة' : 'موظفو المركز'}</div>
+          <div className="brand-txt brand-logos">
+            {/* التطبيق يعمل خلف basePath /center — وسم <img> يحتاج البادئة صراحةً */}
+            <img src="/center/brand/logo-center.png" alt="مركز حماية الشهود والمبلّغين والخبراء والضحايا — النيابة العامة" />
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'center' }}>{viewOnly ? 'الفرز المبدئي — إشراف القيادة' : 'بوابة الفرز المبدئي — موظفو المركز'}</div>
           </div>
+          <button className="collapse-btn" onClick={toggleSide} title={collapsed ? 'توسيع القائمة' : 'طيّ القائمة'} aria-label={collapsed ? 'توسيع القائمة' : 'طيّ القائمة'}>
+            <I name={collapsed ? 'left_panel_open' : 'left_panel_close'} size={20} />
+          </button>
         </div>
         <nav className="nav">
           {NAV.map((n) => (
-            <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => goNav(n.id)}>
-              <I name={n.icon} size={20} /> <span>{n.t}</span>
-              {n.badge && <span className="nav-badge">{n.badge}</span>}
+            <button key={n.id} className={'nav-item' + (active === n.id && !sel ? ' on' : '')} title={collapsed ? n.t : undefined} onClick={() => goNav(n.id)}>
+              <I name={n.icon} size={20} /> <span className="nav-lbl">{n.t}</span>
+              {n.badge ? <span className="nav-badge">{n.badge}</span> : null}
             </button>
           ))}
         </nav>
-        {!viewOnly &&
-          <div className="acct">
-            <p className="acct-lbl">الحساب المسجَّل دخوله</p>
-            <div className="acct-card">
-              <div className="avatar" style={{ width: 34, height: 34 }}><I name="person" size={19} /></div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{CLERKS[acct].name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{CLERKS[acct].short} · {CLERKS[acct].shift}</div>
-              </div>
-            </div>
-          </div>}
-        <div className="side-foot">قائمة الفرز مشتركة بين الموظفين المناوبين؛ أي معالجة مُسجَّلة في التدقيق باسم الموظف. القيادة تطّلع وتُشرف، وإعادة الإسناد بيدها.</div>
+        <div className="side-bottom">
+          <div className="side-user" title={who.name + ' — موثّق عبر نفاذ'}>
+            <span className="su-av">{(who.name || '؟').trim().charAt(0)}</span>
+            <span className="nav-lbl" style={{ minWidth: 0 }}>
+              <span className="su-name" style={{ display: 'block' }}>{who.name}</span>
+              <span className="su-badge"><I name="verified_user" size={12} fill /> موثّق عبر نفاذ</span>
+            </span>
+          </div>
+          <button className="logout-btn" title="تسجيل الخروج" onClick={() => setConfirmOut(true)}><I name="logout" size={18} /><span className="nav-lbl">تسجيل الخروج</span></button>
+          <div className="side-copy nav-lbl">© 2026 النيابة العامة</div>
+        </div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
         <header className="topbar">
           <button className="menu-btn" onClick={() => setOpen(true)}><I name="menu" size={22} /></button>
-          <span className="topbar-title">{sel ? (viewOnly ? 'عرض طلب' : 'فرز طلب') : cur.t}</span>
+          {sel && <SecretChip code={sel.secret} />}
           <span className="who">
+            <button className="qa-btn" title="المراسلات" onClick={() => goNav('messages')}><I name="forum" size={20} />{unreadMsgs > 0 && <span className="qa-badge">{unreadMsgs}</span>}</button>
+            <button className="qa-btn" title="الإشعارات" onClick={() => goNav('notifications')}><I name="notifications" size={20} />{unreadNotifs > 0 && <span className="qa-badge">{unreadNotifs}</span>}</button>
             <Tag tone={viewOnly ? 'info' : 'error'} size="sm" iconLeft={<I name={viewOnly ? 'visibility' : 'lock'} size={13} />}>{viewOnly ? 'اطّلاع وإشراف' : 'سري للغاية'}</Tag>
             <div className="avatar"><I name="person" size={20} /></div>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{who.short}</span>
-            <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
           </span>
         </header>
         <main className="content">{body}</main>
       </div>
+      {confirmOut &&
+        <div className="nf-scrim" onClick={() => setConfirmOut(false)}>
+          <div className="nf-modal" onClick={(e) => e.stopPropagation()}>
+            <I name="logout" size={36} color="var(--color-error)" />
+            <h3 style={{ margin: '10px 0 6px', fontSize: 17, color: 'var(--text-strong)' }}>تأكيد تسجيل الخروج</h3>
+            <p className="muted" style={{ margin: '0 0 18px', lineHeight: 1.7 }}>ستُقفل الجلسة ويُسجَّل الخروج في التدقيق، وأي عمل غير محفوظ سيُفقد.</p>
+            <div className="row" style={{ justifyContent: 'center', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmOut(false)}>إلغاء</button>
+              <button className="btn" style={{ background: 'var(--color-error)', color: '#fff' }} onClick={signout}><I name="logout" size={18} /> تسجيل الخروج</button>
+            </div>
+          </div>
+        </div>}
       {toast &&
         <div style={{ position: 'fixed', insetInlineStart: 24, bottom: 24, zIndex: 60, background: 'var(--text-strong)', color: '#fff', padding: '12px 18px', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, fontWeight: 600 }}>
           <I name="check_circle" size={18} color="var(--green-40)" fill /> {toast}

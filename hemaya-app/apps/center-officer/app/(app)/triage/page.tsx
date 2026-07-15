@@ -8,6 +8,12 @@ const CAT_AR: Record<string, string> = {
   witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة",
 };
 
+function fmtDate(iso: string): string {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString("ar-SA-u-nu-latn", { dateStyle: "short", timeStyle: "short" }); }
+  catch { return iso; }
+}
+
 function daysAgo(iso: string): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
@@ -45,6 +51,7 @@ export default async function Page() {
       status: "triage",
       clerk: "c1",
       days: daysAgo(c.created_at),
+      createdAt: c.created_at,
       prior: !!details.prior_submit,
       urgency: "عادي",
       paper: isPaper,
@@ -52,7 +59,7 @@ export default async function Page() {
       reason: details.reason || "",
       entity: details.entity || "",
       caseNo: details.case_no || "",
-      actions: [],
+      actions: [{ icon: "inbox", t: "ورود الطلب", m: isPaper ? "أُدخل ورقياً عبر وحدة الإدخال اليدوي" : "عبر نفاذ — قائمة الفرز المشتركة", when: fmtDate(c.created_at), who: "النظام" }],
       calls: [],
     };
   });
