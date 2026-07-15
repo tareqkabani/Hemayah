@@ -1,9 +1,11 @@
 /* ============================================================
-   مخزن مرحلة القرار والإشعار — المسار الجديد (بطلب رئيس المركز)
-   IIFE(window.HemayaDecision) → وحدة ES تُصدّر HemayaDecision.
-   آلة الحالة: preparing → voting → issued (المعدّ يطرح مباشرةً للتصويت).
-   مصدر الحقيقة: Supabase (يُغذَّى عبر hydrate؛ الطفرات تُوجَّه لأفعال الخادم).
+   مخزن مرحلة القرار والإشعار (CO-3) — تحديث 15 يوليو 2026.
+   آلة الحالة: preparing → pending_deputy → approved → voting → issued
+   (المعدّ يُعِدّ من الدراسات والتقييمات ← اعتماد نائب الرئيس ← يعود
+    للمعدّ فيطرحه للتصويت ← إصدار الرئيس وإشعار الطرفين م10).
+   مصدر الحقيقة: Supabase (hydrate؛ الطفرات تُوجَّه لأفعال الخادم وتُحدَّث تفاؤليّاً).
    ============================================================ */
+import { DECISION_STAGES, decisionStageOf, nextDecisionAction } from "@hemaya/domain";
 
 export const HemayaDecision = (function () {
   "use strict";
@@ -23,20 +25,20 @@ export const HemayaDecision = (function () {
   var MAJORITY = 4; // أغلبية حاسمة من 7
 
   var PREPARERS = { prep1: { name: "معدّ قرار المركز", t: "مستشار قانوني — معدّ القرار", org: "إدارة البرنامج — النيابة العامة" } };
-  var PROTECTION_TYPES = ["الحماية الأمنية والمرافقة", "إخفاء البيانات", "تغيير مكان الإقامة", "الحماية الإجرائية في الجلسات", "وسائل اتصال آمنة", "الدعم المالي المؤقّت"];
 
-  // قوالب المرفقات الافتراضية (من طلب الحماية حتى قرار المركز — كلّها مرفقات)
-  var DOC_SLOTS_DEFAULT = [
-    { id: "req",      group: "request",    label: "طلب الحماية",                required: true },
-    { id: "erec",     group: "entityRec",  label: "توصية الجهة المختصة",        required: true },
-    { id: "study",    group: "study",      label: "جميع الدراسات الخاصة بالطلب",  required: true },
-    { id: "psych",    group: "assessment", label: "جميع التقييمات الخاصة بالطلب", required: true },
-    { id: "decision", group: "decision",   label: "قرار المركز المُعَدّ",         required: true },
+  // أنواع تدابير الحماية (م14) — القرار يحمل أنواعه ومدّته وحيثياته
+  var PROTECTION_TYPES = [
+    "الحماية الشخصية والمرافقة",
+    "تأمين المسكن ومقرّ العمل",
+    "إخفاء الهوية وسريّتها",
+    "تغيير مكان الإقامة أو العمل",
+    "رقابة الاتصالات (بموافقة مكتوبة — م9/1)",
+    "الهوية المؤقّتة (م9/3)",
   ];
-  function slotIcon(s) { return s.group === "request" ? "assignment_ind" : s.group === "entityRec" ? "recommend" : s.group === "study" ? "balance" : s.group === "decision" ? "gavel" : s.group === "assessment" ? "psychology" : "attach_file"; }
+  var REASON_SKELETON = "استناداً إلى الدراسات والتقييمات المُجمَّعة (عوامل المادة 9) وما اقتُرح من تدابير المادة 14، أُعِدّ هذا القرار لعرضه — إعدادٌ محايد بلا توصية بالقبول أو الرفض؛ والقرار خالصٌ للمجلس.";
 
   // الحالة في الذاكرة — تُغذَّى من الخادم (hydrate) ثم تُحدَّث تفاؤليّاً
-  var store = { requests: [], decisions: {}, votes: {}, seatUsers: {}, me: null };
+  var store = { requests: [], decisions: {}, packages: {}, attachments: {}, votes: {}, messages: [], me: null };
   var listeners = [];
   var actions = null; // تُحقَن من البوابة (أفعال الخادم)
 
@@ -47,30 +49,25 @@ export const HemayaDecision = (function () {
   function setActions(a) { actions = a; }
   function hydrate(data) {
     if (!data) return;
-    store.requests  = data.requests  || [];
-    store.decisions = data.decisions || {};
-    store.votes     = data.votes     || {};
-    store.seatUsers = data.seatUsers || {};
-    store.me        = data.me        || null;
+    store.requests    = data.requests    || [];
+    store.decisions   = data.decisions   || {};
+    store.packages    = data.packages    || {};
+    store.attachments = data.attachments || {};
+    store.votes       = data.votes       || {};
+    store.messages    = data.messages    || [];
+    store.me          = data.me          || null;
     emit();
   }
 
   function reqBySecret(s) { for (var i = 0; i < store.requests.length; i++) if (store.requests[i].secret === s) return store.requests[i]; return null; }
+  function caseIdOf(secret) { var q = reqBySecret(secret); return q ? q.id : null; }
   function allCases() { return store.requests.slice(); }
-  function ensureDecision(secret) {
-    if (!store.decisions[secret]) store.decisions[secret] = { status: "preparing", preparer: "prep1", files: {}, paths: {}, docs: DOC_SLOTS_DEFAULT.slice().map(function (s) { return { id: s.id, group: s.group, label: s.label, required: true, icon: slotIcon(s), fileName: null, storagePath: null }; }), attachedDocs: [], packageConfirmed: false, rejections: [], votingStartedAt: null, deadlineClosed: false, issued: null };
-    return store.decisions[secret];
+  function getDecision(secret) { return store.decisions[secret] || null; }
+  function dOf(secret) {
+    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", approvals: { deputy: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
   }
 
-  // بيان مرفقات القضية (القوالب الافتراضية مدموجة مع المُخزَّن)
-  function caseDocuments(secret) {
-    var d = store.decisions[secret];
-    if (d && d.docs && d.docs.length) return d.docs.map(function (x) { return { id: x.id, group: x.group, label: x.label, required: x.required !== false, icon: slotIcon(x), fileName: x.fileName || null, storagePath: x.storagePath || null }; });
-    return DOC_SLOTS_DEFAULT.map(function (s) { return { id: s.id, group: s.group, label: s.label, required: true, icon: slotIcon(s), fileName: null, storagePath: null }; });
-  }
-  function requiredDocIds(secret) { return caseDocuments(secret).filter(function (d) { return d.required; }).map(function (d) { return d.id; }); }
-
-  // حصيلة التصويت (إغلاق 4/7؛ العدد فردي فلا تعادل عند اكتمال النصاب)
+  // حصيلة التصويت (للقيادة — العضو لا يرى أصوات غيره فتُحسب له من voteOpen فقط)
   function tally(votesFor) {
     var accept = 0, reject = 0, cast = 0;
     var keys = votesFor ? Object.keys(votesFor) : [];
@@ -81,95 +78,160 @@ export const HemayaDecision = (function () {
     else if (cast >= VOTING_SEATS.length) { closed = true; outcome = accept >= reject ? "مقبول" : "مرفوض"; }
     return { accept: accept, reject: reject, cast: cast, pending: pending, closed: closed, outcome: outcome };
   }
+  // النتيجة الفعلية للطلب: تجمع الأغلبية + إغلاق المهلة + باب التصويت من الخادم
   function resultFor(secret) {
-    var votesFor = store.votes[secret];
-    var t = tally(votesFor);
-    var deadlineClosed = !!(store.decisions[secret] && store.decisions[secret].deadlineClosed);
+    var d = dOf(secret);
+    var t = tally(store.votes[secret]);
     if (t.closed) { t.deadlineClosed = false; return t; }
-    if (deadlineClosed && t.cast > 0) { t.closed = true; t.outcome = t.accept >= t.reject ? "مقبول" : "مرفوض"; t.deadlineClosed = true; return t; }
-    t.deadlineClosed = false; return t;
+    if (d.deadlineClosed && t.cast > 0) { t.closed = true; t.outcome = t.accept >= t.reject ? "مقبول" : "مرفوض"; t.deadlineClosed = true; return t; }
+    // للعضو: لا حصيلة لديه — voteOpen من الخادم هو الفيصل
+    if (d.status === "voting" && !d.voteOpen) { t.closed = true; }
+    t.deadlineClosed = !!d.deadlineClosed;
+    return t;
+  }
+
+  // الإجراء المطلوب — دالة موحّدة (مصدرها @hemaya/domain)
+  function nextActionOf(scope, seat, q) {
+    var d = dOf(q.secret);
+    var my = (store.votes[q.secret] || {})[seat];
+    var res = resultFor(q.secret);
+    return nextDecisionAction(scope, {
+      status: d.status,
+      mine: !!(d.mine || (scope === "preparer" && d.unclaimed)),
+      returned: (d.rejections || []).length > 0,
+      voted: !!my,
+      closed: !!res.closed,
+      leadSeat: seat === "deputy" || seat === "chair" ? seat : undefined,
+    });
+  }
+  function stageOf(status) { return decisionStageOf(status); }
+
+  // ——— المراسلات: خيوط من رسائل القاعدة (معزولة بالمقعد؛ القيادة تطّلع على الجميع) ———
+  function threadKey(m) { return m.secret + "/" + m.party + "/" + m.partyUid + "/" + m.withSeat; }
+  function getThreads(scope) {
+    var byKey = {};
+    for (var i = 0; i < store.messages.length; i++) {
+      var m = store.messages[i];
+      var k = threadKey(m);
+      if (!byKey[k]) byKey[k] = { id: k, secret: m.secret, caseId: m.caseId, party: m.party, partyUid: m.partyUid, with: m.withSeat, msgs: [] };
+      byKey[k].msgs.push({ id: m.id, from: m.fromSeat, fromMe: m.fromMe, t: m.body, when: m.when, whenTs: m.whenTs || null });
+    }
+    var out = []; for (var k2 in byKey) out.push(byKey[k2]);
+    out.sort(function (a, b) { return a.msgs.length && b.msgs.length ? (a.msgs[a.msgs.length - 1].id < b.msgs[b.msgs.length - 1].id ? 1 : -1) : 0; });
+    return out; // RLS في القاعدة تكفّلت بالعزل: غير القيادة لا يصله إلا خيوطه
+  }
+  function findThread(id) { var ts = getThreads("any"); for (var i = 0; i < ts.length; i++) if (ts[i].id === id) return ts[i]; return null; }
+  function startThread(party, secret, withWho) {
+    var me = store.me || {}; var uid = me.uid;
+    var k = secret + "/" + party + "/" + uid + "/" + withWho;
+    return k; // الخيط يتجسّد فعلياً عند أول رسالة (council_send_message)
+  }
+  function sendMessage(threadId, text) {
+    var parts = threadId.split("/");
+    var secret = parts[0], party = parts[1], partyUid = parts[2], withSeat = parts[3];
+    var cid = caseIdOf(secret); if (!cid) return Promise.resolve(null);
+    var me = store.me || {};
+    store.messages.push({ id: "tmp" + Date.now(), secret: secret, caseId: cid, party: party, partyUid: partyUid, withSeat: withSeat, fromSeat: me.seat || party, fromMe: true, body: text, when: nowLabel(), whenTs: new Date().toISOString() });
+    emit();
+    if (actions && actions.sendMessage) return actions.sendMessage(cid, party, partyUid, withSeat, text).then(logErr("message"));
+    return Promise.resolve(null);
   }
 
   var API = {
     SEATS: SEATS, MEMBER_SEATS: MEMBER_SEATS, VOTING_SEATS: VOTING_SEATS, MAJORITY: MAJORITY,
-    PREPARERS: PREPARERS, PROTECTION_TYPES: PROTECTION_TYPES,
-    DOC_SLOTS_DEFAULT: DOC_SLOTS_DEFAULT,
+    PREPARERS: PREPARERS, PROTECTION_TYPES: PROTECTION_TYPES, REASON_SKELETON: REASON_SKELETON,
+    DECISION_STAGES: DECISION_STAGES,
     setActions: setActions, hydrate: hydrate,
     getMe: function () { return store.me; },
-    allCases: allCases, queueBySecret: reqBySecret,
-    caseDocuments: caseDocuments, requiredDocIds: requiredDocIds,
+    allCases: allCases, queueBySecret: reqBySecret, caseIdOf: caseIdOf,
     subscribe: function (fn) { listeners.push(fn); return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
-    getDecision: function (secret) { return store.decisions[secret] || null; },
+    getDecision: getDecision, dOf: dOf,
+    getPackage: function (secret) { return store.packages[secret] || null; },
+    getAttachments: function (secret) { return store.attachments[secret] || []; },
     getVotes: function (secret) { return store.votes[secret] || {}; },
     tally: tally, resultFor: resultFor,
+    nextActionOf: nextActionOf, stageOf: stageOf,
+    getThreads: getThreads, findThread: findThread, startThread: startThread, sendMessage: sendMessage,
 
-    // المعدّ يُنشئ طلباً جديداً (المنطلق) — يعيد الرمز السري (وعدٌ)
-    createRequest: function (data) {
-      if (!actions || !actions.createRequest) return Promise.resolve(null);
-      return actions.createRequest(data.name, data.nid).then(function (r) {
-        logErr("create")(r);
-        if (r && r.ok && r.row) {
-          var secret = r.row.secret_code;
-          store.requests.unshift({ secret: secret, id: r.row.id, cat: "—", risk: "—", preparer: "prep1", createdByPreparer: true, applicant: { name: data.name, nid: data.nid } });
-          ensureDecision(secret);
-          emit();
-          return secret;
-        }
-        return null;
-      });
+    // المعدّ: حفظ مسوّدة القرار (أنواع م14 + مدة + حيثيات)
+    saveDecision: function (secret, patch) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      if (patch.types) d.types = patch.types;
+      if (patch.duration !== undefined) d.duration = patch.duration;
+      if (patch.reasoning !== undefined) d.reasoning = patch.reasoning;
+      store.decisions[secret] = d; emit();
+      if (cid && actions && actions.saveDecision) return actions.saveDecision(cid, d.types, d.duration, d.reasoning).then(logErr("save"));
+      return Promise.resolve(null);
     },
-    // رفع/إزالة ملف مرفق (تحديث تفاؤليّ + فعل الخادم؛ الرفع للتخزين يتمّ في المكوّن)
-    setFile: function (secret, docId, fileName, storagePath, meta) {
-      var d = ensureDecision(secret);
-      var doc = d.docs.find(function (x) { return x.id === docId; });
-      if (fileName) {
-        if (!doc) { doc = { id: docId, group: (meta && meta.group) || "other", label: (meta && meta.label) || "مستند إضافي", required: !!(meta && meta.required), icon: slotIcon({ group: (meta && meta.group) || "other", label: (meta && meta.label) || "" }), fileName: null, storagePath: null }; d.docs.push(doc); }
-        doc.fileName = fileName; doc.storagePath = storagePath || null;
-      } else if (doc) { doc.fileName = null; doc.storagePath = null; }
-      d.attachedDocs = d.docs.filter(function (x) { return x.fileName; }).map(function (x) { return x.id; });
-      emit();
-      var rid = reqBySecret(secret) && reqBySecret(secret).id;
-      if (rid && actions) {
-        if (fileName && actions.setAttachment) actions.setAttachment(rid, docId, (doc && doc.group) || (meta && meta.group) || "other", (doc && doc.label) || (meta && meta.label) || docId, (doc && doc.required) || false, fileName, storagePath || null).then(logErr("setFile"));
-        else if (!fileName && actions.removeAttachment) actions.removeAttachment(rid, docId).then(logErr("removeFile"));
-      }
+    // المعدّ: رفع القرار لاعتماد نائب الرئيس
+    submitForApproval: function (secret, patch) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      d.types = patch.types; d.duration = patch.duration; d.reasoning = patch.reasoning;
+      d.approvals = { deputy: null }; d.status = "pending_deputy"; d.submittedAt = nowLabel();
+      store.decisions[secret] = d; emit();
+      if (cid && actions && actions.submitForApproval) return actions.submitForApproval(cid, d.types, d.duration, d.reasoning).then(logErr("submit"));
+      return Promise.resolve(null);
     },
-    addDocSlot: function (secret, slot) {
-      var d = ensureDecision(secret);
-      var id = "x" + (typeof Date !== "undefined" ? Date.now() : Math.floor(Math.random() * 1e9));
-      d.docs.push({ id: id, group: slot.group || "other", label: slot.label || "مستند إضافي", required: !!slot.required, icon: slotIcon(slot), fileName: null, storagePath: null });
-      emit();
-      return id;
+    // نائب الرئيس حصراً: اعتماد — يعود للمعدّ لطرحه
+    approve: function (secret) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      if (d.status !== "pending_deputy") return Promise.resolve(null);
+      d.approvals = { deputy: { when: nowLabel() } }; d.status = "approved"; emit();
+      if (cid && actions && actions.approve) return actions.approve(cid).then(logErr("approve"));
+      return Promise.resolve(null);
     },
-    // المعدّ يطرح الحزمة للتصويت مباشرةً
-    submitForVoting: function (secret) {
-      var d = ensureDecision(secret);
-      d.attachedDocs = d.docs.filter(function (x) { return x.fileName; }).map(function (x) { return x.id; });
-      d.packageConfirmed = true; d.packageConfirmedAt = nowLabel();
-      d.status = "voting"; d.votingStartedAt = nowLabel();
-      emit();
-      var rid = reqBySecret(secret) && reqBySecret(secret).id;
-      if (rid && actions && actions.submitVoting) actions.submitVoting(rid).then(logErr("submit"));
+    // نائب الرئيس حصراً: إعادة بملاحظة إلزامية
+    rejectApproval: function (secret, note) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      d.rejections = (d.rejections || []).concat([{ note: note || "", when: nowLabel() }]);
+      d.approvals = { deputy: null }; d.status = "preparing"; d.submittedAt = null; emit();
+      if (cid && actions && actions.rejectApproval) return actions.rejectApproval(cid, note || "").then(logErr("return"));
+      return Promise.resolve(null);
+    },
+    // المعدّ بعد الاعتماد: الطرح على المجلس
+    openVoting: function (secret) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      if (d.status !== "approved") return Promise.resolve(null);
+      d.status = "voting"; d.votingStartedAt = nowLabel(); d.voteOpen = true; emit();
+      if (cid && actions && actions.openVoting) return actions.openVoting(cid).then(logErr("open"));
+      return Promise.resolve(null);
     },
     // تصويت العضو/القيادة (قبول/رفض) — عزلٌ صفّيّ بالخادم
     castVote: function (secret, seat, choice, note) {
+      var cid = caseIdOf(secret);
       if (!store.votes[secret]) store.votes[secret] = {};
       store.votes[secret][seat] = { choice: choice, note: note || "", when: nowLabel() };
       emit();
-      var rid = reqBySecret(secret) && reqBySecret(secret).id;
-      if (rid && actions && actions.castVote) actions.castVote(rid, choice === "قبول" ? "accept" : "reject", note || "").then(logErr("vote"));
+      if (cid && actions && actions.castVote) return actions.castVote(cid, choice === "قبول" ? "accept" : "reject", note || "").then(logErr("vote"));
+      return Promise.resolve(null);
     },
     closeByDeadline: function (secret) {
-      var d = ensureDecision(secret); d.deadlineClosed = true; emit();
-      var rid = reqBySecret(secret) && reqBySecret(secret).id;
-      if (rid && actions && actions.closeDeadline) actions.closeDeadline(rid).then(logErr("close"));
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      d.deadlineClosed = true; d.voteOpen = false; emit();
+      if (cid && actions && actions.closeDeadline) return actions.closeDeadline(cid).then(logErr("close"));
+      return Promise.resolve(null);
     },
+    // الرئيس حصراً بعد الإغلاق — الحصيلة تُحسم في القاعدة، والإشعار فوريّ (م10)
     issue: function (secret, payload) {
-      var d = ensureDecision(secret);
-      d.issued = { type: payload.type, reason: payload.reason || "", when: nowLabel() };
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      var res = resultFor(secret);
+      d.issued = { type: res.outcome || (payload && payload.type) || "قبول", reason: (payload && payload.reason) || "", when: nowLabel() };
       d.status = "issued"; emit();
-      var rid = reqBySecret(secret) && reqBySecret(secret).id;
-      if (rid && actions && actions.issue) actions.issue(rid, payload.type === "قبول" ? "accept" : "reject", payload.reason || "").then(logErr("issue"));
+      if (cid && actions && actions.issue) return actions.issue(cid, (payload && payload.reason) || "").then(logErr("issue"));
+      return Promise.resolve(null);
+    },
+    // مرفق داعم اختياري (أثناء الإعداد)
+    setFile: function (secret, docId, group, label, fileName, storagePath) {
+      var cid = caseIdOf(secret);
+      var list = store.attachments[secret] || (store.attachments[secret] = []);
+      var found = null; for (var i = 0; i < list.length; i++) if (list[i].id === docId) found = list[i];
+      if (fileName) { if (!found) { found = { id: docId, group: group || "other", label: label || "مستند داعم" }; list.push(found); } found.fileName = fileName; found.storagePath = storagePath || null; }
+      else if (found) { list.splice(list.indexOf(found), 1); }
+      emit();
+      if (!cid || !actions) return Promise.resolve(null);
+      if (fileName && actions.setAttachment) return actions.setAttachment(cid, docId, group || "other", label || "مستند داعم", fileName, storagePath || null).then(logErr("setFile"));
+      if (!fileName && actions.removeAttachment) return actions.removeAttachment(cid, docId).then(logErr("removeFile"));
+      return Promise.resolve(null);
     },
   };
 

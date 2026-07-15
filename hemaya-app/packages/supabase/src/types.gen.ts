@@ -381,10 +381,53 @@ export type Database = {
         }
         Relationships: []
       }
+      council_attachments: {
+        Row: {
+          case_id: string
+          doc_group: string
+          doc_id: string
+          file_name: string | null
+          id: string
+          label: string
+          storage_path: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          case_id: string
+          doc_group?: string
+          doc_id: string
+          file_name?: string | null
+          id?: string
+          label: string
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          case_id?: string
+          doc_group?: string
+          doc_id?: string
+          file_name?: string | null
+          id?: string
+          label?: string
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "council_attachments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       council_decisions: {
         Row: {
           case_id: string
-          chair_approved_at: string | null
           created_at: string | null
           deadline_closed: boolean
           deputy_approved_at: string | null
@@ -397,13 +440,13 @@ export type Database = {
           reasoning: string | null
           rejections: Json
           status: string
+          submitted_at: string | null
           types: Json
           updated_at: string | null
           voting_started_at: string | null
         }
         Insert: {
           case_id: string
-          chair_approved_at?: string | null
           created_at?: string | null
           deadline_closed?: boolean
           deputy_approved_at?: string | null
@@ -416,13 +459,13 @@ export type Database = {
           reasoning?: string | null
           rejections?: Json
           status?: string
+          submitted_at?: string | null
           types?: Json
           updated_at?: string | null
           voting_started_at?: string | null
         }
         Update: {
           case_id?: string
-          chair_approved_at?: string | null
           created_at?: string | null
           deadline_closed?: boolean
           deputy_approved_at?: string | null
@@ -435,6 +478,7 @@ export type Database = {
           reasoning?: string | null
           rejections?: Json
           status?: string
+          submitted_at?: string | null
           types?: Json
           updated_at?: string | null
           voting_started_at?: string | null
@@ -444,6 +488,47 @@ export type Database = {
             foreignKeyName: "council_decisions_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: true
+            referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      council_messages: {
+        Row: {
+          body: string
+          case_id: string
+          created_at: string
+          id: string
+          party: string
+          party_uid: string
+          sender_uid: string
+          with_seat: string
+        }
+        Insert: {
+          body: string
+          case_id: string
+          created_at?: string
+          id?: string
+          party: string
+          party_uid: string
+          sender_uid: string
+          with_seat: string
+        }
+        Update: {
+          body?: string
+          case_id?: string
+          created_at?: string
+          id?: string
+          party?: string
+          party_uid?: string
+          sender_uid?: string
+          with_seat?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "council_messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -480,148 +565,6 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "protection_cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      decision_attachments: {
-        Row: {
-          doc_group: string
-          doc_id: string
-          file_name: string | null
-          id: string
-          label: string
-          request_id: string
-          required: boolean
-          storage_path: string | null
-          updated_at: string | null
-          uploaded_by: string | null
-        }
-        Insert: {
-          doc_group?: string
-          doc_id: string
-          file_name?: string | null
-          id?: string
-          label: string
-          request_id: string
-          required?: boolean
-          storage_path?: string | null
-          updated_at?: string | null
-          uploaded_by?: string | null
-        }
-        Update: {
-          doc_group?: string
-          doc_id?: string
-          file_name?: string | null
-          id?: string
-          label?: string
-          request_id?: string
-          required?: boolean
-          storage_path?: string | null
-          updated_at?: string | null
-          uploaded_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "decision_attachments_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "decision_requests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      decision_requests: {
-        Row: {
-          applicant_name: string
-          applicant_nid: string
-          category: string | null
-          created_at: string | null
-          deadline_closed: boolean
-          id: string
-          issued_at: string | null
-          issued_reason: string | null
-          issued_type: string | null
-          package_confirmed: boolean
-          package_confirmed_at: string | null
-          preparer_id: string | null
-          risk: string | null
-          secret_code: string
-          status: string
-          updated_at: string | null
-          voting_started_at: string | null
-        }
-        Insert: {
-          applicant_name: string
-          applicant_nid: string
-          category?: string | null
-          created_at?: string | null
-          deadline_closed?: boolean
-          id?: string
-          issued_at?: string | null
-          issued_reason?: string | null
-          issued_type?: string | null
-          package_confirmed?: boolean
-          package_confirmed_at?: string | null
-          preparer_id?: string | null
-          risk?: string | null
-          secret_code: string
-          status?: string
-          updated_at?: string | null
-          voting_started_at?: string | null
-        }
-        Update: {
-          applicant_name?: string
-          applicant_nid?: string
-          category?: string | null
-          created_at?: string | null
-          deadline_closed?: boolean
-          id?: string
-          issued_at?: string | null
-          issued_reason?: string | null
-          issued_type?: string | null
-          package_confirmed?: boolean
-          package_confirmed_at?: string | null
-          preparer_id?: string | null
-          risk?: string | null
-          secret_code?: string
-          status?: string
-          updated_at?: string | null
-          voting_started_at?: string | null
-        }
-        Relationships: []
-      }
-      decision_votes: {
-        Row: {
-          choice: string
-          id: string
-          note: string | null
-          request_id: string
-          voted_at: string | null
-          voter_id: string
-        }
-        Insert: {
-          choice: string
-          id?: string
-          note?: string | null
-          request_id: string
-          voted_at?: string | null
-          voter_id: string
-        }
-        Update: {
-          choice?: string
-          id?: string
-          note?: string | null
-          request_id?: string
-          voted_at?: string | null
-          voter_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "decision_votes_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "decision_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -1683,6 +1626,16 @@ export type Database = {
           outcome: string
         }[]
       }
+      council_open_voting: {
+        Args: { _case_id: string }
+        Returns: {
+          status: string
+        }[]
+      }
+      council_remove_attachment: {
+        Args: { _case_id: string; _doc_id: string }
+        Returns: undefined
+      }
       council_return: {
         Args: { _case_id: string; _note: string }
         Returns: undefined
@@ -1693,6 +1646,27 @@ export type Database = {
           _duration: string
           _reasoning: string
           _types: Json
+        }
+        Returns: undefined
+      }
+      council_send_message: {
+        Args: {
+          _body: string
+          _case_id: string
+          _party: string
+          _party_uid: string
+          _with_seat: string
+        }
+        Returns: undefined
+      }
+      council_set_attachment: {
+        Args: {
+          _case_id: string
+          _doc_id: string
+          _file_name: string
+          _group: string
+          _label: string
+          _storage_path: string
         }
         Returns: undefined
       }
@@ -1721,55 +1695,8 @@ export type Database = {
         Args: { _case_id: string; _choice: string; _note: string }
         Returns: undefined
       }
+      council_vote_open: { Args: { _case_id: string }; Returns: boolean }
       current_officer_caseids: { Args: never; Returns: string[] }
-      dec_cast_vote: {
-        Args: { _choice: string; _note: string; _request_id: string }
-        Returns: undefined
-      }
-      dec_close_deadline: { Args: { _request_id: string }; Returns: undefined }
-      dec_create_request: {
-        Args: { _name: string; _nid: string }
-        Returns: {
-          id: string
-          secret_code: string
-        }[]
-      }
-      dec_issue: {
-        Args: { _reason: string; _request_id: string; _type: string }
-        Returns: undefined
-      }
-      dec_remove_attachment: {
-        Args: { _doc_id: string; _request_id: string }
-        Returns: undefined
-      }
-      dec_req_visible: {
-        Args: { _request_id: string; _uid: string }
-        Returns: boolean
-      }
-      dec_set_attachment: {
-        Args: {
-          _doc_id: string
-          _file_name: string
-          _group: string
-          _label: string
-          _request_id: string
-          _required: boolean
-          _storage_path: string
-        }
-        Returns: undefined
-      }
-      dec_submit_voting: { Args: { _request_id: string }; Returns: undefined }
-      dec_tally: {
-        Args: { _request_id: string }
-        Returns: {
-          accept: number
-          cast_n: number
-          closed: boolean
-          outcome: string
-          pending: number
-          reject: number
-        }[]
-      }
       has_authority: {
         Args: { _authority: Database["public"]["Enums"]["referral_authority"] }
         Returns: boolean
