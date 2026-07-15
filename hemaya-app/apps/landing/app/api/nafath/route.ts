@@ -13,6 +13,7 @@ const emailFor = (nid: string) => `${nid}@nafath.local`;
 const ORIGIN = {
   seeker: "/seeker",
   center: "/center",
+  decision: "/decision",
   competent: "/entities",
   ag: "/ag",
   technical: "/technical",
@@ -29,15 +30,15 @@ const DEMO: Record<string, Spec> = {
   "2000000002": { role: "case_officer", portal: ORIGIN.center + "/triage", label: "الفرز المبدئي" },
   "2000000003": { role: "studier", portal: ORIGIN.center + "/study", label: "الدراسة — الدارس" },
   "2000000004": { role: "evaluator", portal: ORIGIN.center + "/assessment", label: "التقييم — المقيّم" },
-  "2000000005": { role: "case_officer", portal: ORIGIN.center + "/decision", label: "إعداد القرار" },
-  "2000000006": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000005": { role: "case_officer", portal: ORIGIN.decision, label: "إعداد القرار" },
+  "2000000006": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "2000000007": { role: "case_officer", portal: ORIGIN.center + "/execution", label: "التنفيذ والتجديد" },
   "2000000008": { role: "board_chair", portal: ORIGIN.center + "/oversight", label: "قيادة المركز — الرئيس" },
   "2000000009": { role: "deputy_chair", portal: ORIGIN.center + "/oversight-deputy", label: "قيادة المركز — النائب" },
-  "2000000061": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
-  "2000000062": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
-  "2000000063": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
-  "2000000064": { role: "board_member", portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000061": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000062": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000063": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
+  "2000000064": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "3000000001": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة", attrs: { authority: "competent" } },
   "3000000002": { role: "moh_specialist", portal: ORIGIN.health, label: "وزارة الصحة", attrs: { authority: "health" } },
   "3000000003": { role: "hr_specialist", portal: ORIGIN.hr, label: "الموارد البشرية", attrs: { authority: "hr" } },
@@ -57,7 +58,7 @@ const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   case_officer: { portal: ORIGIN.center + "/triage", label: "موظف المركز" },
   studier: { portal: ORIGIN.center + "/study", label: "الدراسة — الدارس" },
   evaluator: { portal: ORIGIN.center + "/assessment", label: "التقييم — المقيّم" },
-  board_member: { portal: ORIGIN.center + "/decision-vote", label: "أعضاء المجلس" },
+  board_member: { portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   board_chair: { portal: ORIGIN.center + "/oversight", label: "قيادة المركز — الرئيس" },
   deputy_chair: { portal: ORIGIN.center + "/oversight-deputy", label: "قيادة المركز — النائب" },
   competent_body: { portal: ORIGIN.competent, label: "الجهات المختصة" },
@@ -124,7 +125,13 @@ export async function POST(req: Request) {
 
     // 3) تسجيل الدخول — يضبط كوكي جلسة Supabase على localhost (مشتركة بين المنافذ)
     const supabase = createServerClient();
-    const { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD });
+    let { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD });
+    // معالجة ذاتية: حساب مزروع/قديم بكلمة جسر مختلفة (مثل بذور nafath-staff-2026
+    // مع NAFATH_BRIDGE_PASSWORD مخصّصة) — نوحّد كلمته ثم نعيد المحاولة مرة واحدة
+    if (sErr && /invalid login credentials/i.test(sErr.message) && userId) {
+      await admin.auth.admin.updateUserById(userId, { password: DEV_PASSWORD });
+      ({ error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD }));
+    }
     if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 });
 
     return NextResponse.json({ ok: true, portal: spec.portal, role: spec.role, label: spec.label });
