@@ -44,3 +44,42 @@ export function dueDate(from: Date, rule: SlaRule): Date {
   d.setDate(d.getDate() + rule.days);
   return d;
 }
+
+// ─────────────── أيام العمل: الأحد–الخميس (الجمعة والسبت عطلة) ───────────────
+
+const WEEKEND = new Set([5, 6]); // getDay(): 5 = الجمعة، 6 = السبت
+
+export function isBusinessDay(d: Date): boolean {
+  return !WEEKEND.has(d.getDay());
+}
+
+/** يضيف أيام عملٍ على تاريخ — يتجاوز الجمعة والسبت. */
+export function addBusinessDays(from: Date, days: number): Date {
+  const d = new Date(from);
+  let left = days;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (isBusinessDay(d)) left -= 1;
+  }
+  return d;
+}
+
+/** عدد أيام العمل المنقضية بين تاريخين (يتجاهل الجمعة والسبت). */
+export function businessDaysBetween(from: Date, to: Date): number {
+  if (to <= from) return 0;
+  const d = new Date(from);
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(0, 0, 0, 0);
+  let n = 0;
+  while (d < end) {
+    d.setDate(d.getDate() + 1);
+    if (isBusinessDay(d)) n += 1;
+  }
+  return n;
+}
+
+/** تاريخ الاستحقاق مع مراعاة businessDays في القاعدة. */
+export function dueDateFor(from: Date, rule: SlaRule): Date {
+  return rule.businessDays ? addBusinessDays(from, rule.days) : dueDate(from, rule);
+}

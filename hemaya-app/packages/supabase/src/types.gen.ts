@@ -881,6 +881,50 @@ export type Database = {
           },
         ]
       }
+      leadership_messages: {
+        Row: {
+          author_id: string
+          author_role: Database["public"]["Enums"]["app_role"]
+          body: string
+          case_id: string
+          created_at: string
+          direction: string
+          id: string
+          leader: string
+          read_at: string | null
+        }
+        Insert: {
+          author_id: string
+          author_role: Database["public"]["Enums"]["app_role"]
+          body: string
+          case_id: string
+          created_at?: string
+          direction: string
+          id?: string
+          leader: string
+          read_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          author_role?: Database["public"]["Enums"]["app_role"]
+          body?: string
+          case_id?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          leader?: string
+          read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leadership_messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lifecycle_reviews: {
         Row: {
           case_id: string
@@ -1008,9 +1052,11 @@ export type Database = {
           case_id: string | null
           channel: string | null
           created_at: string | null
+          crit: boolean
           due_at: string | null
           id: string
           read: boolean | null
+          recipient_id: string | null
           sent_at: string | null
           target_tab: string | null
           title: string | null
@@ -1022,9 +1068,11 @@ export type Database = {
           case_id?: string | null
           channel?: string | null
           created_at?: string | null
+          crit?: boolean
           due_at?: string | null
           id?: string
           read?: boolean | null
+          recipient_id?: string | null
           sent_at?: string | null
           target_tab?: string | null
           title?: string | null
@@ -1036,9 +1084,11 @@ export type Database = {
           case_id?: string | null
           channel?: string | null
           created_at?: string | null
+          crit?: boolean
           due_at?: string | null
           id?: string
           read?: boolean | null
+          recipient_id?: string | null
           sent_at?: string | null
           target_tab?: string | null
           title?: string | null
@@ -1622,6 +1672,24 @@ export type Database = {
           },
         ]
       }
+      user_prefs: {
+        Row: {
+          prefs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          prefs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          prefs?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           attributes: Json | null
@@ -1661,8 +1729,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      assign_study_eval: {
+        Args: { _case_id: string; _per_role?: number }
+        Returns: undefined
+      }
       case_has_grievance: { Args: { _case_id: string }; Returns: boolean }
       case_in_decision: { Args: { _case_id: string }; Returns: boolean }
+      category_ar: {
+        Args: { _c: Database["public"]["Enums"]["app_category"] }
+        Returns: string
+      }
       cb_branch: { Args: never; Returns: string }
       cb_entity: {
         Args: never
@@ -1779,7 +1855,42 @@ export type Database = {
         Args: { _role: Database["public"]["Enums"]["app_role"]; _user: string }
         Returns: boolean
       }
+      is_assigned_assessment: { Args: { _case_id: string }; Returns: boolean }
+      is_assigned_study: { Args: { _case_id: string }; Returns: boolean }
+      is_center_leader: { Args: never; Returns: boolean }
       is_council: { Args: { _uid: string }; Returns: boolean }
+      mark_leader_thread_read: {
+        Args: { _case_id: string; _leader: string }
+        Returns: undefined
+      }
+      my_assessment_tasks: {
+        Args: never
+        Returns: {
+          assigned_at: string
+          case_id: string
+          category: Database["public"]["Enums"]["app_category"]
+          foreign_info: Json
+          peers: number
+          ref_no: string
+          secret_code: string
+          source: Database["public"]["Enums"]["case_source"]
+          submitted_at: string
+        }[]
+      }
+      my_study_tasks: {
+        Args: never
+        Returns: {
+          assigned_at: string
+          case_id: string
+          category: Database["public"]["Enums"]["app_category"]
+          foreign_info: Json
+          peers: number
+          ref_no: string
+          secret_code: string
+          source: Database["public"]["Enums"]["case_source"]
+          submitted_at: string
+        }[]
+      }
       notify_foreign: {
         Args: { _decision: string; _id: string }
         Returns: {
@@ -1851,6 +1962,7 @@ export type Database = {
           status: Database["public"]["Enums"]["case_status"]
         }[]
       }
+      record_secret_reveal: { Args: { _case_id: string }; Returns: undefined }
       referral_update: {
         Args: {
           _assignee: string
@@ -1916,6 +2028,10 @@ export type Database = {
           status: Database["public"]["Enums"]["case_status"]
         }[]
       }
+      send_leader_message: {
+        Args: { _body: string; _case_id: string; _leader: string }
+        Returns: string
+      }
       send_to_decision: {
         Args: { _case_id: string }
         Returns: {
@@ -1928,10 +2044,15 @@ export type Database = {
           status: Database["public"]["Enums"]["case_status"]
         }[]
       }
+      source_ar: {
+        Args: { _s: Database["public"]["Enums"]["case_source"] }
+        Returns: string
+      }
       submit_assessment: {
         Args: {
           _case_id: string
           _notes: string
+          _partial_reason?: string
           _proposed_duration: string
           _proposed_type: Json
           _recommendation: string
@@ -1997,6 +2118,7 @@ export type Database = {
         Args: {
           _case_id: string
           _notes: string
+          _partial_reason?: string
           _proposed_duration: string
           _proposed_type: Json
           _recommendation: string

@@ -7,3 +7,8 @@ export {
   Breadcrumb, Pagination, ProgressIndicator, Tooltip,
 } from "./components";
 export { SecretCode, DeadlineTimer, RiskLevel, EmergencyButton } from "./patterns";
+// القشرة الموحّدة (أنماطها: import "@hemaya/ui/shell.css")
+export {
+  PortalShell, SecretChip, NotificationsScreen, NotifItem, MessagesScreen,
+  I, NOTIF_TONES, fmtWhen, groupOf, daysAgo, catStyle,
+} from "./shell";

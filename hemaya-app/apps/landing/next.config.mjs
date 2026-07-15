@@ -13,6 +13,8 @@ const ZONES = {
   "/interior": zone("ZONE_INTERIOR_URL", "http://localhost:3011"),
   "/security": zone("ZONE_SECURITY_URL", "http://localhost:3012"),
   "/decision": zone("ZONE_DECISION_URL", "http://localhost:3014"),
+  "/studier": zone("ZONE_STUDIER_URL", "http://localhost:3015"),
+  "/evaluator": zone("ZONE_EVALUATOR_URL", "http://localhost:3016"),
 };
 const API_URL = zone("ZONE_API_URL", "http://localhost:3020");
 
