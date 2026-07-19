@@ -1,0 +1,30 @@
+# ============================================================
+# Portainer Stack — سيرفر القاعدة: كشف منفذَي Supabase على واجهة الشبكة
+#
+# لماذا؟ نسخ Supabase CLI الأحدث من 2.109 تربط منافذ المكدّس على
+# 127.0.0.1 فقط، فيتعذّر على سيرفرَي الواجهات والـAPIs الوصول إلى
+# القاعدة (55321) وتظهر «fetch failed» عند الدخول. هذا الـstack يعيد
+# نشر المنفذين على عنوان السيرفر الشبكي تحويلاً إلى الربط المحلي.
+#
+# Stacks ← Add stack ← Repository:
+#   Repository URL: https://github.com/tareqkabani/Hemayah
+#   Compose path:   deploy/staging/db-proxy.stack.yml
+# المتغيّر المطلوب (يُدخل مرة واحدة ويبقى عبر كل Pull and redeploy):
+#   DB_BIND_IP  عنوان هذا السيرفر على الشبكة الداخلية (مثال: 172.22.7.51)
+#
+# ملاحظتان:
+# - غير مطلوب مع CLI v2.109.1 (تربط على كل الواجهات أصلاً) — إن نُشر
+#   معها سيفشل الربط بتعارض المنفذ؛ احذفه أو ثبّت النسخة الأحدث.
+# - 55321 للواجهات والمتصفحات، و55323 لوحة Studio (للمشرفين فقط —
+#   لا تفتحه عبر جدار الشبكة لغيرهم).
+# ============================================================
+services:
+  hemaya-db-expose:
+    image: alpine/socat:1.8.0.0
+    network_mode: host
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        socat TCP-LISTEN:55321,bind=${DB_BIND_IP},fork,reuseaddr TCP:127.0.0.1:55321 &
+        exec socat TCP-LISTEN:55323,bind=${DB_BIND_IP},fork,reuseaddr TCP:127.0.0.1:55323
+    restart: unless-stopped
