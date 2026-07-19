@@ -30,6 +30,7 @@ const FRONTEND = [
   portal("decision"),          // 3014
   portal("studier"),           // 3015
   portal("evaluator"),         // 3016
+  portal("triage"),            // 3017
 ];
 const API = [portal("api")];   // 3020 (Hono REST)
 

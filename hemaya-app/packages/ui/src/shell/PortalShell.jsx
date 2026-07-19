@@ -7,10 +7,12 @@ import { I } from "./util";
 import { SecretChip } from "./SecretChip";
 import { Tag } from "../components";
 
-// عناوين الشاشات القياسية وأيقوناتها — الترتيب من config.screens
+// عناوين الشاشات القياسية وأيقوناتها — الترتيب من config.screens،
+// وتسميات البوابة الخاصة (config.screenMeta) تطغى على هذه الافتراضيات.
 const SCREEN_META = {
   dashboard: { t: "لوحة المعلومات", icon: "dashboard" },
   tasks: { t: "المهام المُسندة", icon: "assignment_ind" },
+  queue: { t: "الطلبات", icon: "inbox" },
   messages: { t: "المراسلات", icon: "forum" },
   notifications: { t: "الإشعارات", icon: "notifications" },
   profile: { t: "الملف الشخصي", icon: "account_circle" },
@@ -38,7 +40,8 @@ export function PortalShell({
     setOpen(false);
     onNavigate(id);
   };
-  const nav = config.screens.map((id) => ({ id, ...SCREEN_META[id], badge: counters[id] || null }));
+  const meta = { ...SCREEN_META, ...(config.screenMeta || {}) };
+  const nav = config.screens.map((id) => ({ id, ...meta[id], badge: counters[id] || null }));
 
   return (
     <div className="shell">

@@ -7,8 +7,8 @@ const nextConfig = {
   // basePath:false كي تكون الوجهة حرفيّة خارج منطقة /center (منطقة /decision في الشاشة الموحّدة)
   // (basePath:false يجعل المصدر والوجهة حرفيّين — لذا المصدر مكتوب ببادئة /center الصريحة)
   async redirects() {
-    return ["/center/decision", "/center/decision-lead", "/center/decision-vote"].map((source) => ({
-      source, destination: "/decision", basePath: false, permanent: false,
+    return ["/center/decision", "/center/decision-lead", "/center/decision-vote", "/center/triage"].map((source) => ({
+      source, destination: source === "/center/triage" ? "/triage" : "/decision", basePath: false, permanent: false,
     }));
   },
 };

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Card, CardBody, Tag, InlineAlert } from "@hemaya/ui";
 
 const SECTIONS: { t: string; href?: string; external?: boolean }[] = [
-  { t: "الفرز المبدئيّ — قائمة واردة مشتركة", href: "/triage" },
+  // الفرز المبدئي انتقل لبوابته الموحّدة (منطقة /triage) — رابط خام يعبر المناطق
+  { t: "الفرز المبدئي — بوابة الفرز الموحّدة", href: "/triage", external: true },
   { t: "الدراسة — بوابة الدارس", href: "/study" },
   { t: "التقييم — بوابة المقيّم", href: "/assessment" },
   // مرحلة القرار انتقلت لبوابة القرار الموحّدة (منطقة /decision) — رابط خام يعبر المناطق

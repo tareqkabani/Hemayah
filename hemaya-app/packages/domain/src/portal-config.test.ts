@@ -4,6 +4,8 @@ import {
   PORTAL_CONFIGS,
   STAGE_FLOW,
   STUDIER_CONFIG,
+  TRIAGE_CONFIG,
+  TRIAGE_LEAD_CONFIG,
 } from "./portal-config";
 import { addBusinessDays, businessDaysBetween, isBusinessDay } from "./sla";
 
@@ -73,6 +75,88 @@ describe("إعدادات الدارس/المقيّم — قيم المصفوفة
     expect(PORTAL_CONFIGS.evaluator.roles).toEqual(["evaluator"]);
     expect(PORTAL_CONFIGS.studier.strings.output).toBe("الدراسة");
     expect(PORTAL_CONFIGS.evaluator.strings.output).toBe("التقييم");
+  });
+});
+
+// حالات سجلّ الفرز: triage (وارد جديد) · replied (وردت التوصية) · pending (لدى الجهة) · study/closed (مُنجز)
+describe("nextAction — موظف الفرز", () => {
+  it("وردت التوصية → اتخاذ قرار الفرز (م10) — الأولوية الأولى", () => {
+    const act = TRIAGE_CONFIG.nextAction({ status: "replied" });
+    expect(act).not.toBeNull();
+    expect(act!.t).toBe("وردت توصية الجهة — اتخاذ قرار الفرز (م10)");
+    expect(act!.icon).toBe("gavel");
+  });
+
+  it("وارد جديد → محضر اتصال ثم الفحص الشكلي فقرار الفرز (م7)", () => {
+    const act = TRIAGE_CONFIG.nextAction({ status: "triage" });
+    expect(act!.t).toBe("محضر اتصال موثّق ثم الفحص الشكلي فقرار الفرز (م7)");
+    expect(act!.icon).toBe("fact_check");
+  });
+
+  it("وارد ورقيّ → صيغة الهوية غير الموثّقة", () => {
+    const act = TRIAGE_CONFIG.nextAction({ status: "triage", paper: true });
+    expect(act!.t).toBe("ورود ورقيّ (هوية غير موثّقة) — محضر اتصال ثم الفحص الشكلي (م7)");
+  });
+
+  it("بانتظار الجهة أو مُنجز → لا إجراء على الموظف", () => {
+    expect(TRIAGE_CONFIG.nextAction({ status: "pending" })).toBeNull();
+    expect(TRIAGE_CONFIG.nextAction({ status: "study" })).toBeNull();
+    expect(TRIAGE_CONFIG.nextAction({ status: "closed" })).toBeNull();
+  });
+});
+
+describe("nextAction — قيادة الفرز (إشراف)", () => {
+  it("تجاوز مهلة الجهة → مراجعة التصعيد", () => {
+    const act = TRIAGE_LEAD_CONFIG.nextAction({ status: "pending", sla: { totalDays: 5, daysElapsed: 5 } });
+    expect(act).not.toBeNull();
+    expect(act!.icon).toBe("priority_high");
+  });
+
+  it("مهلة جارية أو وارد جديد → لا إجراء على القيادة (لا تدخّل في قرار الموظف)", () => {
+    expect(TRIAGE_LEAD_CONFIG.nextAction({ status: "pending", sla: { totalDays: 5, daysElapsed: 2 } })).toBeNull();
+    expect(TRIAGE_LEAD_CONFIG.nextAction({ status: "pending" })).toBeNull();
+    expect(TRIAGE_LEAD_CONFIG.nextAction({ status: "triage" })).toBeNull();
+    expect(TRIAGE_LEAD_CONFIG.nextAction({ status: "replied" })).toBeNull();
+  });
+});
+
+describe("إعدادات الفرز — قيم المصفوفة حرفياً", () => {
+  for (const cfg of [TRIAGE_CONFIG, TRIAGE_LEAD_CONFIG]) {
+    it(`${cfg.portal}/${cfg.label}: لوحة افتراضية · بلا طوارئ · رمز سري · قائمة مشتركة · المرحلة 2 من 6`, () => {
+      expect(cfg.defaultScreen).toBe("dashboard");
+      expect(cfg.emergencyButton).toBe(false); // العاجل لا يدخل الفرز (م8)
+      expect(cfg.identityMode).toBe("secret-code");
+      expect(cfg.identityRevealSeconds).toBe(6);
+      expect(cfg.isolationScope).toBe("shared-queue");
+      expect(cfg.stage).toEqual({ index: 2, total: 6 });
+      expect(STAGE_FLOW[cfg.stage.index - 1]).toBe("الفرز المبدئي");
+      expect(cfg.screens[0]).toBe("dashboard");
+      expect(cfg.screens[cfg.screens.length - 1]).toBe("profile");
+      expect(cfg.screens).toContain("queue");
+      // مهلة توصية الجهة: 5 أيام عمل (م5/4)
+      expect(cfg.sla.output.slaId).toBe("recommendation");
+      expect(cfg.sla.output.totalBusinessDays).toBe(5);
+      // الطرفان: طالب الحماية بالرمز السري والجهة بضابط الاتصال
+      expect(cfg.messaging.parties.map((p) => p.id)).toEqual(["seeker", "entity"]);
+      expect(cfg.messaging.perCaseThread).toBe(true);
+      expect(cfg.messaging.activeCasesOnly).toBe(true);
+      expect(cfg.messaging.identityTag).toBe("بالرمز السري");
+    });
+  }
+
+  it("الموظف يبدأ المراسلة والقيادة اطّلاع فقط", () => {
+    expect(TRIAGE_CONFIG.messaging.mode).toBe("initiator");
+    expect(TRIAGE_LEAD_CONFIG.messaging.mode).toBe("read-only");
+  });
+
+  it("تسميات شاشة القائمة تختلف بالدور (شاشة queue من screenMeta)", () => {
+    expect(TRIAGE_CONFIG.screenMeta!.queue!.t).toBe("الطلبات الواردة");
+    expect(TRIAGE_LEAD_CONFIG.screenMeta!.queue!.t).toBe("سجلّ الفرز");
+  });
+
+  it("السجلّ يحوي الإعدادين بأدوارهما", () => {
+    expect(PORTAL_CONFIGS.triage.roles).toEqual(["case_officer"]);
+    expect(PORTAL_CONFIGS["triage-lead"].roles).toEqual(["deputy_chair", "board_chair"]);
   });
 });
 

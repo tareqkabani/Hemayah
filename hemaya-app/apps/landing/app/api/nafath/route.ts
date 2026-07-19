@@ -13,6 +13,7 @@ const emailFor = (nid: string) => `${nid}@nafath.local`;
 const ORIGIN = {
   seeker: "/seeker",
   center: "/center",
+  triage: "/triage",
   decision: "/decision",
   studier: "/studier",
   evaluator: "/evaluator",
@@ -29,7 +30,7 @@ type Spec = { role: string; portal: string; label: string; attrs?: Record<string
 const DEMO: Record<string, Spec> = {
   "1000000001": { role: "subject", portal: ORIGIN.seeker, label: "طالب الحماية" },
   "2000000001": { role: "hotline_operator", portal: ORIGIN.center + "/paper-intake", label: "الاستقبال الورقيّ" },
-  "2000000002": { role: "case_officer", portal: ORIGIN.center + "/triage", label: "الفرز المبدئي" },
+  "2000000002": { role: "case_officer", portal: ORIGIN.triage, label: "الفرز المبدئي" },
   "2000000003": { role: "studier", portal: ORIGIN.studier, label: "الدراسة — الدارس" },
   "2000000004": { role: "evaluator", portal: ORIGIN.evaluator, label: "التقييم — المقيّم" },
   "2000000005": { role: "case_officer", portal: ORIGIN.decision, label: "إعداد القرار" },
@@ -57,7 +58,7 @@ const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب
 const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   subject: { portal: ORIGIN.seeker, label: "طالب الحماية" },
   hotline_operator: { portal: ORIGIN.center + "/paper-intake", label: "الاستقبال الورقيّ" },
-  case_officer: { portal: ORIGIN.center + "/triage", label: "موظف المركز" },
+  case_officer: { portal: ORIGIN.triage, label: "موظف المركز" },
   studier: { portal: ORIGIN.studier, label: "الدراسة — الدارس" },
   evaluator: { portal: ORIGIN.evaluator, label: "التقييم — المقيّم" },
   board_member: { portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
