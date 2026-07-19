@@ -37,8 +37,11 @@ begin
       ('3000000004','security_manager',   '{"authority":"security"}'::jsonb,  'مدير الإدارة الأمنية'),
       ('3000000005','moi_officer',        '{"authority":"moi"}'::jsonb,       'ضابط وزارة الداخلية'),
       ('4000000001','prosecutor_general', '{}'::jsonb,                        'النائب العام'),
-      ('5000000001','advisor',            '{"advisor":"a1"}'::jsonb,          'مستشار المكتب الفني'),
-      ('5000000002','tech_manager',       '{}'::jsonb,                        'مدير المكتب الفني')
+      ('5000000001','advisor',            '{"advisor":"a1","spec":"قانوني"}'::jsonb,        'م. عبدالله العتيبي'),
+      ('5000000002','tech_manager',       '{}'::jsonb,                        'م. فهد الدوسري'),
+      -- مستشارا مكتبٍ إضافيان: للإسناد الآليّ بالعبء واختبار العزل المتبادل
+      ('5000000003','advisor',            '{"advisor":"a2","spec":"أمني"}'::jsonb,          'د. منى الزهراني'),
+      ('5000000004','advisor',            '{"advisor":"a3","spec":"نفسي/اجتماعي"}'::jsonb,  'أ. سارة القحطاني')
     ) as t(nid, role, attrs, name)
   loop
     select id into uid from auth.users where email = r.nid || '@nafath.local';
@@ -65,6 +68,10 @@ begin
         jsonb_build_object('sub', uid::text, 'email', r.nid || '@nafath.local', 'email_verified', true),
         'email', now(), now(), now()
       );
+    else
+      -- الاسم الظاهر يتبع البذرة (idempotent — يصحّح أسماء الحسابات القائمة)
+      update auth.users set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('name', r.name)
+      where id = uid;
     end if;
     insert into user_roles (user_id, role, attributes)
     values (uid, r.role::app_role, r.attrs)
