@@ -20,22 +20,20 @@ services:
       context: ../..
       dockerfile: deploy/staging/docker/frontend.Dockerfile
       args:
-        # الوضع المباشر بالـIP (نمط 15 يوليو الشغّال) — روابط القاعدة والبوابة
-        # تُخبز وقت البناء، والنطاق https معطَّل حتى يفعّل فريق الشبكة سجلّ DNS.
-        # عند التفعيل: أعد الأسطر الثلاثة إلى صيغة النطاق ثم Pull and redeploy:
-        #   NEXT_PUBLIC_SUPABASE_URL: "https://${PUBLIC_HOST}/supabase"
-        #   NEXT_PUBLIC_GATEWAY_URL:  "https://${PUBLIC_HOST}"
-        NEXT_PUBLIC_SUPABASE_URL: "http://${DB_HOST}:55321"
+        # ما يُدمج في شيفرة المتصفح: كل شيء عبر النطاق بـ https (الـDNS مفعّل)
+        NEXT_PUBLIC_SUPABASE_URL: "https://${PUBLIC_HOST}/supabase"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
-        NEXT_PUBLIC_GATEWAY_URL: "http://${FRONT_HOST}:3000"
+        NEXT_PUBLIC_GATEWAY_URL: "https://${PUBLIC_HOST}"
     ports:
       - "3000:3000"
     environment:
-      # جانب الخادم يصل القاعدة داخلياً مباشرة (لا يمرّ بالوكيل)
+      # جانب الخادم يصل القاعدة داخلياً مباشرة بالـIP وقت التشغيل — غير مخبوز،
+      # فلا يتأثر بالنطاق ولا بشهادته (هذا ما أسقط الدخول بـfetch failed سابقاً)
+      SUPABASE_INTERNAL_URL: "http://${DB_HOST}:55321"
       NEXT_PUBLIC_SUPABASE_URL: "http://${DB_HOST}:55321"
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
       SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}"
-      NEXT_PUBLIC_GATEWAY_URL: "http://${FRONT_HOST}:3000"
+      NEXT_PUBLIC_GATEWAY_URL: "https://${PUBLIC_HOST}"
       SERVER_ACTIONS_ALLOWED_ORIGINS: "${PUBLIC_HOST},${FRONT_HOST}:3000"
       NAFATH_BRIDGE_PASSWORD: "${NAFATH_BRIDGE_PASSWORD}"
       ZONE_API_URL: "http://${API_HOST}:3020"
