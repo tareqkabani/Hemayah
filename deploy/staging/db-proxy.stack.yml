@@ -9,8 +9,9 @@
 # Stacks ← Add stack ← Repository:
 #   Repository URL: https://github.com/tareqkabani/Hemayah
 #   Compose path:   deploy/staging/db-proxy.stack.yml
-# المتغيّر المطلوب (يُدخل مرة واحدة ويبقى عبر كل Pull and redeploy):
-#   DB_BIND_IP  عنوان هذا السيرفر على الشبكة الداخلية (مثال: 172.22.7.51)
+# بلا متغيّرات مطلوبة: العنوان مثبَّت افتراضياً على سيرفر القاعدة الحالي
+# (172.22.7.51) — انشر مباشرة. ولو تغيّر السيرفر يوماً يُتجاوز بمتغيّر
+#   DB_BIND_IP في حقول الـstack دون تعديل الملف.
 #
 # ملاحظتان:
 # - غير مطلوب مع CLI v2.109.1 (تربط على كل الواجهات أصلاً) — إن نُشر
@@ -25,6 +26,6 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        socat TCP-LISTEN:55321,bind=${DB_BIND_IP},fork,reuseaddr TCP:127.0.0.1:55321 &
-        exec socat TCP-LISTEN:55323,bind=${DB_BIND_IP},fork,reuseaddr TCP:127.0.0.1:55323
+        socat TCP-LISTEN:55321,bind=${DB_BIND_IP:-172.22.7.51},fork,reuseaddr TCP:127.0.0.1:55321 &
+        exec socat TCP-LISTEN:55323,bind=${DB_BIND_IP:-172.22.7.51},fork,reuseaddr TCP:127.0.0.1:55323
     restart: unless-stopped
