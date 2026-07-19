@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { Card, CardBody, Tag, InlineAlert } from "@hemaya/ui";
 
-const SECTIONS = [
+const SECTIONS: { t: string; href?: string; external?: boolean }[] = [
   { t: "الفرز المبدئيّ — قائمة واردة مشتركة", href: "/triage" },
   { t: "الدراسة — بوابة الدارس", href: "/study" },
   { t: "التقييم — بوابة المقيّم", href: "/assessment" },
-  { t: "القرار — معدّ قرار المركز", href: "/decision" },
-  { t: "القرار — أعضاء المجلس (تصويت)", href: "/decision-vote" },
-  { t: "القرار — قيادة المجلس (اعتماد/إصدار)", href: "/decision-lead" },
+  // مرحلة القرار انتقلت لبوابة القرار الموحّدة (منطقة /decision) — رابط خام يعبر المناطق
+  { t: "القرار والإشعار — بوابة القرار الموحّدة", href: "/decision", external: true },
   { t: "التنفيذ والتجديد — دورة حياة المشمولين", href: "/execution" },
   { t: "قيادة المركز — رئيس المركز (إشراف)", href: "/oversight" },
   { t: "قيادة المركز — نائب رئيس المركز", href: "/oversight-deputy" },
@@ -22,7 +21,7 @@ export default function Page() {
         <p>أقسام البوابة أدناه. القاعدة والصلاحيات والتصميم مربوطة.</p>
       </div>
       <InlineAlert kind="info" title="حالة البوابة">
-        الفرز المبدئي والدراسة والتقييم والقرار والاستقبال الورقيّ مُفعَّلة. ربط القرار بـ Supabase (بدل المخزن المحلّي) يتبع خطة البناء.
+        الفرز المبدئي والدراسة والتقييم والاستقبال الورقيّ مُفعَّلة هنا. مرحلة «القرار والإشعار» تُدار في بوابة القرار الموحّدة بدورة الاعتماد الجديدة (إعداد ← اعتماد النائب ← طرح ← تصويت ← إصدار).
       </InlineAlert>
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 18 }}>
         {SECTIONS.map((s, i) => {
@@ -34,6 +33,7 @@ export default function Page() {
               </div>
             </CardBody></Card>
           );
+          if (s.external) return <a key={i} href={s.href} style={{ textDecoration: "none" }}>{inner}</a>;
           return s.href ? <Link key={i} href={s.href} style={{ textDecoration: "none" }}>{inner}</Link> : <div key={i}>{inner}</div>;
         })}
       </div>

@@ -2,14 +2,13 @@
 /* ============================================================
    قيادة المركز — الإشراف التنفيذي (منقول من oversight-portal.jsx)
    window→@hemaya/ui + وحدات محلّية. المخازن الخارجيّة (Metrics/Handoff/Challenges)
-   محروسةٌ للـSSR وتسقط لبدائلها. مرحلة القرار مدمجة من DecisionLeadership.
+   محروسةٌ للـSSR وتسقط لبدائلها. مرحلة القرار انتقلت لبوابة القرار
+   الموحّدة (منطقة /decision) — تحديث 15 يوليو؛ هنا بطاقة عبورٍ إليها فقط.
    role ∈ 'chair' | 'deputy'.
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, RiskLevel, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
-import { DecisionLeadership } from "./DecisionPortal";
-import { HemayaDecision } from "./decision-store";
 import { HemayaChallenges } from "./challenges-store";
 import { HemayaHandoff } from "./execution-handoff";
 import { HemayaMetrics } from "./center-metrics";
@@ -433,22 +432,23 @@ const { App } = (function () {
     </div>);
   }
 
-  // ===== مرحلة القرار — مدمجة من المخزن المشترك (DecisionLeadership) =====
-  function DecisionApprovals({ role }) {
-    const DL = DecisionLeadership;
-    const [sel, setSel] = useState(null);
-    if (!DL) return <div className="lede">تعذّر تحميل وحدة القرار.</div>;
-    if (sel) return <DL.ApprovalReview q={sel} me={role} back={() => setSel(null)} />;
-    return <DL.Approvals me={role} open={(q) => { setSel(q); window.scrollTo(0, 0); }} />;
-  }
-  function DecisionVoting({ role }) {
-    const DL = DecisionLeadership;
-    const [sel, setSel] = useState(null);
-    if (!DL) return <div className="lede">تعذّر تحميل وحدة القرار.</div>;
-    if (sel) return sel.kind === 'lifecycle'
-      ? <DL.LifecycleSession q={sel} me={role} scope="leadership" back={() => setSel(null)} />
-      : <DL.DecisionSession q={sel} me={role} scope="leadership" back={() => setSel(null)} />;
-    return <DL.DecisionCases scope="leadership" me={role} open={(q) => { setSel(q); window.scrollTo(0, 0); }} />;
+  // ===== مرحلة القرار — انتقلت لبوابة القرار الموحّدة (تحديث 15 يوليو) =====
+  // دورة الاعتماد الجديدة (إعداد ← اعتماد النائب ← طرح ← تصويت ← إصدار الرئيس)
+  // تُدار كاملةً في منطقة /decision؛ من هنا عبورٌ مباشر بدور القيادة.
+  function DecisionHandoff({ role, kind }) {
+    const t = kind === 'approvals' ? 'اعتماد القرارات' : 'التصويت وإصدار القرار';
+    const d = kind === 'approvals'
+      ? 'مراجعة القرارات المرفوعة من المعدّ واعتمادها أو إعادتها بملاحظة — صلاحية نائب رئيس المركز حصراً.'
+      : 'الاطّلاع على الحصيلة والتصويت كعضو، ثم إصدار القرار وإشعار الطرفين (م10) — الإصدار بيد رئيس المركز.';
+    return (<div>
+      <h2 className="h2">{t}</h2>
+      <p className="lede">انتقلت مرحلة «القرار والإشعار» إلى بوابة القرار الموحّدة بدورة الاعتماد الجديدة: إعداد ← اعتماد النائب ← الطرح ← التصويت ← الإصدار.</p>
+      <Card className="card pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div><b style={{ color: 'var(--text-strong)' }}>{t} — في بوابة القرار</b><div className="muted" style={{ marginTop: 3 }}>{d}</div></div>
+        {/* رابط خام (بلا بادئة المنطقة) — يعبر من منطقة /center إلى منطقة /decision */}
+        <a className="btn btn-primary" href="/decision" style={{ textDecoration: 'none' }}><I name={kind === 'approvals' ? 'approval' : 'gavel'} size={18} /> الانتقال لبوابة القرار</a>
+      </Card>
+    </div>);
   }
 
   // ===== التطبيق =====
@@ -631,16 +631,13 @@ const { App } = (function () {
     const [open, setOpen] = useState(false);
     const [acting, setActing] = useState(false);
     const [toastMsg, setToastMsg] = useState(null);
-    const [, forceOv] = useState(0);
-    React.useEffect(() => { if (initialData) HemayaDecision.hydrate(initialData); }, []);
-    React.useEffect(() => HemayaDecision && HemayaDecision.subscribe(() => forceOv((n) => n + 1)), []);
     const toast = (m) => { setToastMsg(m); clearTimeout(_ot); _ot = setTimeout(() => setToastMsg(null), 2600); };
     const go = (id) => { setActive(id); setOpen(false); window.scrollTo(0, 0); };
     const cur = NAV.find((n) => n.id === active);
     let body;
     if (active === 'pipeline') body = <Pipeline role={role} acting={acting} toast={toast} />;
-    else if (active === 'approvals') body = <DecisionApprovals role={role} />;
-    else if (active === 'voting') body = <DecisionVoting role={role} />;
+    else if (active === 'approvals') body = <DecisionHandoff role={role} kind="approvals" />;
+    else if (active === 'voting') body = <DecisionHandoff role={role} kind="voting" />;
     else if (active === 'challenges') body = <Challenges role={role} acting={acting} toast={toast} />;
     else if (active === 'handoff') body = <Handoff role={role} toast={toast} />;
     else if (active === 'alerts') body = <Alerts role={role} acting={acting} toast={toast} />;

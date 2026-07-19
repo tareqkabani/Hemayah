@@ -2,4 +2,5 @@ export * from "./enums";
 export * from "./roles";
 export * from "./sla";
 export * from "./case-state";
+export * from "./decision-state";
 export * from "./materials";
