@@ -5,3 +5,4 @@ export * from "./case-state";
 export * from "./decision-state";
 export * from "./materials";
 export * from "./portal-config";
+export * from "./grievance";
