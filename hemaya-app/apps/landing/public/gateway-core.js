@@ -80,7 +80,9 @@
     '3000000005': 'entity-interior',
     '4000000001': 'ag-main',
     '5000000001': 'tech-consultants',
-    '5000000002': 'tech-manager'
+    '5000000002': 'tech-manager',
+    '5000000003': 'tech-consultants',
+    '5000000004': 'tech-consultants'
   };
   var PORTAL_DEMO = {};
   Object.keys(IDENTITY).forEach(function (did) { PORTAL_DEMO[IDENTITY[did]] = did; });

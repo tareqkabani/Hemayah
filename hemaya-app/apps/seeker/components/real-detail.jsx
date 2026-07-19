@@ -136,7 +136,9 @@ export function RealRequestDetail({ request, back, go }) {
     setBusy(true); setErr('');
     const against = [gScope, gReason].filter((s) => s && s.trim()).join(' — ');
     const due = new Date(Date.now() + 10 * 86400000).toISOString();
-    const { error } = await supabase.from('grievances').insert({ case_id: request.id, against, status: 'filed', filed_at: new Date().toISOString(), decision_due: due });
+    // scope/applicant_reason حقلان بنيويّان لدورة المكتب الفني (م21) — لا استنتاج نصّي
+    const scope = isReject ? 'reject' : 'types';
+    const { error } = await supabase.from('grievances').insert({ case_id: request.id, against, scope, applicant_reason: gReason.trim() || null, status: 'filed', filed_at: new Date().toISOString(), decision_due: due });
     setBusy(false);
     if (error) { setErr('تعذّر رفع التظلّم: ' + error.message); return; }
     setMode('detail'); await load();

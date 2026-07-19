@@ -216,7 +216,8 @@ function GrievanceDetail({ g, isHead, advisorName, back, onAdvisorDecide, onAdop
   const [returnNote, setReturnNote] = useState('');
 
   const myDec = g.advisorDecision;
-  const toggle = (arr, set) => (t) => set(arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
+  // تحديث دالّي — نقرات متتالية في دفعةٍ واحدة لا تُسقط بعضها
+  const toggle = (set) => (t) => set((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   const canDecide = decision && decReason.trim() && (decision !== 'support' || decTypes.length > 0);
   const canAdopt = outcome && adoptReason.trim() && (outcome !== 'accept' || adoptTypes.length > 0);
 
@@ -340,7 +341,7 @@ function GrievanceDetail({ g, isHead, advisorName, back, onAdvisorDecide, onAdop
           {decision === 'support' && (
             <div className="fld">
               <label className="fld-label">أنواع الحماية المقترحة عند تأييد التظلّم (من الـ13 — المادة الرابعة عشرة)</label>
-              <TypeChips value={decTypes} onToggle={toggle(decTypes, setDecTypes)} />
+              <TypeChips value={decTypes} onToggle={toggle(setDecTypes)} />
             </div>
           )}
           <div className="fld">
@@ -387,7 +388,7 @@ function GrievanceDetail({ g, isHead, advisorName, back, onAdvisorDecide, onAdop
             {outcome === 'accept' && (
               <div className="fld">
                 <label className="fld-label">أنواع الحماية المقرّرة (من الـ13 — المادة الرابعة عشرة)</label>
-                <TypeChips value={adoptTypes} onToggle={toggle(adoptTypes, setAdoptTypes)} />
+                <TypeChips value={adoptTypes} onToggle={toggle(setAdoptTypes)} />
               </div>
             )}
             <div className="fld">
