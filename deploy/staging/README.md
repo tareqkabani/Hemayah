@@ -29,6 +29,8 @@ supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY)='
 
 المنافذ المطلوبة عبر الشبكة: **55321** (للمتصفحات والسيرفرين)، و**55323** (لوحة Studio — للمشرفين فقط). أبقِ 55322 (Postgres) مغلقاً خارجياً.
 
+> **⚠️ نسخ CLI الأحدث من 2.109 تربط المنافذ على `127.0.0.1` فقط** — فيصل سيرفر القاعدة نفسه إليها ولا يصل غيره، وتظهر «fetch failed» عند الدخول من الواجهات. العلاج المعتمد: انشر stack كشف المنافذ على **Portainer سيرفر القاعدة** — Compose path: `deploy/staging/db-proxy.stack.yml` بمتغيّر واحد `DB_BIND_IP` = عنوان السيرفر الشبكي (يُدخل مرة واحدة ويبقى). تحقّق بعده من أي جهاز: `curl http://<DB_HOST>:55321/auth/v1/health`.
+
 ## 2) سيرفر الـAPIs — stack في Portainer
 
 Portainer ← **Stacks ← Add stack ← Repository**:
@@ -76,6 +78,8 @@ Deploy ← تحقق: `http://<API_HOST>:3020/v1/health` ترجع `{"status":"ok"
 | العملية | أين | الأمر/الخطوة |
 |---------|-----|--------------|
 | تحديث لنسخة أحدث | Portainer على السيرفرين | الـ stack ← **Pull and redeploy** |
+| تطبيق هجرات جديدة (تبقي البيانات) | سيرفر القاعدة | `cd Hemayah && git pull && supabase migration up` |
+| انقطاع 55321 بعد تحديث CLI | Portainer سيرفر القاعدة | نشر/تشغيل stack ‏`db-proxy.stack.yml` (انظر تنبيه الخطوة 1) |
 | تصفير بيانات التجربة | سيرفر القاعدة | `cd Hemayah && git pull && supabase db reset` |
 | سجلّات | Portainer | Containers ← Logs |
 | هويات تجريبية | — | طالب حماية `1000000001` · فرز `2000000002` · رئيس `2000000008` · نائب عام `4000000001` |
