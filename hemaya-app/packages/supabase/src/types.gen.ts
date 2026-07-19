@@ -326,6 +326,7 @@ export type Database = {
           created_at: string | null
           id: string
           officer_id: string | null
+          result: string
           summary: string
         }
         Insert: {
@@ -334,6 +335,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           officer_id?: string | null
+          result?: string
           summary: string
         }
         Update: {
@@ -342,6 +344,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           officer_id?: string | null
+          result?: string
           summary?: string
         }
         Relationships: [
@@ -987,6 +990,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_reads: {
+        Row: {
+          notif_key: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          notif_key: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          notif_key?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -2121,7 +2142,7 @@ export type Database = {
         | "upheld"
         | "dismissed"
       msg_dir: "in" | "out" | "note"
-      msg_thread: "center" | "body"
+      msg_thread: "center" | "body" | "coord"
       referral_authority:
         | "hr"
         | "health"
@@ -2336,7 +2357,7 @@ export const Constants = {
         "dismissed",
       ],
       msg_dir: ["in", "out", "note"],
-      msg_thread: ["center", "body"],
+      msg_thread: ["center", "body", "coord"],
       referral_authority: [
         "hr",
         "health",
@@ -2370,4 +2391,3 @@ export const Constants = {
     },
   },
 } as const
-

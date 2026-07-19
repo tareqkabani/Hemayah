@@ -11,6 +11,7 @@ import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, Notific
 import { PORTAL_CONFIGS, STAGE_FLOW } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
+import { fetchRegister } from "@/lib/register";
 import "./triage-screens.css";
 
 /* ============================================================
@@ -202,18 +203,18 @@ function stampNow() {
   let h = d.getHours(); const ap = h < 12 ? 'ص' : 'م'; h = h % 12 || 12;
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(h)}:${p(d.getMinutes())} ${ap}`;
 }
-function CallLogs({ rec, actor, viewOnly, isDone, logs, setLogs }) {
+function CallLogs({ rec, actor, viewOnly, isDone, logs, setLogs, onAdd }) {
   const [result, setResult] = useState('');
   const [channel, setChannel] = useState('phone');
   const [note, setNote] = useState('');
   const canAdd = !viewOnly && !isDone;
   const who = CLERKS[actor] ? CLERKS[actor].name : 'الموظف';
-  const save = () => {
+  const save = async () => {
     if (!result) return;
-    // القضايا الفعليّة: احفظ المحضر في القاعدة (شرطٌ لقرار triage_decide) — append-only + تدقيق.
-    if (rec.real && rec.caseId) {
-      const summary = note.trim() || (CALL_RESULTS[result] ? CALL_RESULTS[result].t : 'محضر اتصال');
-      addContactLog(rec.caseId, channel, summary);
+    // القضايا الفعليّة: احفظ المحضر في القاعدة أولاً (شرطٌ لقرار triage_decide) — append-only + تدقيق.
+    if (rec.real && rec.caseId && onAdd) {
+      const ok = await onAdd(rec, channel, result, note.trim());
+      if (!ok) return;
     }
     setLogs((l) => [...l, { date: stampNow(), channel, result, note: note.trim(), by: who }]);
     setResult(''); setNote(''); setChannel('phone');
@@ -326,7 +327,7 @@ function FormalCheck({ checks, setChecks }) {
 }
 
 // ===== شاشة التفاصيل / الفرز =====
-function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal }) {
+function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog }) {
   const [decision, setDecision] = useState('');
   const [entity, setEntity] = useState('');
   const [branch, setBranch] = useState(() => CITY_REGION[rec.city] || 'RUH');
@@ -409,7 +410,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal }) {
           </div>
         </Card>}
 
-      <CallLogs key={rec.secret} rec={rec} actor={actor} viewOnly={viewOnly} isDone={isDone} logs={logs} setLogs={setLogs} />
+      <CallLogs key={rec.secret} rec={rec} actor={actor} viewOnly={viewOnly} isDone={isDone} logs={logs} setLogs={setLogs} onAdd={onAddLog} />
 
       {/* توصية الجهة — مرفقة أو واردة */}
       {hasRec && (
@@ -693,7 +694,7 @@ function notifsOf(rows, cfg, viewOnly, readIds) {
 }
 
 // ===== التطبيق — تركيب القشرة الموحّدة =====
-function App({ roleKey, me, initialRows, prefs, basePath }) {
+function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initialMessages }) {
   const cfg = PORTAL_CONFIGS[roleKey] || PORTAL_CONFIGS.triage;
   const viewOnly = roleKey === 'triage-lead';
   const supabase = useRef(createClient()).current;
@@ -702,11 +703,15 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState('');
   const [collapsed, setCollapsed] = useState(!!(prefs || {})['sidebar-triage']);
-  const [threads, setThreads] = useState([]); // خيوط المراسلات — تُوصل بالقاعدة في الخطوة التالية
-  const [readIds, setReadIds] = useState([]);
-  const readKey = 'triageNotifRead-' + roleKey + '-v2';
-  useEffect(() => { try { const s = JSON.parse(localStorage.getItem(readKey) || 'null'); if (Array.isArray(s)) setReadIds(s); } catch (e) {} }, [readKey]);
-  const persistRead = (ids) => { setReadIds(ids); try { localStorage.setItem(readKey, JSON.stringify(ids)); } catch (e) {} };
+  const [msgRows, setMsgRows] = useState(initialMessages || []);
+  const [localThreads, setLocalThreads] = useState([]); // خيوط بدأها الموظف ولم تُرسل أول رسالة بعد
+  // مقروئية الإشعارات في القاعدة (notification_reads) — تصمد عبر الأجهزة
+  const [readIds, setReadIds] = useState(initialReadKeys || []);
+  // مقروئية خيوط الرسائل محلية (لا عمود قراءة في messages) — عدّادات فقط
+  const [msgReadIds, setMsgReadIds] = useState([]);
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem('triageMsgRead-v1') || 'null'); if (Array.isArray(s)) setMsgReadIds(s); } catch (e) {} }, []);
+  const persistMsgRead = (ids) => { setMsgReadIds(ids); try { localStorage.setItem('triageMsgRead-v1', JSON.stringify(ids)); } catch (e) {} };
+  const say = (m) => { setToast(m); setTimeout(() => setToast(''), 3400); };
 
   // القضايا الفعليّة من Supabase (initialRows) تتصدّر القائمة المشتركة
   const [rows, setRows] = useState(() => {
@@ -716,10 +721,50 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
   });
 
   const notifs = notifsOf(rows, cfg, viewOnly, readIds);
-  const markRead = (id) => { if (!readIds.includes(id)) persistRead([...readIds, id]); };
-  const markAllRead = () => persistRead(Array.from(new Set([...readIds, ...notifs.map((x) => x.id)])));
+  const markRead = async (id) => {
+    if (readIds.includes(id)) return;
+    setReadIds((xs) => [...xs, id]);
+    await supabase.from('notification_reads').upsert({ user_id: me.id, notif_key: id }, { onConflict: 'user_id,notif_key' });
+  };
+  const markAllRead = async () => {
+    const missing = notifs.filter((n) => !n.read).map((n) => n.id);
+    if (!missing.length) return;
+    setReadIds((xs) => Array.from(new Set([...xs, ...missing])));
+    await supabase.from('notification_reads').upsert(missing.map((k) => ({ user_id: me.id, notif_key: k })), { onConflict: 'user_id,notif_key' });
+  };
   const unreadNotifs = notifs.filter((x) => !x.read).length;
+  const rowByCase = {}; rows.forEach((r) => { rowByCase[r.caseId] = r; });
+  const threads = (() => {
+    const map = new Map();
+    for (const m of msgRows) {
+      const party = m.thread === 'coord' ? 'entity' : 'seeker';
+      const key = m.case_id + ':' + party;
+      if (!map.has(key)) map.set(key, { id: key, caseId: m.case_id, secret: (rowByCase[m.case_id] || {}).secret || '—', party, unread: 0, msgs: [] });
+      const t = map.get(key);
+      // الاتجاه من منظور المستفيد: خيط center ⇒ in = من المركز؛ خيط coord ⇒ out = من المركز
+      const fromMe = m.thread === 'coord' ? m.direction === 'out' : m.direction === 'in';
+      t.msgs.push({ id: m.id, from: fromMe ? 'me' : 'party', body: m.body, at: m.created_at });
+      if (!fromMe && !msgReadIds.includes(m.id)) t.unread += 1;
+    }
+    const db = Array.from(map.values());
+    const extras = localThreads.filter((lt) => !map.has(lt.id));
+    return [...extras, ...db].sort((a, b) => (((a.msgs[a.msgs.length - 1] || {}).at || '9999') < ((b.msgs[b.msgs.length - 1] || {}).at || '9999') ? 1 : -1));
+  })();
   const unreadMsgs = threads.reduce((a, t) => a + (t.unread || 0), 0);
+
+  // ريل-تايم: تغيّر القضايا/التوصيات يعيد جلب السجلّ تحت RLS؛ الرسائل تُلحق مباشرة
+  useEffect(() => {
+    const reload = async () => setRows(await fetchRegister(supabase));
+    const ch = supabase
+      .channel('triage-shell')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'protection_cases' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recommendations' }, reload)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
+        (p) => setMsgRows((m) => (m.some((x) => x.id === p.new.id) ? m : [...m, p.new])))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const goNav = (id) => { setActive(id); setSel(null); };
   const openNotif = (n) => { markRead(n.id); goNav(n.dest); };
 
@@ -765,20 +810,39 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
   const openCase = (r) => { setActive('queue'); setSel(r); };
   const needCount = rows.filter((r) => cfg.nextAction(r)).length;
 
-  // مراسلات محلية مؤقتاً — الربط بجداول القاعدة وReltime في الخطوة التالية
   const startThread = (caseId, partyId) => {
     const key = caseId + ':' + partyId;
-    const r = rows.find((x) => String(x.caseId || x.secret) === String(caseId));
-    setThreads((xs) => xs.some((x) => x.id === key) ? xs : [{ id: key, caseId, secret: r ? r.secret : '—', party: partyId, unread: 0, msgs: [] }, ...xs]);
+    const r = rowByCase[caseId];
+    setLocalThreads((xs) => (xs.some((x) => x.id === key) ? xs : [{ id: key, caseId, secret: r ? r.secret : '—', party: partyId, unread: 0, msgs: [] }, ...xs]));
     return key;
   };
-  const sendMessage = (t, body) => {
-    setThreads((xs) => xs.map((x) => x.id === t.id ? { ...x, msgs: [...x.msgs, { from: 'me', body, at: new Date().toISOString() }] } : x));
+  const openThread = (t) => {
+    const ids = t.msgs.filter((m) => m.from === 'party' && !msgReadIds.includes(m.id)).map((m) => m.id);
+    if (ids.length) persistMsgRead([...msgReadIds, ...ids]);
+  };
+  const sendMessage = async (t, body) => {
+    if (viewOnly) { say('اطّلاع فقط — القيادة لا تراسل نيابةً عن الموظف.'); return; }
+    const thread = t.party === 'entity' ? 'coord' : 'center';
+    const direction = t.party === 'entity' ? 'out' : 'in'; // من منظور المستفيد: in = من المركز
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({ case_id: t.caseId, thread, direction, body, sender_label: cfg.label })
+      .select()
+      .single();
+    if (error) { say('تعذّر الإرسال: ' + error.message); return; }
+    setLocalThreads((xs) => xs.filter((x) => x.id !== t.id));
+    if (data) setMsgRows((m) => (m.some((x) => x.id === data.id) ? m : [...m, data]));
+  };
+  // حفظ محضر اتصال في القاعدة (شرط أي قرار فرز)
+  const onAddLog = async (rec, channel, result, note) => {
+    const r = await addContactLog(rec.caseId, channel, result, note);
+    if (!r.ok) say('تعذّر حفظ المحضر: ' + r.error);
+    return r.ok;
   };
 
   let body;
   if (active === 'queue') body = sel
-    ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} onReveal={revealAudit} />
+    ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} onReveal={revealAudit} onAddLog={onAddLog} />
     : <Queue rows={rows} open={setSel} viewOnly={viewOnly} acct={acct} />;
   else if (active === 'dashboard') body = <Dashboard cfg={cfg} rows={rows} viewOnly={viewOnly} openCase={openCase} go={goNav} notifs={notifs} onOpenNotif={openNotif} />;
   else if (active === 'profile') body = <Profile actor={acct} viewOnly={viewOnly} />;
@@ -791,7 +855,7 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
         : 'قنوات التواصل مع طالب الحماية (بالرمز السري) والجهات المختصة (ضابط الاتصال المعتمد) — لتسريع إجراءات الفرز. كل رسالة مسجّلة في التدقيق.'}
       threads={threads}
       activeCases={rows.filter((r) => r.status !== 'closed').map((r) => ({ caseId: r.caseId || r.secret, secret: r.secret, label: r.cat }))}
-      onOpenThread={() => {}}
+      onOpenThread={openThread}
       onSend={sendMessage}
       onStart={startThread}
       senderLabel={cfg.label}
@@ -807,7 +871,7 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
       user={{ name: me.name }}
       active={active}
       onNavigate={goNav}
-      counters={{ queue: viewOnly ? needCount : rows.filter((r) => r.status === 'triage').length, messages: unreadMsgs, notifications: unreadNotifs }}
+      counters={{ queue: needCount, messages: unreadMsgs, notifications: unreadNotifs }}
       secret={sel ? sel.secret : null}
       onRevealSecret={() => revealAudit(sel)}
       roleTag={viewOnly ? 'اطّلاع وإشراف' : 'سري للغاية'}
@@ -821,6 +885,6 @@ function App({ roleKey, me, initialRows, prefs, basePath }) {
   );
 }
 
-export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage' }) {
-  return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} />;
+export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [] }) {
+  return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} initialReadKeys={initialReadKeys} initialMessages={initialMessages} />;
 }

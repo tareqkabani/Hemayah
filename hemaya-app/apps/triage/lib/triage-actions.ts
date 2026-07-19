@@ -2,15 +2,16 @@
 import { revalidatePath } from "next/cache";
 import { createServerClient } from "@hemaya/supabase";
 
-export async function addContactLog(caseId: string, channel: string, summary: string) {
-  if (!summary.trim()) return { ok: false as const, error: "ملخّص المحضر مطلوب." };
+export async function addContactLog(caseId: string, channel: string, result: string, summary: string) {
   const supabase = createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase.from("contact_logs").insert({
-    case_id: caseId, officer_id: user?.id, channel, summary,
+    case_id: caseId, officer_id: user?.id, channel,
+    result: result === "noanswer" ? "noanswer" : "answered",
+    summary: summary.trim() || "—",
   });
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath(`/triage/${caseId}`);
+  revalidatePath("/triage");
   return { ok: true as const };
 }
 
