@@ -4,3 +4,4 @@ export * from "./sla";
 export * from "./case-state";
 export * from "./decision-state";
 export * from "./materials";
+export * from "./portal-config";

@@ -134,3 +134,189 @@ begin
     end loop;
   end;
 end $$;
+
+-- ── 3) سيناريو بوابتي الدارس والمقيّم (HANDOFF-STUDY-EVAL) ──
+--   شخصا العرض: أ. خالد العنزي EMP-4210 (دارس) · أ. منى الزهراني EMP-4233 (مقيّمة)،
+--   وأقران إضافيون (لا يدخلون) ليصحّ عدّاد «أنت أحد N» مع العزل الصفّي التام.
+--   قضايا under_study مُسنَدة يدوياً بحسب سيناريو العرض (المشغّل يُسنِد الجديدة آلياً):
+--   C-2026-0481 عاجل (الدوران) · C-2026-0512 أجنبي م6 (دارس) · C-2026-0492 (دارس)
+--   C-2026-0488 (مقيّمة) · C-2026-0475 دراسة معتمدة · C-2026-0470 تقييم معتمد.
+do $$
+declare
+  r record; uid uuid;
+  pwd text := crypt('nafath-staff-2026', gen_salt('bf'));
+  officer uuid; sid1 uuid; sid2 uuid; sid3 uuid; eid1 uuid; eid2 uuid; eid3 uuid;
+  cid uuid;
+begin
+  -- الرمز C-2026-0481 هو بطل سيناريو الدراسة والتقييم (قائمة القبول)؛
+  -- قضية الإحالات التوضيحية (REF-2026-8101 في referrals_wiring) كانت تحمله —
+  -- تُعاد تسميتها بما يوافق مرجعها كي يبقى الرمز فريداً (عرضيّ بحت).
+  update protection_cases set secret_code = 'C-2026-8101'
+    where ref_no = 'REF-2026-8101' and secret_code = 'C-2026-0481';
+  update referrals set ref = replace(ref, '2026-0481', '2026-8101')
+    where case_id = (select id from protection_cases where ref_no = 'REF-2026-8101')
+      and ref like '%2026-0481';
+  -- أقران بلا دخول (لعدّادات الأقران فقط)
+  for r in
+    select * from (values
+      ('2000000031','studier',   'دارس مساند أول'),
+      ('2000000032','studier',   'دارس مساند ثانٍ'),
+      ('2000000041','evaluator', 'مقيّم مساند أول'),
+      ('2000000042','evaluator', 'مقيّم مساند ثانٍ')
+    ) as t(nid, role, name)
+  loop
+    select id into uid from auth.users where email = r.nid || '@nafath.local';
+    if uid is null then
+      uid := gen_random_uuid();
+      insert into auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, created_at, updated_at,
+        raw_app_meta_data, raw_user_meta_data,
+        confirmation_token, recovery_token, email_change_token_new, email_change
+      ) values (
+        '00000000-0000-0000-0000-000000000000', uid, 'authenticated', 'authenticated',
+        r.nid || '@nafath.local', pwd, now(), now(), now(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        jsonb_build_object('name', r.name, 'national_id', r.nid, 'source', 'seed'),
+        '', '', '', ''
+      );
+      insert into auth.identities (id, user_id, provider_id, identity_data, provider,
+        last_sign_in_at, created_at, updated_at)
+      values (gen_random_uuid(), uid, uid::text,
+        jsonb_build_object('sub', uid::text, 'email', r.nid || '@nafath.local', 'email_verified', true),
+        'email', now(), now(), now());
+    end if;
+    insert into user_roles (user_id, role) values (uid, r.role::app_role)
+    on conflict (user_id, role) do nothing;
+  end loop;
+
+  select id into officer from auth.users where email = '2000000002@nafath.local';
+  select id into sid1 from auth.users where email = '2000000003@nafath.local';
+  select id into sid2 from auth.users where email = '2000000031@nafath.local';
+  select id into sid3 from auth.users where email = '2000000032@nafath.local';
+  select id into eid1 from auth.users where email = '2000000004@nafath.local';
+  select id into eid2 from auth.users where email = '2000000041@nafath.local';
+  select id into eid3 from auth.users where email = '2000000042@nafath.local';
+
+  -- شخصا العرض + الرقم الوظيفي (idempotent)
+  update auth.users set raw_user_meta_data = raw_user_meta_data || '{"name":"خالد العنزي"}'::jsonb
+    where id = sid1;
+  update auth.users set raw_user_meta_data = raw_user_meta_data || '{"name":"منى الزهراني"}'::jsonb
+    where id = eid1;
+  update user_roles set attributes = coalesce(attributes,'{}'::jsonb) || '{"emp":"EMP-4210"}'::jsonb
+    where user_id = sid1 and role = 'studier';
+  update user_roles set attributes = coalesce(attributes,'{}'::jsonb) || '{"emp":"EMP-4233"}'::jsonb
+    where user_id = eid1 and role = 'evaluator';
+
+  for r in
+    select * from (values
+      -- (ref, secret, category, source, واقعة, تهديد)
+      ('REF-2026-0481','C-2026-0481','witness','urgent','فساد إداري ومالي','مرتفع'),
+      ('REF-2026-0512','C-2026-0512','witness','foreign','غسل أموال عابر للحدود','مرتفع'),
+      ('REF-2026-0492','C-2026-0492','reporter','local','رشوة في عقود حكومية','متوسط'),
+      ('REF-2026-0475','C-2026-0475','victim','local','اتّجار بالأشخاص','مرتفع'),
+      ('REF-2026-0488','C-2026-0488','victim','local','ابتزاز وتهديد','متوسط'),
+      ('REF-2026-0470','C-2026-0470','expert','local','تزوير مستندات رسمية','متوسط')
+    ) as t(ref, secret, category, source, waqia, threat)
+  loop
+    if exists (select 1 from protection_cases where ref_no = r.ref) then continue; end if;
+
+    insert into protection_cases (ref_no, secret_code, category, status, source, officer_id, classification)
+    values (r.ref, r.secret, r.category::app_category, 'under_study', r.source::case_source, officer, 'high')
+    returning id into cid;
+
+    insert into protection_requests (case_id, applicant_role, channel, details)
+    values (cid, r.category, 'body', jsonb_build_object(
+      'entity','النيابة العامة بمنطقة الرياض', 'case_no','ق-'|| right(r.ref,4) ||'/1447',
+      'incoming_no','17'|| right(r.ref,4), 'crime', r.waqia, 'waqia', r.waqia,
+      'threat', r.threat, 'extends','الزوج والأبناء'));
+
+    insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
+                                 factors9, raised_at, due_at, received_at, channel, notes)
+    values (cid, 'النيابة العامة بمنطقة الرياض', 'توفير',
+      '["الحماية الأمنية","إخفاء البيانات الشخصية","سلامة التنقّل (مرافق أمني)"]'::jsonb,
+      null,
+      '{"نوع الجريمة":"كبيرة موجبة للتوقيف","مستوى الخطر":"شديد","امتداد الخطر":"الزوج والأبناء","القدرة على التكيف":"نعم"}'::jsonb,
+      now() - interval '2 days', now() + interval '3 days', now() - interval '1 day', 'electronic',
+      'جسامة الجريمة وكونها موجبة للتوقيف · وجود خطر شديد ومباشر · أهمية شهادته للمصلحة العامة.');
+
+    if r.source = 'foreign' then
+      insert into foreign_requests (case_id, country, reciprocity, ref, secret, authority, auth_kind,
+                                    category, city, foreign_ref, basis, summary, status)
+      values (cid, 'الأردن', true, r.ref, r.secret, 'النيابة العامة — عمّان', 'قضائية',
+              'witness', 'الرياض', 'JOR/MLA/2026/188', 'اتفاقية ثنائية',
+              'طلب مساعدة قانونية لحماية شاهدٍ مقيمٍ في المملكة (المادة السادسة).', 'referred');
+    end if;
+
+    -- الإسناد بحسب سيناريو العرض (المشغّلات تولّد إشعارات الإسناد/المهلة آلياً)
+    if r.secret = 'C-2026-0481' then
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid1, now() - interval '4 hours'), (cid, sid2, now() - interval '4 hours'),
+        (cid, sid3, now() - interval '4 hours');
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid1, now() - interval '4 hours'), (cid, eid2, now() - interval '4 hours');
+    elsif r.secret = 'C-2026-0512' then
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid1, now() - interval '3 hours'), (cid, sid2, now() - interval '3 hours');
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid2, now() - interval '3 hours'), (cid, eid3, now() - interval '3 hours');
+    elsif r.secret = 'C-2026-0492' then
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid1, now() - interval '1 day'), (cid, sid3, now() - interval '1 day');
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid3, now() - interval '1 day');
+      update notifications set created_at = now() - interval '1 day',
+        sent_at = now() - interval '1 day', read = true
+        where case_id = cid and recipient_id = sid1;
+    elsif r.secret = 'C-2026-0475' then
+      insert into studies (case_id, studier_id, recommendation, proposed_type, notes, created_at, submitted_at)
+      values (cid, sid1, 'قبول كلي', '["الحماية الأمنية","إخفاء البيانات الشخصية"]'::jsonb,
+              'تتوافر مسوّغات الحماية وفق عوامل المادة 9.', now() - interval '4 days', now() - interval '2 days');
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid2, now() - interval '4 days'), (cid, sid3, now() - interval '4 days');
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid2, now() - interval '4 days');
+      insert into notifications (case_id, recipient_id, type, title, body, target_tab, read, sent_at, created_at)
+      values (cid, sid1, 'output', 'استُقبل مخرَجك',
+        r.secret || ' — أُرسلت دراستك للتجميع الآلي تمهيداً لعرضها على المجلس.',
+        'tasks', true, now() - interval '2 days', now() - interval '2 days');
+      update notifications set created_at = now() - interval '4 days',
+        sent_at = now() - interval '4 days', read = true
+        where case_id = cid and recipient_id = sid1 and type = 'assign';
+    elsif r.secret = 'C-2026-0488' then
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid1, now() - interval '1 day'), (cid, eid2, now() - interval '1 day'),
+        (cid, eid3, now() - interval '1 day');
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid2, now() - interval '1 day');
+      update notifications set created_at = now() - interval '1 day',
+        sent_at = now() - interval '1 day', read = true
+        where case_id = cid and recipient_id = eid1;
+    elsif r.secret = 'C-2026-0470' then
+      insert into assessments (case_id, evaluator_id, recommendation, proposed_type, notes, created_at, submitted_at)
+      values (cid, eid1, 'قبول كلي', '["الإرشاد القانوني والنفسي والاجتماعي"]'::jsonb,
+              'لا مانع نفسيّ أو اجتماعيّ من تفعيل الحماية.', now() - interval '5 days', now() - interval '2 days');
+      insert into assessments (case_id, evaluator_id, created_at) values
+        (cid, eid3, now() - interval '5 days');
+      insert into studies (case_id, studier_id, created_at) values
+        (cid, sid3, now() - interval '5 days');
+      insert into notifications (case_id, recipient_id, type, title, body, target_tab, read, sent_at, created_at)
+      values (cid, eid1, 'output', 'استُقبل مخرَجك',
+        r.secret || ' — أُرسل تقييمك للتجميع الآلي تمهيداً لعرضه على المجلس.',
+        'tasks', true, now() - interval '2 days', now() - interval '2 days');
+      update notifications set created_at = now() - interval '5 days',
+        sent_at = now() - interval '5 days', read = true
+        where case_id = cid and recipient_id = eid1 and type = 'assign';
+    end if;
+
+    -- تذكير النائب بالميعاد على الطلب العاجل (مشغّل الإشعار يولّد فئة «msg» آلياً)
+    if r.secret = 'C-2026-0481' then
+      insert into leadership_messages (case_id, author_id, author_role, leader, direction, body)
+      values
+        (cid, sid1, 'studier', 'deputy', 'in',
+         'يقترب ميعاد تسليم الدراسة للطلب C-2026-0481 — يوم عمل ضمن مظلّة 3 أيام (المادة 10). يُرجى إتمام الاعتماد في الوقت.'),
+        (cid, eid1, 'evaluator', 'deputy', 'in',
+         'يقترب ميعاد تسليم التقييم للطلب C-2026-0481 — يوم عمل ضمن مظلّة 3 أيام (المادة 10). يُرجى إتمام الاعتماد في الوقت.');
+    end if;
+  end loop;
+end $$;

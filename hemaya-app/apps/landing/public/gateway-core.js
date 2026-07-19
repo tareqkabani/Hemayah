@@ -15,6 +15,8 @@
   var APP = {
     seeker:    '/seeker',
     center:    '/center',      // بوّابة موظف المركز — تعرض البوّابة الفرعية حسب دور المستخدم
+    studier:   '/studier',     // الدراسة — بوّابة مستقلّة
+    evaluator: '/evaluator',   // التقييم — بوّابة مستقلّة
     entities:  '/entities',
     health:    '/health',
     hr:        '/hr',
@@ -41,8 +43,8 @@
     'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker },
     'center-intake':    { role: 'center',    label: 'الاستقبال الورقيّ',        href: APP.center },
     'center-triage':    { role: 'center',    label: 'الفرز المبدئي',            href: APP.center },
-    'center-studier':   { role: 'center',    label: 'الدراسة — الدارس',         href: APP.center },
-    'center-evaluator': { role: 'center',    label: 'التقييم — المقيّم',        href: APP.center },
+    'center-studier':   { role: 'center',    label: 'الدراسة — الدارس',         href: APP.studier },
+    'center-evaluator': { role: 'center',    label: 'التقييم — المقيّم',        href: APP.evaluator },
     'center-preparer':  { role: 'center',    label: 'إعداد القرار',             href: APP.center },
     'center-council':   { role: 'center',    label: 'أعضاء المجلس',             href: APP.center },
     'center-exec':      { role: 'center',    label: 'التنفيذ والتجديد',         href: APP.center },
