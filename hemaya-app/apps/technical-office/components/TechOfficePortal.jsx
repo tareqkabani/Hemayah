@@ -106,7 +106,7 @@ function Dashboard({ cfg, isHead, rows, advisors, go, openCase, unreadMsgs, unre
       ? 'إشراف مدير المكتب الفني على كامل أعمال التظلّمات: قرارات المستشارين واعتماد البتّ والالتزام بالمواعيد (م10، م21) — كل ما يتطلّب إجراءً منك يظهر هنا أولاً.'
       : 'تَرِد إليك التظلّمات المُسنَدة آلياً حسب العبء. تعمل مستقلّاً ولا ترى عمل بقية المستشارين — وكل ما يتطلّب إجراءً منك يظهر هنا أولاً.'}</p>
     <FocusCard g={focus && focus.r} act={focus && focus.act} isHead={isHead} openCase={openCase} />
-    <div className="stats" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+    <div className="stats">
       {stats.map((s, i) => (
         <button key={i} className="card stat" onClick={() => go(s.to)}>
           <span className="stat-ico" style={{ background: s.bg, color: s.fg }}><I name={s.icon} size={20} fill /></span>
@@ -632,7 +632,8 @@ function App({ roleKey, me, mySpec, initialRows, prefs, basePath, initialNotifs,
   const openCase = (g) => { setActive('queue'); setSel(g.id); };
   const openNotif = (n) => {
     markRead(n.id);
-    if (n.ref) { const g = rows.find((x) => x.ref === n.ref); if (g) { openCase(g); return; } }
+    // وجهة إشعار الرسالة هي المراسلات وإن ذُكر مرجع التظلّم في نصّه
+    if (n.dest !== 'messages' && n.ref) { const g = rows.find((x) => x.ref === n.ref); if (g) { openCase(g); return; } }
     goNav(n.dest);
   };
 

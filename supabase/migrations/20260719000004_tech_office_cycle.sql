@@ -329,6 +329,7 @@ grant execute on function public.advisor_decide_grievance(uuid, text, jsonb, tex
 grant execute on function public.office_return_grievance(uuid, text) to authenticated;
 grant execute on function public.office_adopt_grievance(uuid, text, jsonb, text) to authenticated;
 grant execute on function public.record_secret_reveal(uuid) to authenticated;
--- الإسناد يُطلقه المُشغّل حصراً
+-- الإسناد يُطلقه المُشغّل حصراً؛ وأسماء الموظفين لا تُستبان باستدعاءٍ مباشر
 revoke execute on function public.pick_grievance_advisor() from public, anon, authenticated;
 revoke execute on function public._next_grv_ref() from public, anon, authenticated;
+revoke execute on function public._actor_name(uuid) from public, anon, authenticated;

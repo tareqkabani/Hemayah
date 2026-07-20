@@ -151,7 +151,9 @@ begin
   return _id;
 end $$;
 grant execute on function public.send_office_message(uuid, text, text) to authenticated;
+-- سياسات RLS تُقيَّم بحقوق المستعلِم — يلزم authenticated تنفيذ دالّة العزل
 revoke execute on function public.owns_grievance(uuid) from public, anon;
+grant execute on function public.owns_grievance(uuid) to authenticated;
 
 -- ─────────────────── 4) البثّ الحيّ ───────────────────
 do $$ begin
