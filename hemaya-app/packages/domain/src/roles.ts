@@ -35,18 +35,24 @@ export interface Portal {
   roles: AppRole[];
 }
 
-/** خريطة البوابات (تطبيقٌ لكل بوابة) وأدوارها ومنافذها. */
+/** خريطة البوابات (تطبيقٌ لكل بوابة) وأدوارها ومنافذها.
+ *  المنافذ مطابقة لسكربتات dev في apps/*&#47;package.json — كلها خلف
+ *  الشاشة الموحّدة (landing:3000) بمسارات Multi-Zones. */
 export const PORTALS: Portal[] = [
-  { app: "seeker", title: "بوابة طالب الحماية", port: 3000, roles: ["subject"] },
-  { app: "attorney-general", title: "بوابة النائب العام", port: 3001, roles: ["prosecutor_general"] },
+  { app: "landing", title: "الشاشة الموحّدة (بوابة الدخول)", port: 3000, roles: [] },
   { app: "center-officer", title: "موظف المركز (فرز · دراسة · قرار)", port: 3002,
     roles: ["case_officer", "studier", "evaluator", "board_member", "board_chair", "deputy_chair", "hotline_operator"] },
-  { app: "center-leadership", title: "قيادة المركز", port: 3003, roles: ["board_chair", "deputy_chair"] },
-  { app: "center-execution", title: "التنفيذ والتجديد", port: 3004, roles: ["case_officer"] },
-  { app: "technical-office", title: "المكتب الفني (التظلّمات)", port: 3005, roles: ["advisor", "tech_manager"] },
-  { app: "security-admin", title: "الإدارة الأمنية", port: 3006, roles: ["security_officer", "security_manager"] },
-  { app: "interior", title: "وزارة الداخلية (المسار الأجنبي)", port: 3007, roles: ["moi_officer"] },
-  { app: "health", title: "وزارة الصحة", port: 3008, roles: ["moh_specialist", "moh_manager"] },
-  { app: "hr", title: "وزارة الموارد البشرية", port: 3009, roles: ["hr_specialist", "hr_manager"] },
-  { app: "competent-entities", title: "الجهات المختصة", port: 3010, roles: ["competent_body"] },
+  { app: "competent-entities", title: "الجهات المختصة", port: 3006, roles: ["competent_body"] },
+  { app: "attorney-general", title: "بوابة النائب العام", port: 3007, roles: ["prosecutor_general"] },
+  { app: "technical-office", title: "المكتب الفني (التظلّمات)", port: 3008, roles: ["advisor", "tech_manager"] },
+  { app: "health", title: "وزارة الصحة", port: 3009, roles: ["moh_specialist", "moh_manager"] },
+  { app: "hr", title: "وزارة الموارد البشرية", port: 3010, roles: ["hr_specialist", "hr_manager"] },
+  { app: "interior", title: "وزارة الداخلية (المسار الأجنبي)", port: 3011, roles: ["moi_officer"] },
+  { app: "security-admin", title: "الإدارة الأمنية", port: 3012, roles: ["security_officer", "security_manager"] },
+  { app: "seeker", title: "بوابة طالب الحماية", port: 3013, roles: ["subject"] },
+  { app: "decision", title: "دورة القرار (اعتماد · تصويت · إصدار)", port: 3014,
+    roles: ["case_officer", "board_member", "board_chair", "deputy_chair"] },
+  { app: "studier", title: "بوابة الدارس", port: 3015, roles: ["studier"] },
+  { app: "evaluator", title: "بوابة المقيّم", port: 3016, roles: ["evaluator"] },
+  { app: "triage", title: "بوابة الفرز المبدئي", port: 3017, roles: ["case_officer", "deputy_chair", "board_chair"] },
 ];

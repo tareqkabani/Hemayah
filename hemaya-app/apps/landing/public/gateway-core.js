@@ -85,7 +85,10 @@
     '5000000004': 'tech-consultants'
   };
   var PORTAL_DEMO = {};
-  Object.keys(IDENTITY).forEach(function (did) { PORTAL_DEMO[IDENTITY[did]] = did; });
+  // أول هوية لكل بوابة تبقى هي المعبّأة مسبقاً (لا تطغى هويات الزملاء اللاحقة)
+  Object.keys(IDENTITY).forEach(function (did) {
+    if (!PORTAL_DEMO[IDENTITY[did]]) PORTAL_DEMO[IDENTITY[did]] = did;
+  });
 
   function portalForId(id) { return IDENTITY[id] || 'seeker-main'; }
   function secretForId(id) {

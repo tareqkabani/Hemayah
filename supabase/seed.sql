@@ -327,3 +327,76 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ── 4) ثلاث رحلات تظلّم مكتملة الحزمة لبوابة المكتب الفني ──
+--   قضايا صدر فيها قرار مركزٍ (بحزمة توصية + دراسة + تقييم) ثم رُفع تظلّم:
+--   مُشغّلات الورود تتولى مرجع GRV والإسناد بالأقلّ عبئاً وإشعارات المستشارين والمدير.
+--   idempotent عبر ref_no.
+do $$
+declare
+  seeker uuid; studier uuid; evaluator uuid; cid uuid;
+  specs record;
+begin
+  select id into seeker    from auth.users where email = '1000000001@nafath.local';
+  select id into studier   from auth.users where email = '2000000003@nafath.local';
+  select id into evaluator from auth.users where email = '2000000004@nafath.local';
+
+  for specs in
+    select * from (values
+      ('REF-2026-4820','C-2026-0479','witness'::app_category,'reject',
+       'لديّ أدلّة على استمرار التهديد بعد تقديم الشهادة، وأرى أن الخطر ما زال قائماً ومباشراً على حياتي وأسرتي، وأطلب إعادة النظر في رفض طلبي.',
+       'reject', 'النيابة العامة', 'high'::risk_level, 9),
+      ('REF-2026-4790','C-2026-0473','victim'::app_category,'accept',
+       'أنواع الحماية المقرّرة لا تشمل تغيير مكان الإقامة رغم أن التهديد مصدره أشخاص يعرفون سكني الحالي.',
+       'types', 'النيابة العامة', 'critical'::risk_level, 13),
+      ('REF-2026-4905','C-2026-0490','reporter'::app_category,'reject',
+       'تعرّضت لمضايقات متكرّرة في محيط عملي بعد الإبلاغ، وأرى أن قرار الرفض لم يأخذ بالاعتبار أثر ذلك على استقراري النفسي والوظيفي.',
+       'reject', 'هيئة الرقابة ومكافحة الفساد', 'medium'::risk_level, 11)
+    ) as s(ref, secret, cat, dec_outcome, reason, scope, entity, risk, days_ago)
+  loop
+    if exists (select 1 from protection_cases where ref_no = specs.ref) then continue; end if;
+
+    insert into protection_cases (ref_no, secret_code, category, status, source, submitted_by, classification, created_at)
+    values (specs.ref, specs.secret, specs.cat,
+            case specs.dec_outcome when 'accept' then 'accepted'::case_status else 'rejected'::case_status end,
+            'local', seeker, specs.risk, now() - make_interval(days => specs.days_ago))
+    returning id into cid;
+
+    insert into recommendations (case_id, source_body, decision, notes, raised_at, received_at)
+    values (cid, specs.entity, 'توفير',
+      'توجد قضية جزائية قائمة لدى الجهة، وأهمية أقوال المعني مؤثّرة في الإثبات.',
+      now() - make_interval(days => specs.days_ago - 1), now() - make_interval(days => specs.days_ago - 3));
+
+    insert into studies (case_id, studier_id, recommendation, proposed_type, notes, submitted_at)
+    values (cid, studier,
+      case specs.dec_outcome when 'accept' then 'قبول' else 'رفض' end,
+      '["الحماية الأمنية","إخفاء البيانات الشخصية"]'::jsonb,
+      case specs.dec_outcome
+        when 'accept' then 'الواقعة جسيمة والخطر مرتفع؛ تُقرّر الحماية الأمنية وإخفاء البيانات.'
+        else 'الواقعة ذات أهمية، إلا أن عناصر المباشرة لم تكتمل في تاريخ الدراسة.' end,
+      now() - make_interval(days => specs.days_ago - 4));
+
+    insert into assessments (case_id, evaluator_id, recommendation, proposed_type, notes, submitted_at)
+    values (cid, evaluator,
+      case specs.dec_outcome when 'accept' then 'قبول' else 'رفض' end,
+      '["الإرشاد القانوني/النفسي/الاجتماعي"]'::jsonb,
+      case specs.dec_outcome
+        when 'accept' then 'الأثر النفسي مرتفع والدعم الاجتماعي محدود؛ روعي ذلك في الأنواع المقترحة.'
+        else 'يوجد أثر نفسي ملموس دون بلوغ عتبة الحماية الكاملة وقت التقييم.' end,
+      now() - make_interval(days => specs.days_ago - 4));
+
+    insert into council_decisions (case_id, status, types, reasoning, issued_type, issued_reason, issued_at)
+    values (cid, 'issued',
+      case specs.dec_outcome when 'accept' then '["الحماية الأمنية","إخفاء البيانات الشخصية"]'::jsonb else '[]'::jsonb end,
+      case specs.dec_outcome when 'accept' then 'الاكتفاء بالحماية الأمنية وإخفاء البيانات في هذه المرحلة.' else null end,
+      specs.dec_outcome,
+      case specs.dec_outcome
+        when 'accept' then 'قبول الطلب بأنواع حماية محدّدة دون تغيير مكان الإقامة.'
+        else 'عدم اكتمال عناصر الخطر المباشر وفق المادة (التاسعة)، وكفاية التدابير الإجرائية العامة في هذه المرحلة.' end,
+      now() - make_interval(days => specs.days_ago - 6));
+
+    insert into grievances (case_id, against, scope, applicant_reason, filed_at)
+    values (cid, case specs.scope when 'types' then 'الاعتراض على أنواع الحماية المقرّرة' else 'الاعتراض على رفض الطلب' end,
+            specs.scope, specs.reason, now() - make_interval(days => specs.days_ago - 8));
+  end loop;
+end $$;
