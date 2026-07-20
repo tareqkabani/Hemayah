@@ -441,6 +441,7 @@ export type Database = {
           issued_type: string | null
           preparer_id: string | null
           reasoning: string | null
+          ref: string | null
           rejections: Json
           status: string
           submitted_at: string | null
@@ -460,6 +461,7 @@ export type Database = {
           issued_type?: string | null
           preparer_id?: string | null
           reasoning?: string | null
+          ref?: string | null
           rejections?: Json
           status?: string
           submitted_at?: string | null
@@ -479,6 +481,7 @@ export type Database = {
           issued_type?: string | null
           preparer_id?: string | null
           reasoning?: string | null
+          ref?: string | null
           rejections?: Json
           status?: string
           submitted_at?: string | null
@@ -1749,6 +1752,7 @@ export type Database = {
     }
     Functions: {
       _actor_name: { Args: { _uid: string }; Returns: string }
+      _next_decision_ref: { Args: never; Returns: string }
       _next_grv_ref: { Args: never; Returns: string }
       _scope_ar: { Args: { _scope: string }; Returns: string }
       advisor_decide_grievance: {

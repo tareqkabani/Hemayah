@@ -188,7 +188,7 @@ export function MessagesScreen({
       </div>
       {composing && (
         <Card className="card pad" style={{ marginBottom: 16 }}>
-          <b style={{ color: "var(--text-strong)", display: "block", marginBottom: 10 }}>بدء مراسلة مع القيادة</b>
+          <b style={{ color: "var(--text-strong)", display: "block", marginBottom: 10 }}>بدء مراسلة جديدة</b>
           <div className="fld">
             <span className="fld-label">بشأن الطلب</span>
             <select value={cReq} onChange={(e) => setCReq(e.target.value)} style={SEL_STYLE}>

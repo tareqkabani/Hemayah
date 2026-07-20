@@ -9,7 +9,7 @@ export const GRIEVANCE_SELECT = `id, ref, case_id, scope, against, applicant_rea
     recommendations(source_body, decision, proposed_type, notes, raised_at, received_at),
     studies(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at),
     assessments(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at),
-    council_decisions(status, types, duration, reasoning, issued_type, issued_reason, issued_at))`;
+    council_decisions(ref, status, types, duration, reasoning, issued_type, issued_reason, issued_at))`;
 
 const CAT_AR = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
 const RISK_AR = { low: "منخفض", medium: "متوسط", high: "مرتفع", critical: "حرج" };
@@ -45,6 +45,7 @@ export function mapGrievances(rows, now = new Date()) {
     // قرار المركز محل التظلّم — من صفّ council_decisions الفعلي
     const decision = cd && cd.issued_at
       ? {
+          no: cd.ref || g.decision_ref || null,
           outcome: cd.issued_type === "accept" ? "accept" : "reject",
           date: fmtDate(cd.issued_at),
           issuedAt: cd.issued_at,

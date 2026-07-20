@@ -259,6 +259,7 @@ function GrievanceDetail({ g, isHead, advisorName, back, onAdvisorDecide, onAdop
       <Card className="card pad" style={{ marginBottom: 14 }}>
         <div className="sec-h"><I name="description" size={19} color="var(--color-primary)" /> القرار محل التظلّم</div>
         <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+          {g.decision.no && <span className="ro-field" style={{ flex: 1 }}><span style={{ fontWeight: 600, color: 'var(--text-strong)', fontSize: 13 }}>رقم القرار</span><span className="mono muted" dir="ltr">{g.decision.no}</span></span>}
           <span className="ro-field" style={{ flex: 1 }}><span style={{ fontWeight: 600, color: 'var(--text-strong)', fontSize: 13 }}>التاريخ</span><span className="muted">{g.decision.date}</span></span>
           <span className="ro-field"><span style={{ fontWeight: 600, color: 'var(--text-strong)', fontSize: 13 }}>المآل</span>{decisionOutcomeTag(g.decision.outcome)}</span>
         </div>
@@ -562,6 +563,9 @@ function App({ roleKey, me, mySpec, initialRows, prefs, basePath, initialNotifs,
       for (const m of caseMsgs) {
         const g = rowByCase[m.case_id];
         if (!g) continue;
+        // خيط «المتظلّم» يخصّ مراسلة المكتب حصراً — رسائل موظفي المراحل السابقة
+        // على القضية (فرز/مركز، direction=in بغير صفة المكتب) لا تُعرض ولا تُنسب إلينا
+        if (m.direction === 'in' && m.sender_label !== cfg.label) continue;
         const fromMe = m.direction === 'in';
         push(g.id + ':seeker', g.id, 'seeker',
           { id: 'cm:' + m.id, from: fromMe ? 'me' : 'party', body: m.body, at: m.created_at, _key: 'cm:' + m.id },
