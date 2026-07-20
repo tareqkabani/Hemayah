@@ -48,8 +48,10 @@ const DEMO: Record<string, Spec> = {
   "3000000004": { role: "security_manager", portal: ORIGIN.security, label: "الإدارة الأمنية", attrs: { authority: "security" } },
   "3000000005": { role: "moi_officer", portal: ORIGIN.interior, label: "وزارة الداخلية", attrs: { authority: "moi" } },
   "4000000001": { role: "prosecutor_general", portal: ORIGIN.ag, label: "النائب العام" },
-  "5000000001": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a1" } },
+  "5000000001": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a1", spec: "قانوني" } },
   "5000000002": { role: "tech_manager", portal: ORIGIN.technical, label: "مدير المكتب الفني" },
+  "5000000003": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a2", spec: "أمني" } },
+  "5000000004": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a3", spec: "نفسي/اجتماعي" } },
 };
 const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب الحماية" };
 

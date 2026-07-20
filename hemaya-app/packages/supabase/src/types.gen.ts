@@ -753,32 +753,59 @@ export type Database = {
       }
       grievances: {
         Row: {
+          advisor_decision: Json | null
           against: string | null
+          applicant_reason: string | null
+          assigned_at: string | null
+          assigned_to: string | null
           case_id: string
           decision_due: string | null
+          decision_ref: string | null
           filed_at: string | null
           id: string
+          office_decision: Json | null
           outcome: string | null
+          ref: string | null
+          return_log: Json
+          scope: string | null
           status: Database["public"]["Enums"]["grievance_status"] | null
           tech_opinion: string | null
         }
         Insert: {
+          advisor_decision?: Json | null
           against?: string | null
+          applicant_reason?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
           case_id: string
           decision_due?: string | null
+          decision_ref?: string | null
           filed_at?: string | null
           id?: string
+          office_decision?: Json | null
           outcome?: string | null
+          ref?: string | null
+          return_log?: Json
+          scope?: string | null
           status?: Database["public"]["Enums"]["grievance_status"] | null
           tech_opinion?: string | null
         }
         Update: {
+          advisor_decision?: Json | null
           against?: string | null
+          applicant_reason?: string | null
+          assigned_at?: string | null
+          assigned_to?: string | null
           case_id?: string
           decision_due?: string | null
+          decision_ref?: string | null
           filed_at?: string | null
           id?: string
+          office_decision?: Json | null
           outcome?: string | null
+          ref?: string | null
+          return_log?: Json
+          scope?: string | null
           status?: Database["public"]["Enums"]["grievance_status"] | null
           tech_opinion?: string | null
         }
@@ -1093,6 +1120,44 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      office_messages: {
+        Row: {
+          author_id: string
+          author_label: string
+          body: string
+          channel: string
+          created_at: string
+          grievance_id: string
+          id: string
+        }
+        Insert: {
+          author_id: string
+          author_label: string
+          body: string
+          channel: string
+          created_at?: string
+          grievance_id: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          author_label?: string
+          body?: string
+          channel?: string
+          created_at?: string
+          grievance_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_messages_grievance_id_fkey"
+            columns: ["grievance_id"]
+            isOneToOne: false
+            referencedRelation: "grievances"
             referencedColumns: ["id"]
           },
         ]
@@ -1683,6 +1748,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _actor_name: { Args: { _uid: string }; Returns: string }
+      _next_grv_ref: { Args: never; Returns: string }
+      _scope_ar: { Args: { _scope: string }; Returns: string }
+      advisor_decide_grievance: {
+        Args: {
+          _decision: string
+          _grievance_id: string
+          _reason: string
+          _types: Json
+        }
+        Returns: undefined
+      }
       approve_urgent: {
         Args: {
           _approve: boolean
@@ -1699,6 +1776,8 @@ export type Database = {
       }
       case_has_grievance: { Args: { _case_id: string }; Returns: boolean }
       case_in_decision: { Args: { _case_id: string }; Returns: boolean }
+      case_triage_active: { Args: { _case_id: string }; Returns: boolean }
+      case_triage_register: { Args: { _case_id: string }; Returns: boolean }
       category_ar: {
         Args: { _c: Database["public"]["Enums"]["app_category"] }
         Returns: string
@@ -1804,6 +1883,7 @@ export type Database = {
         Returns: boolean
       }
       is_assigned_assessment: { Args: { _case_id: string }; Returns: boolean }
+      is_assigned_grievance: { Args: { _case_id: string }; Returns: boolean }
       is_assigned_study: { Args: { _case_id: string }; Returns: boolean }
       is_center_leader: { Args: never; Returns: boolean }
       is_council: { Args: { _uid: string }; Returns: boolean }
@@ -1867,7 +1947,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      office_adopt_grievance: {
+        Args: {
+          _grievance_id: string
+          _outcome: string
+          _reason: string
+          _types: Json
+        }
+        Returns: undefined
+      }
+      office_return_grievance: {
+        Args: { _grievance_id: string; _note: string }
+        Returns: undefined
+      }
       owns_case: { Args: { _case_id: string }; Returns: boolean }
+      owns_grievance: { Args: { _grievance_id: string }; Returns: boolean }
+      pick_grievance_advisor: { Args: never; Returns: string }
       raise_lifecycle_review: {
         Args: {
           _case_id: string
@@ -1980,6 +2075,10 @@ export type Database = {
         Args: { _body: string; _case_id: string; _leader: string }
         Returns: string
       }
+      send_office_message: {
+        Args: { _body: string; _channel: string; _grievance_id: string }
+        Returns: string
+      }
       send_to_decision: {
         Args: { _case_id: string }
         Returns: {
@@ -2074,6 +2173,16 @@ export type Database = {
         }
         Returns: {
           id: string
+        }[]
+      }
+      tech_office_advisors: {
+        Args: never
+        Returns: {
+          decided: number
+          name: string
+          open_load: number
+          spec: string
+          user_id: string
         }[]
       }
       triage_decide: {
@@ -2391,3 +2500,4 @@ export const Constants = {
     },
   },
 } as const
+

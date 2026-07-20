@@ -1,0 +1,40 @@
+/* شاشات المكتب الفني — الأنماط الخاصة فقط؛ أنماط القشرة من @hemaya/ui/shell.css
+   القيم الدقيقة من refs/grievance.css (حزمة التسليم — 19 يوليو 2026) */
+
+.tbl-wrap { overflow-x: auto; }
+.chip.danger.on { background: var(--color-error); border-color: var(--color-error); color: #fff; }
+.btn-danger { background: var(--color-error); color: #fff; }
+
+/* عنوان قسمٍ داخل البطاقة */
+.sec-h { font-size: 15px; font-weight: 700; color: var(--text-strong); display: flex; align-items: center; gap: 7px; margin: 0 0 12px; }
+
+/* شريط «الملف المجمّع آلياً» */
+.pkg-bar { display: flex; align-items: flex-start; gap: 8px; padding: 11px 14px; border-radius: var(--radius-md); background: var(--info-10); color: var(--color-info); font-size: 12.5px; line-height: 1.55; margin-bottom: 14px; }
+
+/* أكورديون الدراسات والتقييمات */
+details.acc { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 10px; overflow: hidden; background: var(--surface-card); }
+details.acc > summary { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; list-style: none; font-weight: 600; color: var(--text-strong); font-size: 14px; }
+details.acc > summary::-webkit-details-marker { display: none; }
+details.acc > summary .chev2 { margin-inline-start: auto; transition: transform .15s; color: var(--text-secondary); }
+details.acc[open] > summary .chev2 { transform: rotate(180deg); }
+.acc-body { padding: 0 16px 16px; }
+.fac { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border-subtle); }
+.fac-k { font-size: 13px; color: var(--text-secondary); }
+.fac-v { font-size: 13px; font-weight: 600; color: var(--text-strong); }
+.opin { font-size: 13.5px; line-height: 1.75; color: var(--text-body); background: var(--surface-subtle); border-radius: var(--radius-md); padding: 12px 14px; margin-top: 12px; }
+
+/* أعمدة توزيع العبء وحالات التظلّمات */
+.bar-row { display: grid; grid-template-columns: 150px 1fr 28px; align-items: center; gap: 10px; margin-bottom: 9px; }
+.bar-k { font-size: 12.5px; color: var(--text-body); }
+.bar-track { height: 9px; border-radius: var(--radius-full); background: var(--surface-subtle); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: var(--radius-full); background: var(--color-primary); display: block; }
+.bar-v { font-size: 12.5px; font-weight: 700; color: var(--text-strong); text-align: end; }
+
+/* الخط الزمني — تلوين محطات الرفض والتظلّم فوق .tl المشتركة */
+.tl-dot.rej { background: var(--error-10); border-color: var(--color-error); }
+.tl-dot.grv { background: var(--warning-10); border-color: var(--color-warning); }
+
+@media (max-width: 880px) {
+  table { min-width: 720px; }
+  .bar-row { grid-template-columns: 110px 1fr 28px; }
+}

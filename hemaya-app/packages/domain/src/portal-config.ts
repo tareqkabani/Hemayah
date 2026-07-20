@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { AppRole } from "@hemaya/supabase";
+import { grievanceNextAction } from "./grievance";
 
 /** دورة الحياة النظامية الست — شريط «المرحلة N من M» في اللوحات. */
 export const STAGE_FLOW = [
@@ -311,10 +312,96 @@ export const TRIAGE_LEAD_CONFIG: PortalConfig = {
   },
 };
 
+// ─────────────── المكتب الفني — التظلّمات (م10، م21) ───────────────
+// دوران على قشرةٍ واحدة: المستشار (قرار مستقلّ في المُسنَد إليه حصراً —
+// عزل متبادل، توزيع آليّ بالعبء) والمدير (يرى الكلّ ويعتمد البتّ أو يعيده —
+// لا يقرّر ابتداءً ولا يعدّل قرار المستشار). قرار المكتب نهائي (م21).
+
+const TECH_OFFICE_SHARED = {
+  portal: "technical",
+  defaultScreen: "dashboard" as const,
+  emergencyButton: false, // المكتب الفني لا يستقبل بلاغات خطر
+  identityMode: "secret-code" as const,
+  identityRevealSeconds: 6,
+  stage: { index: 5, total: STAGE_FLOW.length },
+  sla: {
+    output: {
+      slaId: "grievance_decision",
+      totalBusinessDays: 10,
+      umbrellaDays: 10,
+      article: "م21",
+      label: "البتّ في التظلّم",
+    },
+  },
+};
+
+export const TECH_ADVISOR_CONFIG: PortalConfig = {
+  ...TECH_OFFICE_SHARED,
+  roles: ["advisor"],
+  label: "مستشار المكتب الفني",
+  strings: { brandSub: "بوابة المستشارين — المكتب الفني" },
+  screens: ["dashboard", "queue", "messages", "notifications", "profile"],
+  screenMeta: { queue: { t: "التظلّمات", icon: "gavel" } },
+  messaging: {
+    mode: "initiator", // الموظفون يبدأون — «الرد فقط» خاصة ببوابة طالب الحماية
+    parties: [
+      { id: "head", label: "مدير المكتب الفني" },
+      { id: "center", label: "مركز الحماية — منسّق التظلّمات" },
+      { id: "seeker", label: "المتظلّم (بالرمز السري)" },
+    ],
+    perCaseThread: true,
+    activeCasesOnly: true,
+    deliveryReceipt: "سُلّمت — مسجّلة في التدقيق",
+    identityTag: "الهوية بالرمز السري",
+  },
+  notifCategories: [
+    { id: "assign", label: "الإسناد" },
+    { id: "deadline", label: "المهل" },
+    { id: "msg", label: "الرسائل" },
+    { id: "status", label: "الحالة" },
+  ],
+  isolationScope: "assigned",
+  nextAction: (r) => grievanceNextAction(r, "advisor"),
+};
+
+export const TECH_HEAD_CONFIG: PortalConfig = {
+  ...TECH_OFFICE_SHARED,
+  roles: ["tech_manager"],
+  label: "مدير المكتب الفني",
+  strings: { brandSub: "مدير المكتب الفني" },
+  screens: ["dashboard", "queue", "tasks", "messages", "notifications", "profile"],
+  screenMeta: {
+    queue: { t: "التظلّمات", icon: "gavel" },
+    tasks: { t: "المستشارون", icon: "groups" },
+  },
+  messaging: {
+    mode: "initiator",
+    parties: [
+      { id: "advisor", label: "المستشار المُسنَد" },
+      { id: "center", label: "مركز الحماية — منسّق التظلّمات" },
+      { id: "ag", label: "مكتب النائب العام (إحاطة)" },
+    ],
+    perCaseThread: true,
+    activeCasesOnly: true,
+    deliveryReceipt: "سُلّمت — مسجّلة في التدقيق",
+    identityTag: "الهوية بالرمز السري",
+  },
+  notifCategories: [
+    { id: "decision", label: "قرارات المستشارين" },
+    { id: "incoming", label: "الوارد" },
+    { id: "deadline", label: "المهل" },
+    { id: "msg", label: "الرسائل" },
+  ],
+  isolationScope: "shared-queue",
+  nextAction: (r) => grievanceNextAction(r, "head"),
+};
+
 /** سجلّ الإعدادات — تُضاف بقية البوابات الست عشرة هنا حرفياً من PORTAL-MATRIX. */
 export const PORTAL_CONFIGS: Record<string, PortalConfig> = {
   studier: STUDIER_CONFIG,
   evaluator: EVALUATOR_CONFIG,
   triage: TRIAGE_CONFIG,
   "triage-lead": TRIAGE_LEAD_CONFIG,
+  "tech-advisor": TECH_ADVISOR_CONFIG,
+  "tech-head": TECH_HEAD_CONFIG,
 };

@@ -1,9 +1,2 @@
 @import "@hemaya/ui/styles.css";
-
-/* أصناف مساعدة للوحة الهبوط (dashboard hub) فقط — البوابات المنقولة تعرّف هيكلها (.shell/.main/.nav) بنفسها. */
-.hub { max-width: 1120px; margin-inline: auto; padding: 28px 24px 64px; }
-.page-head { margin-bottom: 20px; }
-.page-head h1 { font-size: 24px; margin: 0 0 4px; color: var(--text-strong); }
-.page-head p { color: var(--text-secondary); margin: 0; }
-.muted { color: var(--text-secondary); }
-.row { display: flex; align-items: center; gap: 12px; }
+@import "@hemaya/ui/shell.css";

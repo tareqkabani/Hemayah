@@ -1,22 +1,23 @@
-import { getUserRoles } from "@hemaya/auth";
-import { createServerClient } from "@hemaya/supabase";
-import { TechnicalOfficePortal } from "@/components/GrievancePortal";
+// بوابة المكتب الفني — تقرأ PortalConfig من @hemaya/domain وتركّب القشرة الموحّدة.
 export const dynamic = "force-dynamic";
+import { TechOfficePortal } from "@/components/TechOfficePortal";
+import { getTechData } from "@/lib/data";
 
-// الدور من المستخدم المسجَّل (فصل مهامّ). المستشار: هويّته من سمة دوره (attributes.advisor) —
-// كلّ مستشارٍ حسابٌ مستقلّ يرى المُسنَد إليه فقط، بلا مبدّل ولا تداخل بين المستشارين.
 export default async function Page() {
-  const roles = await getUserRoles();
-  if (roles.includes("tech_manager")) return <TechnicalOfficePortal role="head" />;
-
-  const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data } = await supabase
-    .from("user_roles")
-    .select("attributes")
-    .eq("user_id", user!.id)
-    .eq("role", "advisor")
-    .single();
-  const meAdvisor = ((data?.attributes as Record<string, unknown>)?.advisor as string) || "a1";
-  return <TechnicalOfficePortal role="advisor" meAdvisor={meAdvisor} />;
+  const d = await getTechData();
+  return (
+    <TechOfficePortal
+      roleKey={d.roleKey}
+      me={d.me}
+      mySpec={d.mySpec}
+      initialRows={d.initialRows}
+      prefs={d.prefs}
+      basePath="/technical"
+      initialNotifs={d.initialNotifs}
+      initialReadKeys={d.initialReadKeys}
+      initialOfficeMsgs={d.initialOfficeMsgs}
+      initialCaseMsgs={d.initialCaseMsgs}
+      advisors={d.advisors}
+    />
+  );
 }
