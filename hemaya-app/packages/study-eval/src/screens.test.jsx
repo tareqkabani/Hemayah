@@ -150,6 +150,52 @@ describe("التوصية الكاملة (AuthRec)", () => {
   });
 });
 
+describe("صدق البيانات — لا اختلاق لغائب (تحقّق عدائي 2026-07-22)", () => {
+  it("توصية بلا details لا تختلق وقائع شخصية — تُعرض «—» والحقول الحقيقية فقط", () => {
+    const detail = {
+      ...DETAIL,
+      recommendation: { ...DETAIL.recommendation, details: null },
+    };
+    render(<AuthRec task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
+    fireEvent.click(screen.getByText("التوصية الكاملة من الجهة المختصة"));
+    expect(screen.queryByText("سليم")).toBeNull();
+    expect(screen.queryByText("لا يرغب")).toBeNull();
+    expect(screen.queryByText("رئيس الفرع المباشر")).toBeNull();
+    expect(screen.queryByText("كبيرة موجبة للتوقيف")).toBeNull();
+    expect(screen.getAllByText("النيابة العامة — فرع الرياض").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("—").length).toBeGreaterThan(3);
+  });
+
+  it("مدة التوصية الفعلية تُعرض لا افتراض «ثلاثون يوماً» المسطّح", () => {
+    const detail = {
+      ...DETAIL,
+      recommendation: { ...DETAIL.recommendation, proposed_duration: "90 days" },
+    };
+    render(<AuthRec task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
+    fireEvent.click(screen.getByText("التوصية الكاملة من الجهة المختصة"));
+    expect(screen.getByText("90 يوماً")).toBeTruthy();
+    expect(screen.queryByText("ثلاثون يوماً")).toBeNull();
+  });
+
+  it("امتداد الخطر بحسب الطالب (م5/4) يظهر في طلب الحماية", () => {
+    const detail = {
+      ...DETAIL,
+      request: { ...DETAIL.request, details: { ...DETAIL.request.details, extends: "الزوج والأبناء", entity: "النيابة العامة" } },
+    };
+    render(<SeekerReq task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
+    fireEvent.click(screen.getByText("طلب الحماية كما ورد من طالب الحماية"));
+    expect(screen.getByText("امتداد الخطر إلى الغير — بحسب الطالب (م5/4)")).toBeTruthy();
+    expect(screen.getByText("الجهة المختصة (بحسب الطلب)")).toBeTruthy();
+  });
+
+  it("تفاصيل الطلب النصية (النمط القديم) تُعرض سرداً في المسوّغات لا تضيع", () => {
+    const detail = { request: { submitted_at: null, details: "سردٌ نصيّ قديم للواقعة." }, recommendation: null };
+    render(<SeekerReq task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
+    fireEvent.click(screen.getByText("طلب الحماية كما ورد من طالب الحماية"));
+    expect(screen.getByText("سردٌ نصيّ قديم للواقعة.")).toBeTruthy();
+  });
+});
+
 describe("عارض المرفقات السرّي (AttViewer)", () => {
   it("يمنع قائمة السياق ويعرض تنبيه التدقيق والعلامة المائية باسم المُطّلع", () => {
     const { container } = render(

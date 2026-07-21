@@ -153,3 +153,13 @@
   .dash-grid2 { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce){ *{transition:none!important;} }
+
+/* أرقام أقسام التوصية الكاملة (AuthRec المشترك) — طبقة هوية النيابة البرونزية */
+:root { --pp-cream-strong: #EEE7DF; --pp-bronze: #AC936D; --pp-bronze-deep: #8A6F49; }
+.grp-n {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+  background: var(--pp-cream-strong); color: var(--pp-bronze-deep);
+  border: 1px solid var(--pp-bronze);
+}

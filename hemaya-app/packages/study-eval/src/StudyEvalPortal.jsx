@@ -20,7 +20,7 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
   const [notifRows, setNotifRows] = useState(initial.notifications);
   const [threadRows, setThreadRows] = useState(initial.threads);
   const [localThreads, setLocalThreads] = useState([]); // خيوط بدأها الموظف ولم تُرسل أول رسالة بعد
-  const [details] = useState(initial.details || {});
+  const [details, setDetails] = useState(initial.details || {});
   const [active, setActive] = useState(cfg.defaultScreen);
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState("");
@@ -93,7 +93,26 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
   const tasksRpc = role === "studier" ? "my_study_tasks" : "my_assessment_tasks";
   const loadTasks = async () => {
     const { data } = await supabase.rpc(tasksRpc);
-    if (data) setTasks(data);
+    if (!data) return;
+    setTasks(data);
+    // تفاصيل النموذج (الطلب + التوصية) للمُسنَد حديثاً — كي يفتح البديل
+    // مهمته لحظة وصول إشعار الإسناد ويجد المستندين كاملين لا فارغين
+    const missing = data.map((t) => t.case_id).filter((id) => !details[id]);
+    if (!missing.length) return;
+    const [reqs, recs] = await Promise.all([
+      supabase.from("protection_requests").select("case_id, applicant_role, channel, details, submitted_at").in("case_id", missing),
+      supabase.from("recommendations").select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details").in("case_id", missing),
+    ]);
+    setDetails((d) => {
+      const next = { ...d };
+      for (const id of missing) {
+        next[id] = {
+          request: reqs.data?.find((r) => r.case_id === id) ?? null,
+          recommendation: recs.data?.find((r) => r.case_id === id) ?? null,
+        };
+      }
+      return next;
+    });
   };
   const loadNotifs = async () => {
     const { data } = await supabase
@@ -117,6 +136,8 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
       .channel("se-shell-" + role)
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, loadNotifs)
       .on("postgres_changes", { event: "*", schema: "public", table: "leadership_messages" }, loadThreads)
+      // الإسناد الحي: وصول مهمة (أو سحبها بإعادة الإسناد) يظهر فوراً دون إعادة تحميل
+      .on("postgres_changes", { event: "*", schema: "public", table: role === "studier" ? "studies" : "assessments" }, loadTasks)
       .subscribe();
     return () => {
       supabase.removeChannel(ch);

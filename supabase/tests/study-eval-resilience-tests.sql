@@ -151,9 +151,9 @@ begin
   raise notice 'اختبار 4 ✓ نظافة النصاب: القضية تقدّمت والباقون وُسموا والطوابير نظيفة';
 end $$;
 
--- ─── 5) عجز الطاقم: لا بديل متاحاً → إنذار للنائب لا توقّف صامت ───
+-- ─── 5) عجز الطاقم: لا سحب بلا بديل — المهمة تبقى نشطة والإنذار مرة يومياً ───
 do $$
-declare c record; i record; r record; _n int; _re int; _ex int;
+declare c record; i record; r record; _n int; _re int; _ex int; _stale uuid;
 begin
   select * into c from t_cases; select * into i from t_ids;
 
@@ -162,18 +162,34 @@ begin
     insert into studies (case_id, studier_id) values (c.c3, r.user_id)
     on conflict (case_id, studier_id) do nothing;
   end loop;
-  -- ونُعثّر واحداً منها
-  update studies set created_at = now() - interval '7 days'
-   where id = (select id from studies where case_id=c.c3 and superseded_at is null limit 1);
+  select id into _stale from studies where case_id=c.c3 and superseded_at is null limit 1;
+  update studies set created_at = now() - interval '7 days' where id = _stale;
 
   select * into _re, _ex from study_eval_watchdog();
   if _ex < 1 then raise exception 'اختبار 5أ فشل: العجز لم يُرصد (ex=%)', _ex; end if;
+
+  -- جوهر الإصلاح: المهمة لم تُسحب — بقيت نشطة بيد صاحبها (لا شلل للقضية)
+  if exists (select 1 from studies where id=_stale and superseded_at is not null) then
+    raise exception 'اختبار 5ب فشل: سُحبت المهمة رغم غياب البديل (شلل)';
+  end if;
+  select count(*) into _n from studies where case_id=c.c3 and superseded_at is null;
+  if _n < 1 then raise exception 'اختبار 5ج فشل: القضية بلا صف نشط'; end if;
+
   select count(*) into _n from notifications
    where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة';
-  if _n < 1 then raise exception 'اختبار 5ب فشل: لا إنذار عجز للنائب'; end if;
+  if _n < 1 then raise exception 'اختبار 5د فشل: لا إنذار عجز للنائب'; end if;
   select count(*) into _n from audit_log where action='study_pool_exhausted' and target='REF-RSL-9913';
-  if _n < 1 then raise exception 'اختبار 5ج فشل: لا تدقيق للعجز'; end if;
-  raise notice 'اختبار 5 ✓ عجز الطاقم: إنذار صريح للقيادة بدل التوقف الصامت';
+  if _n < 1 then raise exception 'اختبار 5هـ فشل: لا تدقيق للعجز'; end if;
+
+  -- الإنذار غير مُغرِق: جولة ثانية خلال اليوم لا تكرّره
+  select count(*) into _n from notifications
+   where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة';
+  perform study_eval_watchdog();
+  if (select count(*) from notifications
+      where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة') <> _n then
+    raise exception 'اختبار 5و فشل: إنذار العجز يتكرر كل جولة (إغراق)';
+  end if;
+  raise notice 'اختبار 5 ✓ العجز: لا سحب بلا بديل، القضية حيّة، والإنذار مرة يومياً';
 end $$;
 
 -- ─── 6) الحارس معطّل افتراضياً: لا يمسّ شيئاً حين الإعداد off ───
@@ -191,6 +207,61 @@ begin
   if _re <> 0 or _ex <> 0 or _before <> _after then
     raise exception 'اختبار 6 فشل: الحارس عمل وهو معطّل'; end if;
   raise notice 'اختبار 6 ✓ الحارس معطّل افتراضياً — التفعيل قرار بيئة صريح';
+end $$;
+
+-- ─── 7) حارس الإحياء: المُحال عنه لا «يُحيي» صفه باعتمادٍ متأخر ───
+do $$
+declare c record; _old uuid; _ok boolean := false;
+begin
+  select * into c from t_cases;
+  select studier_id into _old from studies
+   where case_id = c.c1 and superseded_at is not null limit 1;
+  perform pg_temp.impersonate(_old);
+  execute 'set local role authenticated';
+  begin
+    perform submit_study(c.c1, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+    raise exception 'FORCE';
+  exception when others then
+    if sqlerrm like '%أُعيد إسناد هذه المهمة%' then _ok := true; else raise; end if;
+  end;
+  execute 'reset role';
+  if not _ok then raise exception 'اختبار 7أ فشل: الصف المُحال أُحيي باعتماد متأخر'; end if;
+  if exists (select 1 from studies where case_id=c.c1 and submitted_at is not null and superseded_at is not null) then
+    raise exception 'اختبار 7ب فشل: صف submitted+superseded معاً';
+  end if;
+  raise notice 'اختبار 7 ✓ حارس الإحياء: مخرَج المُحال عنه مرفوض صراحةً';
+end $$;
+
+-- ─── 8) تحصين TRUNCATE: سجل التدقيق والجداول محصّنة من التفريغ ───
+do $$
+begin
+  if has_table_privilege('authenticated','public.audit_log','TRUNCATE')
+     or has_table_privilege('anon','public.audit_log','TRUNCATE')
+     or has_table_privilege('authenticated','public.protection_cases','TRUNCATE')
+     or has_table_privilege('anon','public.studies','TRUNCATE') then
+    raise exception 'اختبار 8 فشل: TRUNCATE ما يزال ممنوحاً';
+  end if;
+  raise notice 'اختبار 8 ✓ TRUNCATE محجوب عن anon/authenticated (سجل التدقيق محصّن)';
+end $$;
+
+-- ─── 9) قفل الكتابة: تعديل studies/assessments مباشرةً ممنوع (RPC فقط) ───
+do $$
+declare c record; _old uuid; _ok boolean := false;
+begin
+  select * into c from t_cases;
+  select studier_id into _old from studies
+   where case_id = c.c1 and superseded_at is not null limit 1;
+  perform pg_temp.impersonate(_old);
+  execute 'set local role authenticated';
+  begin
+    update studies set superseded_at = null, submitted_at = now(), recommendation = 'RESURRECTED'
+     where case_id = c.c1 and studier_id = _old;
+    raise exception 'FORCE';
+  exception when insufficient_privilege then _ok := true;
+  end;
+  execute 'reset role';
+  if not _ok then raise exception 'اختبار 9 فشل: الكتابة المباشرة نفذت — حارس الإحياء قابل للتجاوز'; end if;
+  raise notice 'اختبار 9 ✓ قفل الكتابة: لا إحياء ولا تعديل مباشر — الدوالّ المدقَّقة هي الباب الوحيد';
 end $$;
 
 rollback;

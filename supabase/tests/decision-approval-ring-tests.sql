@@ -186,5 +186,44 @@ begin
   raise notice 'اختبار 5 ✓ إعادة الرئيس من حلقته بملاحظة إلزامية وتصفير الختمين';
 end $$;
 
+-- ─── 6) فتح المرفقات من قرّاء الحزمة (المعدّ/الأعضاء/القيادة) = تدقيق م15/16 ───
+do $$
+declare i record; c record; _n int; _b int; _ok boolean := false; _subject uuid;
+begin
+  select * into i from t_ids; select * into c from t_case;
+
+  select count(*) into _b from audit_log where action='attachment_open';
+  perform pg_temp.impersonate(i.preparer);
+  execute 'set local role authenticated';
+  perform record_attachment_open(c.cid, 'تقرير تقييم المخاطر');
+  execute 'reset role';
+  perform pg_temp.impersonate(i.member);
+  execute 'set local role authenticated';
+  perform record_attachment_open(c.cid, 'طلب الحماية المسبّب');
+  execute 'reset role';
+  perform pg_temp.impersonate(i.chair);
+  execute 'set local role authenticated';
+  perform record_attachment_open(c.cid, 'بيانات القضية والإجراءات النظامية');
+  execute 'reset role';
+  select count(*) into _n from audit_log where action='attachment_open';
+  if _n - _b <> 3 then raise exception 'اختبار 6أ فشل: تدقيق قرّاء الحزمة (delta=%)', _n - _b; end if;
+
+  -- غير المخوَّل (طالب الحماية) يبقى مرفوضاً
+  select id into _subject from auth.users where email='1000000001@nafath.local';
+  if _subject is not null then
+    perform pg_temp.impersonate(_subject);
+    execute 'set local role authenticated';
+    begin
+      perform record_attachment_open(c.cid, 'أي مستند');
+      raise exception 'FORCE';
+    exception when others then
+      if sqlerrm like '%not assigned%' then _ok := true; else raise; end if;
+    end;
+    execute 'reset role';
+    if not _ok then raise exception 'اختبار 6ب فشل: غير المخوَّل فتح مرفقاً'; end if;
+  end if;
+  raise notice 'اختبار 6 ✓ فتح المرفقات مسجَّل للمعدّ والعضو والرئيس، ومرفوض لغير المخوَّل';
+end $$;
+
 rollback;
 \echo '✓✓ اختبارات حلقتي الاعتماد اجتازت كاملة — أُرجعت المعاملة، لا أثر في القاعدة'
