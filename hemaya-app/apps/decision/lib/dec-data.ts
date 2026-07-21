@@ -39,8 +39,8 @@ export async function getDecisionData() {
         voting_started_at, deadline_closed, rejections, issued_type, issued_reason, issued_at, updated_at),
       protection_requests(details, channel, submitted_at),
       studies(recommendation, partial_reason, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at),
-      assessments(recommendation, partial_reason, notes, found_recommendation, found_request, submitted_at),
-      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes)`)
+      assessments(recommendation, partial_reason, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at),
+      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes, details)`)
     // تشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
     .in("status", ["in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
     .order("created_at", { ascending: false });
@@ -123,6 +123,9 @@ export async function getDecisionData() {
     const reqDetails = normalizeReqDetails(req?.details);
     packages[secret] = {
       request: req ? { details: reqDetails, channel: req.channel || "", when: fmt(req.submitted_at) } : null,
+      // المستندان الكاملان بكل حقولهما — يعرضهما SeekerReq/AuthRec المشتركان
+      // (المصدر الواحد مع بوابتي الدارس والمقيّم) دون تسطيح ولا اختصار.
+      docs: { request: req || null, recommendation: rec || null },
       studies: ((c.studies as any[]) || []).filter((s) => s.submitted_at).map((s) => ({
         rec: s.recommendation || "—", partial: s.partial_reason || "", notes: s.notes || "",
         proposed: Array.isArray(s.proposed_type) ? s.proposed_type : [], duration: s.proposed_duration || "", when: fmt(s.submitted_at),
@@ -130,6 +133,7 @@ export async function getDecisionData() {
       })),
       assessments: ((c.assessments as any[]) || []).filter((a) => a.submitted_at).map((a) => ({
         rec: a.recommendation || "—", partial: a.partial_reason || "", notes: a.notes || "", when: fmt(a.submitted_at),
+        proposed: Array.isArray(a.proposed_type) ? a.proposed_type : [], duration: a.proposed_duration || "",
         foundRec: a.found_recommendation, foundReq: a.found_request,
       })),
       recommendation: rec ? {

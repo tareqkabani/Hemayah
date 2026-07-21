@@ -183,6 +183,9 @@ importers:
       '@hemaya/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@hemaya/study-eval':
+        specifier: workspace:*
+        version: link:../../packages/study-eval
       '@hemaya/supabase':
         specifier: workspace:*
         version: link:../../packages/supabase

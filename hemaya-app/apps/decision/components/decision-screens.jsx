@@ -10,6 +10,7 @@ import { Card, Tag, InlineAlert, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaDecision } from "./decision-store";
 import { FoundLine } from "./FoundLine";
+import { SeekerReq, AuthRec } from "@hemaya/study-eval";
 
 const HD = HemayaDecision;
 
@@ -202,28 +203,41 @@ export const DScreens = (function () {
     );
   }
 
-  /* حزمة الاطّلاع — تُعرض الأقسام المتوافرة فقط:
-     طلب الحماية · توصية الجهة المختصة · الدراسات · التقييمات · مرفقات داعمة.
+  /* حزمة الاطّلاع — المستندان الكاملان بكل حقولهما (SeekerReq/AuthRec
+     المشتركان مع بوابتي الدارس والمقيّم — لا تسطيح ولا اختصار) ثم
+     الدراسات والتقييمات كما وردت، فالمرفقات الداعمة.
+     كل فتح مرفقٍ داخل المستندين = صف تدقيق (record_attachment_open).
      attachEditable: المعدّ في «preparing» يرفع/يزيل المرفقات الداعمة. */
   function ReviewPackage({ q, attachEditable, onView, viewed }) {
     const pkg = HD.getPackage(q.secret) || {};
-    const req = pkg.request, rec = pkg.recommendation;
+    const rec = pkg.recommendation;
+    const docs = pkg.docs || {};
     const studies = pkg.studies || [], assessments = pkg.assessments || [];
+    // هوية المُطّلع للعلامة المائية — من مقعد الجلسة الحقيقي
+    const meSeat = (HD.getMe() || {}).seat;
+    const viewer = ((PREPARERS[meSeat] || SEATS[meSeat] || {}).name) || "المُطّلع";
+    // صيغة المستندين المشتركة: task {secret, refNo, cat} + detail {request, recommendation}
+    const docTask = { secret: q.secret, refNo: q.ref || "—", cat: q.cat };
+    const docDetail = { request: docs.request, recommendation: docs.recommendation };
+    const auditOpen = (t, doc) => {
+      // باني supabase كسول — لا يُرسل إلا عند then/await
+      const supa = createClient();
+      supa.rpc("record_attachment_open", { _case_id: HD.caseIdOf(q.secret), _doc: doc })
+        .then(({ error }) => { if (error) console.error("attachment_open audit:", error.message); });
+    };
     return (<div>
       <p className="sec-h" style={{ marginBottom: 10 }}><I name="folder_open" size={18} color="var(--color-primary)" /> حزمة الاطّلاع — مُجمَّعة آلياً</p>
-      <div className="pkg-bar"><I name="smart_toy" size={16} /><span>يجمع النظام مخرجات الدراسة والتقييم كما وردت بلا اختصار أو توصية. يطّلع المعدّ والمجلس على المحتوى الكامل، وكل فتح يُسجَّل في التدقيق (م15/16).</span></div>
+      <div className="pkg-bar"><I name="smart_toy" size={16} /><span>يجمع النظام المستندَين الكاملَين ومخرجات الدراسة والتقييم كما وردت بلا اختصار أو توصية. يطّلع المعدّ والمجلس على المحتوى الكامل، وكل فتح يُسجَّل في التدقيق (م15/16).</span></div>
       {q.foreign && <InlineAlert kind="warning" title="مسار أجنبي (المادة 6)" style={{ margin: "12px 0" }}>طلب وارد عبر اللجنة الدائمة للمساعدة القانونية. عند قبول المجلس تُرفع النتيجة توصيةً إلى النائب العام للبتّ النهائي (المعاملة بالمثل).</InlineAlert>}
 
-      {req && <div style={{ marginTop: 14 }}>
-        <p className="sec-h" style={{ margin: "0 0 8px" }}><I name="assignment_ind" size={18} color="var(--color-primary)" /> طلب الحماية</p>
-        <div style={{ display: "grid", gap: 4 }}>
-          {req.channel && <div className="fac"><span className="fac-k">قناة الورود</span><span className="fac-v">{req.channel}</span></div>}
-          {req.when && <div className="fac"><span className="fac-k">تاريخ التقديم</span><span className="fac-v">{req.when}</span></div>}
-        </div>
-        {req.details && <div className="opin">{req.details}</div>}
+      {docs.request && <div style={{ marginTop: 14 }}>
+        <SeekerReq task={docTask} detail={docDetail} viewer={viewer} onOpenDoc={auditOpen} />
+      </div>}
+      {docs.recommendation && <div style={{ marginTop: 4 }}>
+        <AuthRec task={docTask} detail={docDetail} viewer={viewer} onOpenDoc={auditOpen} />
       </div>}
 
-      {rec && <div style={{ marginTop: 18 }}>
+      {!docs.recommendation && rec && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 8px" }}><I name="recommend" size={18} color="var(--color-primary)" /> توصية الجهة المختصة</p>
         <div style={{ display: "grid", gap: 4 }}>
           <div className="fac"><span className="fac-k">الجهة</span><span className="fac-v">{rec.entity}</span></div>
@@ -246,7 +260,7 @@ export const DScreens = (function () {
 
       {assessments.length > 0 && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="psychology" size={18} color="var(--color-primary)" /> التقييمات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({assessments.length})</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} />)}</div>
+        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} proposed={a.proposed} duration={a.duration} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} />)}</div>
       </div>}
 
       <AttachmentsPanel secret={q.secret} editable={!!attachEditable} onView={onView} viewed={viewed} />
@@ -258,7 +272,8 @@ export const DScreens = (function () {
     const events = [];
     if (d.submittedAt) events.push({ icon: "send", t: "رُفع لاعتماد نائب الرئيس", when: d.submittedAt, ts: d.submittedAtTs, who: PREPARERS.prep1.name });
     (d.rejections || []).forEach((r) => events.push({ icon: "undo", t: "أُعيد للمعدّ للتعديل", m: r.note, when: r.when, ts: r.whenTs, who: SEATS.deputy.name }));
-    if (d.approvals && d.approvals.deputy) events.push({ icon: "approval", t: "اعتمده نائب الرئيس", when: d.approvals.deputy.when, ts: d.approvals.deputy.whenTs, who: SEATS.deputy.name });
+    if (d.approvals && d.approvals.deputy) events.push({ icon: "approval", t: "اعتمده نائب الرئيس (الحلقة الأولى)", when: d.approvals.deputy.when, ts: d.approvals.deputy.whenTs, who: SEATS.deputy.name });
+    if (d.approvals && d.approvals.chair) events.push({ icon: "workspace_premium", t: "اعتمده رئيس المركز (الحلقة الثانية)", when: d.approvals.chair.when, ts: d.approvals.chair.whenTs, who: SEATS.chair.name });
     if (d.votingStartedAt) events.push({ icon: "how_to_vote", t: "طُرح على أعضاء المجلس للتصويت", when: d.votingStartedAt, ts: d.votingStartedAtTs, who: PREPARERS.prep1.name });
     if (d.issued) events.push({ icon: "verified", t: "صدر قرار المركز (" + d.issued.type + ") وأُشعِر الطرفان — م10", when: d.issued.when, ts: d.issued.whenTs, who: SEATS.chair.name });
     if (!events.length) return null;
@@ -283,17 +298,17 @@ export const DScreens = (function () {
   // ————— قرار المركز المُعَدّ — عرضٌ للقراءة —————
   function DecisionView({ decision, foreign }) {
     const d = decision || {};
-    const approved = d.approvals && d.approvals.deputy;
+    const approved = d.approvals && d.approvals.deputy && d.approvals.chair;
     return (
       <Card className="card pad" style={{ marginTop: 16 }}>
         <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> قرار المركز المُعَدّ</p>
-        <div className="pkg-bar"><I name="verified_user" size={16} /><span>أعدّه <b>{PREPARERS.prep1.name}</b> (مستشار قانوني) إعداداً محايداً من الدراسات والتقييمات — بلا توصية بالقبول أو الرفض.{approved ? <React.Fragment> اعتمده <b>نائب رئيس المركز</b> ({approved.when}).</React.Fragment> : null}</span></div>
+        <div className="pkg-bar"><I name="verified_user" size={16} /><span>أعدّه <b>{PREPARERS.prep1.name}</b> (مستشار قانوني) إعداداً محايداً من الدراسات والتقييمات — بلا توصية بالقبول أو الرفض.{approved ? <React.Fragment> اعتمده <b>النائب والرئيس</b> ({d.approvals.chair.when}).</React.Fragment> : null}</span></div>
         <div className="fld" style={{ marginBottom: 12 }}><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
           <div className="row" style={{ gap: 6 }}>{(d.types || []).map((t) => <Tag key={t} tone="success" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}{(d.types || []).length === 0 && <span className="muted">—</span>}</div></div>
         <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">مدّة الحماية</span><b style={{ color: "var(--text-strong)" }}>{d.duration || "—"}</b></div>
         <div className="fld" style={{ marginBottom: 12 }}><span className="fld-label">حيثيات القرار</span><div className="opin" style={{ marginTop: 0 }}>{d.reasoning || "—"}</div></div>
         <div className="row" style={{ gap: 8 }}>
-          <Tag tone={approved ? "success" : "warning"} size="sm" iconLeft={<I name={approved ? "verified" : "pending"} size={13} />}>{approved ? "اعتمده نائب الرئيس" : "بانتظار اعتماد نائب الرئيس"}</Tag>
+          <Tag tone={approved ? "success" : "warning"} size="sm" iconLeft={<I name={approved ? "verified" : "pending"} size={13} />}>{approved ? "اعتمده النائب والرئيس" : "في حلقتي الاعتماد"}</Tag>
           <Tag tone={(STATUS[d.status] || {}).tone || "neutral"} size="sm" iconLeft={<I name={(STATUS[d.status] || {}).icon || "gavel"} size={13} />}>{(STATUS[d.status] || {}).t || d.status}</Tag>
         </div>
         {foreign && <InlineAlert kind="warning" title="مسار أجنبي — المادة 6" style={{ marginTop: 12 }}>عند قبول المجلس تُرفع النتيجة توصيةً إلى النائب العام للبتّ النهائي (المعاملة بالمثل).</InlineAlert>}
