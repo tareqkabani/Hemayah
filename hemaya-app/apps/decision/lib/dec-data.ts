@@ -1,5 +1,6 @@
 import { createServerClient, createServiceClient } from "@hemaya/supabase";
 import { CATEGORY, RISK_LEVEL } from "@hemaya/domain";
+import { normalizeReqDetails } from "./req-details";
 
 // ── تغذية بوابة القرار (CO-3) من الخطّ الحقيقي: protection_cases + council_* ──
 // القراءة تحت RLS: القضايا عبر board_read/co_decision_read؛ الأصوات معزولة صفّياً
@@ -116,20 +117,7 @@ export async function getDecisionData() {
     // حزمة الاطّلاع الحقيقية: الطلب + الدراسات + التقييمات + توصية الجهة
     const req = one(c.protection_requests) as any;
     const rec = one(c.recommendations) as any;
-    // details قد تكون نصاً (النمط القديم) أو كائنَ نموذج الطالب (jsonb) — تُطبَّع نصاً للعرض
-    const reqDetails = ((d: unknown): string => {
-      if (!d) return "";
-      if (typeof d === "string") return d;
-      const o = d as Record<string, unknown>;
-      return [
-        o.reason,
-        o.crime && `الجريمة: ${o.crime}`,
-        o.entity && `الجهة المختصة: ${o.entity}`,
-        o.case_no && `القضية: ${o.case_no}`,
-      ]
-        .filter(Boolean)
-        .join(" — ");
-    })(req?.details);
+    const reqDetails = normalizeReqDetails(req?.details);
     packages[secret] = {
       request: req ? { details: reqDetails, channel: req.channel || "", when: fmt(req.submitted_at) } : null,
       studies: ((c.studies as any[]) || []).filter((s) => s.submitted_at).map((s) => ({

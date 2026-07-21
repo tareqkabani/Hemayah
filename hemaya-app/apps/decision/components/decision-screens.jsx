@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaDecision } from "./decision-store";
+import { FoundLine } from "./FoundLine";
 
 const HD = HemayaDecision;
 
@@ -176,24 +177,6 @@ export const DScreens = (function () {
     if (Array.isArray(factors)) return factors.map((f, i) => Array.isArray(f) ? [String(f[0]), String(f[1])] : [String(i + 1), String(f)]);
     if (typeof factors === "object") return Object.keys(factors).map((k) => [k, String(factors[k])]);
     return [["عوامل م9", String(factors)]];
-  };
-
-  // بندا الاطّلاع (تحديث 2026-07-21): ما أثبته المؤلّف بالاطّلاع على الحزمة —
-  // وجود توصية جهة مختصة / طلب مسبّب. null = مخرَج سابق للتحديث (لا يُعرض).
-  const FoundLine = ({ foundRec, foundReq }) => {
-    if (foundRec == null && foundReq == null) return null;
-    const chip = (label, v) => (
-      <Tag tone={v ? "success" : "neutral"} size="sm" iconLeft={<I name={v ? "check" : "close"} size={12} />}>
-        {label}: {v ? "يوجد" : "لا يوجد"}
-      </Tag>
-    );
-    return (
-      <div className="row" style={{ gap: 6, marginBottom: 10 }}>
-        <span className="muted" style={{ fontSize: 12 }}>بالاطّلاع تبيّن:</span>
-        {foundRec != null && chip("توصية الجهة", foundRec)}
-        {foundReq != null && chip("الطلب المسبّب", foundReq)}
-      </div>
-    );
   };
 
   function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null }) {
