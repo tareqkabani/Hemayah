@@ -9,6 +9,8 @@
    البيانات حقيقيّة من Supabase (hydrate + أفعال الخادم).
    ============================================================ */
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@hemaya/supabase/src/browser";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, RiskLevel } from "@hemaya/ui";
 import { HemayaDecision } from "./decision-store";
 import { DScreens } from "./decision-screens";
@@ -713,7 +715,25 @@ const App = (function () {
 
 // ————— الغلاف: يحقن أفعال الخادم ويُغذّي المخزن من props ثم يرندر —————
 export function DecisionPortal({ scope, initialData }) {
-  useState(() => { HD.hydrate(initialData); return true; }); // تغذية مرّةً واحدة (متطابقة خادم/عميل)
+  useState(() => { HD.hydrate(initialData); return true; }); // تغذية أولى متطابقة خادم/عميل
+  const router = useRouter();
+  // مصالحة حقيقة الخادم: revalidatePath بعد كل فعلٍ يعيد initialData محدثة —
+  // فيُعاد الترطيب: نجاح الفعل يثبت، وفشله (رفض آلة الحالة) يرتدّ آلياً
+  // بدل بقاء الواجهة على حالة تفاؤلية مخالفة للقاعدة.
+  useEffect(() => { HD.hydrate(initialData); }, [initialData]);
+  // بثّ حي: تقدّم المقاعد الأخرى (اعتماد، أصوات، إغلاق) يصل من دون إعادة تحميل يدوية
+  useEffect(() => {
+    const supa = createClient();
+    let tm = null;
+    const kick = () => { if (tm) return; tm = setTimeout(() => { tm = null; router.refresh(); }, 1500); };
+    const ch = supa
+      .channel("decision-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "council_decisions" }, kick)
+      .on("postgres_changes", { event: "*", schema: "public", table: "council_votes" }, kick)
+      .subscribe();
+    return () => { if (tm) clearTimeout(tm); supa.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     HD.setActions({
       saveDecision: DecActions.saveDecision,

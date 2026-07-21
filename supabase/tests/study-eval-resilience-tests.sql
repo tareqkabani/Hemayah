@@ -193,5 +193,40 @@ begin
   raise notice 'اختبار 6 ✓ الحارس معطّل افتراضياً — التفعيل قرار بيئة صريح';
 end $$;
 
+-- ─── 7) حارس الإحياء: المُحال عنه لا «يُحيي» صفه باعتمادٍ متأخر ───
+do $$
+declare c record; _old uuid; _ok boolean := false;
+begin
+  select * into c from t_cases;
+  select studier_id into _old from studies
+   where case_id = c.c1 and superseded_at is not null limit 1;
+  perform pg_temp.impersonate(_old);
+  execute 'set local role authenticated';
+  begin
+    perform submit_study(c.c1, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+    raise exception 'FORCE';
+  exception when others then
+    if sqlerrm like '%أُعيد إسناد هذه المهمة%' then _ok := true; else raise; end if;
+  end;
+  execute 'reset role';
+  if not _ok then raise exception 'اختبار 7أ فشل: الصف المُحال أُحيي باعتماد متأخر'; end if;
+  if exists (select 1 from studies where case_id=c.c1 and submitted_at is not null and superseded_at is not null) then
+    raise exception 'اختبار 7ب فشل: صف submitted+superseded معاً';
+  end if;
+  raise notice 'اختبار 7 ✓ حارس الإحياء: مخرَج المُحال عنه مرفوض صراحةً';
+end $$;
+
+-- ─── 8) تحصين TRUNCATE: سجل التدقيق والجداول محصّنة من التفريغ ───
+do $$
+begin
+  if has_table_privilege('authenticated','public.audit_log','TRUNCATE')
+     or has_table_privilege('anon','public.audit_log','TRUNCATE')
+     or has_table_privilege('authenticated','public.protection_cases','TRUNCATE')
+     or has_table_privilege('anon','public.studies','TRUNCATE') then
+    raise exception 'اختبار 8 فشل: TRUNCATE ما يزال ممنوحاً';
+  end if;
+  raise notice 'اختبار 8 ✓ TRUNCATE محجوب عن anon/authenticated (سجل التدقيق محصّن)';
+end $$;
+
 rollback;
 \echo '✓✓ اختبارات الإسناد المرن اجتازت كاملة — أُرجعت المعاملة، لا أثر في القاعدة'

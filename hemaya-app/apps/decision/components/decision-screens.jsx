@@ -174,14 +174,8 @@ export const DScreens = (function () {
     if (!r || r === "—") return "neutral";
     return "success";
   };
-  const factorRows = (factors) => {
-    if (!factors) return [];
-    if (Array.isArray(factors)) return factors.map((f, i) => Array.isArray(f) ? [String(f[0]), String(f[1])] : [String(i + 1), String(f)]);
-    if (typeof factors === "object") return Object.keys(factors).map((k) => [k, String(factors[k])]);
-    return [["عوامل م9", String(factors)]];
-  };
 
-  function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null }) {
+  function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null, rejectReasons = null }) {
     const tone = recToneOf(rec, partial);
     const tc = tone === "success" ? "var(--color-success)" : tone === "warning" ? "var(--color-warning)" : tone === "error" ? "var(--color-error)" : "var(--border-default)";
     return (
@@ -195,6 +189,14 @@ export const DScreens = (function () {
         <div style={{ padding: 16 }}>
           <FoundLine foundRec={foundRec} foundReq={foundReq} />
           {partial && <div className="fac" style={{ borderTop: "none", paddingTop: 0 }}><span className="fac-k">سبب الجزئية</span><span className="fac-v">{partial}</span></div>}
+          {Array.isArray(rejectReasons) && rejectReasons.length > 0 && <div style={{ marginBottom: 10 }}>
+            <div className="fac-k" style={{ marginBottom: 6 }}>أسباب رفض الحماية</div>
+            <div style={{ display: "grid", gap: 6 }}>{rejectReasons.map((r, i) => (
+              <div key={i} className="ro-field" style={{ display: "block" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>{r.t || r.k || "—"}</span>
+                {r.note && <span className="muted" style={{ display: "block", fontSize: 12.5, marginTop: 3 }}>{r.note}</span>}
+              </div>))}</div>
+          </div>}
           {proposed && proposed.length > 0 && <div className="row" style={{ gap: 6, marginBottom: duration || notes ? 10 : 0 }}>{proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
           {duration && <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{duration}</b></div>}
           {notes && <div className="opin" style={{ marginTop: 0, borderInlineStart: "3px solid " + tc }}>{notes}</div>}
@@ -210,7 +212,6 @@ export const DScreens = (function () {
      attachEditable: المعدّ في «preparing» يرفع/يزيل المرفقات الداعمة. */
   function ReviewPackage({ q, attachEditable, onView, viewed }) {
     const pkg = HD.getPackage(q.secret) || {};
-    const rec = pkg.recommendation;
     const docs = pkg.docs || {};
     const studies = pkg.studies || [], assessments = pkg.assessments || [];
     // هوية المُطّلع للعلامة المائية — من مقعد الجلسة الحقيقي
@@ -237,30 +238,14 @@ export const DScreens = (function () {
         <AuthRec task={docTask} detail={docDetail} viewer={viewer} onOpenDoc={auditOpen} />
       </div>}
 
-      {!docs.recommendation && rec && <div style={{ marginTop: 18 }}>
-        <p className="sec-h" style={{ margin: "0 0 8px" }}><I name="recommend" size={18} color="var(--color-primary)" /> توصية الجهة المختصة</p>
-        <div style={{ display: "grid", gap: 4 }}>
-          <div className="fac"><span className="fac-k">الجهة</span><span className="fac-v">{rec.entity}</span></div>
-          <div className="fac"><span className="fac-k">التوصية</span><span><Tag tone={recToneOf(rec.decision)} size="sm">{rec.decision}</Tag></span></div>
-          {rec.duration && <div className="fac"><span className="fac-k">المدّة المقترحة</span><span className="fac-v">{rec.duration}</span></div>}
-          {rec.channel && <div className="fac"><span className="fac-k">قناة الورود</span><span className="fac-v">{rec.channel}</span></div>}
-          {rec.when && <div className="fac"><span className="fac-k">تاريخ الورود</span><span className="fac-v">{rec.when}</span></div>}
-        </div>
-        {rec.proposed && rec.proposed.length > 0 && <div className="row" style={{ gap: 6, marginTop: 10 }}>{rec.proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
-        {factorRows(rec.factors).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8, marginTop: 10 }}>
-          {factorRows(rec.factors).map(([k, v], j) => (<div key={j} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "7px 11px", background: "var(--surface-subtle)", borderRadius: "var(--radius-md)" }}><span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{k}</span><span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-strong)" }}>{v}</span></div>))}
-        </div>}
-        {rec.notes && <div className="opin">{rec.notes}</div>}
-      </div>}
-
       {studies.length > 0 && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="balance" size={18} color="var(--color-primary)" /> الدراسات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({studies.length} — كلّ مُعدّ مستقلّ ومعزول)</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} icon="balance" title={"الدراسة القانونية " + (studies.length > 1 ? (i + 1) : "")} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} foundRec={s.foundRec} foundReq={s.foundReq} />)}</div>
+        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} icon="balance" title={"الدراسة القانونية " + (studies.length > 1 ? (i + 1) : "")} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} foundRec={s.foundRec} foundReq={s.foundReq} rejectReasons={s.rejectReasons} />)}</div>
       </div>}
 
       {assessments.length > 0 && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="psychology" size={18} color="var(--color-primary)" /> التقييمات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({assessments.length})</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} proposed={a.proposed} duration={a.duration} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} />)}</div>
+        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} proposed={a.proposed} duration={a.duration} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} rejectReasons={a.rejectReasons} />)}</div>
       </div>}
 
       <AttachmentsPanel secret={q.secret} editable={!!attachEditable} onView={onView} viewed={viewed} />
