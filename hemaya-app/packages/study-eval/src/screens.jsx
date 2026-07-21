@@ -1,3 +1,4 @@
+"use client";
 // شاشات الدراسة والتقييم — منقولة من المرجع المعتمد design-refs/study-eval-portal.jsx
 // (تحديث 2026-07-21: الطلبات الواردة · المستندان الكاملان مطويّين · عارض المرفقات
 // السرّي · طبقة هوية النيابة) وموصولة بالبيانات الحيّة تحت RLS.
@@ -246,7 +247,8 @@ export function SeekerReq({ task, detail, viewer, onOpenDoc }) {
   const [open, setOpen] = useState(false);
   const [doc, setDoc] = useState(null);
   const req = detail?.request || null;
-  const dd = req?.details || {};
+  // details قد تكون نصاً حراً (النمط القديم) — يُعرض سرداً في خانة المسوّغات
+  const dd = typeof req?.details === "string" ? { reason: req.details } : req?.details || {};
   const files = Array.isArray(dd.files) ? dd.files : [];
   const openAtt = (name) => {
     setDoc(name);
@@ -277,10 +279,14 @@ export function SeekerReq({ task, detail, viewer, onOpenDoc }) {
             </div>
           </div>
           <div style={{ marginTop: 6 }}>
-            {R("صفة مقدّم الطلب", dd.role || "أصيل — عن نفسه")}
+            {R("صفة مقدّم الطلب", dd.role || "—")}
             {R("دور طالب الحماية في القضية", task.cat, "info")}
             {R("نوع الجريمة محل القضية", dd.crime || dd.waqia || "—")}
-            {R("هل سبق التقديم للجهة المختصة؟", dd.prior_submit ? "نعم — " + (dd.prior_entity || "الجهة المختصة") : "لا")}
+            {dd.entity && R("الجهة المختصة (بحسب الطلب)", dd.entity)}
+            {R("هل سبق التقديم للجهة المختصة؟",
+              dd.prior_submit === true ? "نعم — " + (dd.prior_entity || "الجهة المختصة")
+              : dd.prior_submit === false ? "لا" : "—")}
+            {dd.extends && R("امتداد الخطر إلى الغير — بحسب الطالب (م5/4)", dd.extends, "error")}
             {R("جهة اتصال الطوارئ", "مُسجّلة (محجوبة — تُكشف للتنفيذ فقط)")}
           </div>
           <div className="fld" style={{ marginTop: 8, marginBottom: 8 }}>
@@ -311,6 +317,18 @@ export function SeekerReq({ task, detail, viewer, onOpenDoc }) {
       {doc && <AttViewer doc={doc} secret={task.secret} viewer={viewer} onClose={() => setDoc(null)} />}
     </Card>
   );
+}
+
+// مدة الحماية المقترحة من عمود interval — القيمة الفعلية لا افتراضاً مسطّحاً
+function fmtInterval(v) {
+  if (!v) return "إلى حين انتهاء القضية";
+  const s = String(v).trim();
+  if (s === "30 days") return "ثلاثون يوماً";
+  const m = s.match(/^(\d+)\s*days?$/);
+  if (m) return m[1] + " يوماً";
+  const mo = s.match(/^(\d+)\s*mons?$/);
+  if (mo) return mo[1] + (mo[1] === "1" ? " شهر" : " أشهر");
+  return s;
 }
 
 // ===== التوصية الكاملة من الجهة المختصة (للقراءة · الهوية محجوبة) =====
@@ -364,15 +382,15 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
             {R("ضابط الاتصال المعتمد", rd.officer || "—")}
             {R("مرجع التوصية", rd.rec_ref || "—")}
             {R("تاريخ الرفع", rec?.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : "—", "success")}
-            {R("اعتمدها", rd.approved_by || "رئيس الفرع المباشر")}
+            {R("اعتمدها", rd.approved_by || "—")}
           </Grp>
 
           <Grp n="٢" title="بيانات مقدّم الطلب (محجوبة الهوية)">
             {R("صفة مقدّم الطلب", task.cat)}
-            {R("الحالة الصحية", rd.health || "سليم")}
-            {R("التاريخ الجنائي", rd.criminal || "لا يوجد")}
-            {R("التاريخ النفسي", rd.psych || "لا توجد ملحوظات")}
-            {R("رغبة الكشف عن الهوية", rd.reveal || "لا يرغب", "warning")}
+            {R("الحالة الصحية", rd.health || "—")}
+            {R("التاريخ الجنائي", rd.criminal || "—")}
+            {R("التاريخ النفسي", rd.psych || "—")}
+            {R("رغبة الكشف عن الهوية", rd.reveal || "—", rd.reveal ? "warning" : undefined)}
           </Grp>
 
           <Grp n="٣" title="تفاصيل وأسباب طلب الحماية">
@@ -381,20 +399,20 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
 
           <Grp n="٤" title="ملخّص القضية ودور مقدّم الطلب">
             {R("رقم القضية", dd.case_no || "—")}
-            {R("المرحلة الحالية", rd.stage || "التحقيق")}
+            {R("المرحلة الحالية", rd.stage || "—")}
             {Block("ملخّص القضية", rd.case_summary || "—")}
             {Block("دور مقدّم الطلب وأهمية معلوماته", rd.role_desc || "—")}
           </Grp>
 
           <Grp n="٥" title="مسوّغات توفير الحماية">
-            {R("هل تم التواصل مع مقدّم الطلب؟", rd.contacted || "نعم")}
-            {R("نوع الجريمة", "كبيرة موجبة للتوقيف", "error")}
+            {R("هل تم التواصل مع مقدّم الطلب؟", rd.contacted || "—")}
+            {R("نوع الجريمة", rd.crime_class || "—", rd.crime_class ? "error" : undefined)}
             {dd.waqia && R("الواقعة", dd.waqia)}
             {Block("الوصف الإجرامي", rd.crime_desc || dd.crime || "—")}
-            {R("إخفاء البيانات (م2 من النظام)", "نعم")}
-            {R("وجود خطر يهدّد طالب الحماية", "يوجد", "error")}
+            {R("إخفاء البيانات (م2 من النظام)", rd.hide_identity || "—")}
+            {R("وجود خطر يهدّد طالب الحماية", rd.threat_exists || (rd.threat_type ? "يوجد" : "—"), rd.threat_exists === "يوجد" || rd.threat_type ? "error" : undefined)}
             {rd.threat_type && R("نوع الخطر", rd.threat_type)}
-            {R("مستوى الخطر", dd.threat === "مرتفع" ? "شديد" : dd.threat || "شديد", "error")}
+            {R("مستوى الخطر", dd.threat === "مرتفع" ? "شديد" : dd.threat || "—", dd.threat ? "error" : undefined)}
             {rd.harm_type && R("نوع الضرر", rd.harm_type)}
             {R("امتداد الخطر إلى الغير (م5/4)", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "نعم" : "لا", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "error" : undefined)}
             {rd.extends_who && rd.extends_who !== "لا يمتدّ" && R("إلى من يمتدّ", rd.extends_who)}
@@ -411,7 +429,7 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
           </Grp>
 
           <Grp n="٧" title="مدة الحماية المقترحة">
-            {R("المدة", rec?.proposed_duration ? "ثلاثون يوماً" : "إلى حين انتهاء القضية")}
+            {R("المدة", fmtInterval(rec?.proposed_duration))}
           </Grp>
 
           <Grp n="٨" title="مرفقات التوصية">
@@ -434,7 +452,7 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
             <span className="row" style={{ gap: 8 }}>
               <I name="account_balance" size={17} color="var(--color-primary)" />
               <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-strong)" }}>{rec?.source_body || "—"}</span>
-              <span className="muted">· اعتمدها {rd.approved_by || "رئيس الفرع المباشر"}</span>
+              <span className="muted">{rd.approved_by ? "· اعتمدها " + rd.approved_by : ""}</span>
             </span>
             <Tag tone="neutral" size="sm" iconLeft={<I name="lock_clock" size={13} />}>موقّعة رقمياً</Tag>
           </div>

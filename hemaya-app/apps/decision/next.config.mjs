@@ -2,6 +2,6 @@
 const nextConfig = {
   basePath: "/decision",
   experimental: { serverActions: { allowedOrigins: ["localhost:3000", ...(process.env.SERVER_ACTIONS_ALLOWED_ORIGINS?.split(",") ?? [])] } },
-  transpilePackages: ["@hemaya/ui", "@hemaya/auth", "@hemaya/supabase", "@hemaya/domain"],
+  transpilePackages: ["@hemaya/ui", "@hemaya/auth", "@hemaya/supabase", "@hemaya/domain", "@hemaya/study-eval"],
 };
 export default nextConfig;

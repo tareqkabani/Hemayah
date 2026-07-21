@@ -31,14 +31,21 @@ export async function submitForApproval(caseId: string, types: string[], duratio
   return r;
 }
 
-/** نائب رئيس المركز حصراً: اعتماد → يعود للمعدّ للطرح. */
+/** نائب رئيس المركز: اعتماد → يمرّ لحلقة اعتماد الرئيس. */
 export async function approve(caseId: string) {
   const r = await rpc("council_approve", { _case_id: caseId });
   if (r.ok) revalAll();
   return r;
 }
 
-/** نائب رئيس المركز حصراً: إعادة للمعدّ بملاحظة إلزامية. */
+/** رئيس المركز: الحلقة الثانية — اعتماد → يعود للمعدّ للطرح. */
+export async function approveChair(caseId: string) {
+  const r = await rpc("council_approve_chair", { _case_id: caseId });
+  if (r.ok) revalAll();
+  return r;
+}
+
+/** القيادة (كلٌّ من حلقته): إعادة للمعدّ بملاحظة إلزامية. */
 export async function rejectApproval(caseId: string, note: string) {
   const r = await rpc("council_return", { _case_id: caseId, _note: note });
   if (r.ok) revalAll();

@@ -1,6 +1,5 @@
 import { createServerClient, createServiceClient } from "@hemaya/supabase";
 import { CATEGORY, RISK_LEVEL } from "@hemaya/domain";
-import { normalizeReqDetails } from "./req-details";
 
 // ── تغذية بوابة القرار (CO-3) من الخطّ الحقيقي: protection_cases + council_* ──
 // القراءة تحت RLS: القضايا عبر board_read/co_decision_read؛ الأصوات معزولة صفّياً
@@ -35,12 +34,12 @@ export async function getDecisionData() {
   const caseResp = await supabase
     .from("protection_cases")
     .select(`id, ref_no, secret_code, category, status, classification, source, created_at,
-      council_decisions(status, preparer_id, types, duration, reasoning, submitted_at, deputy_approved_at,
+      council_decisions(status, preparer_id, types, duration, reasoning, submitted_at, deputy_approved_at, chair_approved_at,
         voting_started_at, deadline_closed, rejections, issued_type, issued_reason, issued_at, updated_at),
       protection_requests(details, channel, submitted_at),
-      studies(recommendation, partial_reason, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at),
-      assessments(recommendation, partial_reason, notes, found_recommendation, found_request, submitted_at),
-      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes)`)
+      studies(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
+      assessments(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
+      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes, details)`)
     // تشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
     .in("status", ["in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
     .order("created_at", { ascending: false });
@@ -105,8 +104,15 @@ export async function getDecisionData() {
       reasoning: cd.reasoning || "",
       submittedAt: fmt(cd.submitted_at),
       submittedAtTs: cd.submitted_at || null,
-      approvals: { deputy: cd.deputy_approved_at ? { when: fmt(cd.deputy_approved_at), whenTs: cd.deputy_approved_at } : null },
-      rejections: (Array.isArray(cd.rejections) ? cd.rejections : []).map((r: any) => ({ note: r.note || "", when: fmt(r.at || null) || "—", whenTs: r.at || null })),
+      approvals: {
+        deputy: cd.deputy_approved_at ? { when: fmt(cd.deputy_approved_at), whenTs: cd.deputy_approved_at } : null,
+        chair: cd.chair_approved_at ? { when: fmt(cd.chair_approved_at), whenTs: cd.chair_approved_at } : null,
+      },
+      rejections: (Array.isArray(cd.rejections) ? cd.rejections : []).map((r: any) => ({
+        note: r.note || "", when: fmt(r.at || null) || "—", whenTs: r.at || null,
+        // من أعادها فعلاً — النائب من حلقته أو الرئيس من حلقته (سوء الإسناد كان يحرج القيادة)
+        bySeat: (r.by && idToSeat[r.by]) || null,
+      })),
       votingStartedAt: fmt(cd.voting_started_at),
       votingStartedAtTs: cd.voting_started_at || null,
       deadlineClosed: !!cd.deadline_closed,
@@ -117,17 +123,21 @@ export async function getDecisionData() {
     // حزمة الاطّلاع الحقيقية: الطلب + الدراسات + التقييمات + توصية الجهة
     const req = one(c.protection_requests) as any;
     const rec = one(c.recommendations) as any;
-    const reqDetails = normalizeReqDetails(req?.details);
     packages[secret] = {
-      request: req ? { details: reqDetails, channel: req.channel || "", when: fmt(req.submitted_at) } : null,
-      studies: ((c.studies as any[]) || []).filter((s) => s.submitted_at).map((s) => ({
+      // المستندان الكاملان بكل حقولهما — يعرضهما SeekerReq/AuthRec المشتركان
+      // (المصدر الواحد مع بوابتي الدارس والمقيّم) دون تسطيح ولا اختصار.
+      docs: { request: req || null, recommendation: rec || null },
+      studies: ((c.studies as any[]) || []).filter((s) => s.submitted_at && !s.superseded_at).map((s) => ({
         rec: s.recommendation || "—", partial: s.partial_reason || "", notes: s.notes || "",
         proposed: Array.isArray(s.proposed_type) ? s.proposed_type : [], duration: s.proposed_duration || "", when: fmt(s.submitted_at),
         foundRec: s.found_recommendation, foundReq: s.found_request,
+        rejectReasons: Array.isArray(s.reject_reasons) ? s.reject_reasons : null,
       })),
-      assessments: ((c.assessments as any[]) || []).filter((a) => a.submitted_at).map((a) => ({
+      assessments: ((c.assessments as any[]) || []).filter((a) => a.submitted_at && !a.superseded_at).map((a) => ({
         rec: a.recommendation || "—", partial: a.partial_reason || "", notes: a.notes || "", when: fmt(a.submitted_at),
+        proposed: Array.isArray(a.proposed_type) ? a.proposed_type : [], duration: a.proposed_duration || "",
         foundRec: a.found_recommendation, foundReq: a.found_request,
+        rejectReasons: Array.isArray(a.reject_reasons) ? a.reject_reasons : null,
       })),
       recommendation: rec ? {
         entity: rec.source_body || "الجهة المختصة", decision: rec.decision || "—",
