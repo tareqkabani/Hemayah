@@ -119,6 +119,8 @@ export interface PortalConfig {
 const STUDY_EVAL_SHARED = {
   defaultScreen: "dashboard" as const,
   screens: ["dashboard", "tasks", "messages", "notifications", "profile"] as PortalScreenId[],
+  // التسمية المعتمدة (تحديث 2026-07-21): «الطلبات الواردة» لا «المهام المُسندة»
+  screenMeta: { tasks: { t: "الطلبات الواردة", icon: "assignment_ind" } },
   emergencyButton: false, // لا يستقبلان بلاغات خطر
   identityMode: "secret-code" as const,
   identityRevealSeconds: 6,

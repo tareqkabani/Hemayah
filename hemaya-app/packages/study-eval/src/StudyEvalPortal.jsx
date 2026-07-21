@@ -5,50 +5,11 @@
 // طيّ الجانبية (user_prefs)، عدّادات الخيوط (leadership_messages.read_at).
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@hemaya/supabase/src/browser";
-import { PORTAL_CONFIGS, businessDaysBetween } from "@hemaya/domain";
+import { PORTAL_CONFIGS } from "@hemaya/domain";
 import { PortalShell, NotificationsScreen, MessagesScreen } from "@hemaya/ui";
 import { Tasks, UnifiedForm, Dashboard, Profile } from "./screens";
-import { PROTECTION_TYPES, REJECT_REASONS } from "./lookups";
-
-const TRACK_AR = { local: "عادي", urgent: "عاجل", foreign: "أجنبي" };
-const CAT_AR = { reporter: "مبلّغ", witness: "شاهد", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
-
-function mapTask(row, now) {
-  const elapsed = businessDaysBetween(new Date(row.assigned_at), now);
-  const status = row.submitted_at ? "done" : "new";
-  const remainingUmb = 3 - elapsed;
-  const due =
-    status === "done"
-      ? "مكتملة"
-      : elapsed < 1
-        ? "متبقٍّ يوم عمل"
-        : remainingUmb === 2
-          ? "متبقٍّ يومان"
-          : remainingUmb === 1
-            ? "متبقٍّ يوم"
-            : remainingUmb <= 0
-              ? "متجاوز المهلة"
-              : `متبقٍّ ${remainingUmb} أيام`;
-  const timer =
-    elapsed < 1
-      ? { total: 1, elapsed: 0, ref: "يوم عمل · م10" }
-      : { total: 3, elapsed, ref: "مظلّة 3 أيام · م10" };
-  return {
-    caseId: row.case_id,
-    secret: row.secret_code,
-    refNo: row.ref_no,
-    cat: CAT_AR[row.category] || row.category,
-    track: TRACK_AR[row.source] || "عادي",
-    foreign: row.foreign_info || null,
-    peers: Number(row.peers) || 1,
-    status,
-    due,
-    timer,
-    assignedAt: row.assigned_at,
-    createdAt: row.assigned_at,
-    submittedAt: row.submitted_at,
-  };
-}
+import { mapTask } from "./map-task";
+import { buildSubmitParams } from "./submit-params";
 
 export function StudyEvalPortal({ role, me, initial, basePath }) {
   const cfg = PORTAL_CONFIGS[role];
@@ -188,6 +149,10 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
     const caseId = typeof task === "object" ? task.caseId : (rows.find((r) => r.secret === task) || {}).caseId;
     if (caseId) await supabase.rpc("record_secret_reveal", { _case_id: caseId });
   };
+  // فتح مرفق في العارض = صف تدقيق (من · أي مستند · متى) — م15/16
+  const openDoc = async (task, doc) => {
+    await supabase.rpc("record_attachment_open", { _case_id: task.caseId, _doc: doc });
+  };
   const toggleCollapsed = async () => {
     const v = !collapsed;
     setCollapsed(v);
@@ -230,43 +195,8 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
 
   const submitOutput = async (task, f) => {
     setBusy(true);
-    const rejectReasons =
-      f.rec === "رفض الحماية"
-        ? Object.keys(f.rej)
-            .filter((k) => f.rej[k])
-            .map((k) => ({
-              k,
-              t: (REJECT_REASONS.find((x) => x.k === k) || {}).t || k,
-              note: f.rejNote[k] || null,
-            }))
-        : null;
-    const types =
-      f.rec === "قبول كلي" || f.rec === "قبول جزئي"
-        ? [
-            ...Object.keys(f.types)
-              .filter((k) => k !== "other" && f.types[k])
-              .map((k) => {
-                const idx = Number(k.slice(1));
-                const label = PROTECTION_TYPES[idx]?.t || k;
-                return f.subdur[k] ? `${label} (${f.subdur[k]})` : label;
-              }),
-            ...(f.types.other && f.otherText ? [`أخرى: ${f.otherText}`] : []),
-          ]
-        : null;
-    const duration = f.dur && f.dur.startsWith("ثلاثون") ? "30 days" : null;
-    const notes = [f.dur === "مدة محدّدة" && f.durText ? `المدة المقترحة: ${f.durText}` : null, f.kama || null]
-      .filter(Boolean)
-      .join(" — ");
-    const fn = role === "studier" ? "submit_study" : "submit_assessment";
-    const { error } = await supabase.rpc(fn, {
-      _case_id: task.caseId,
-      _recommendation: f.rec,
-      _reject_reasons: rejectReasons,
-      _proposed_type: types,
-      _proposed_duration: duration,
-      _notes: notes || null,
-      _partial_reason: f.rec === "قبول جزئي" ? f.partial || null : null,
-    });
+    const { fn, params } = buildSubmitParams(role, task, f);
+    const { error } = await supabase.rpc(fn, params);
     setBusy(false);
     if (error) {
       say("تعذّر الاعتماد: " + error.message);
@@ -305,6 +235,7 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
         back={() => setSel(null)}
         onSubmit={submitOutput}
         onReveal={revealSecret}
+        onOpenDoc={openDoc}
         busy={busy}
       />
     ) : (

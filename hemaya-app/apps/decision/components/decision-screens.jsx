@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaDecision } from "./decision-store";
+import { FoundLine } from "./FoundLine";
 
 const HD = HemayaDecision;
 
@@ -178,7 +179,7 @@ export const DScreens = (function () {
     return [["عوامل م9", String(factors)]];
   };
 
-  function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when }) {
+  function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null }) {
     const tone = recToneOf(rec, partial);
     const tc = tone === "success" ? "var(--color-success)" : tone === "warning" ? "var(--color-warning)" : tone === "error" ? "var(--color-error)" : "var(--border-default)";
     return (
@@ -190,6 +191,7 @@ export const DScreens = (function () {
           {when && <span className="muted" style={{ marginInlineStart: "auto", fontSize: 11.5 }}>{when}</span>}
         </div>
         <div style={{ padding: 16 }}>
+          <FoundLine foundRec={foundRec} foundReq={foundReq} />
           {partial && <div className="fac" style={{ borderTop: "none", paddingTop: 0 }}><span className="fac-k">سبب الجزئية</span><span className="fac-v">{partial}</span></div>}
           {proposed && proposed.length > 0 && <div className="row" style={{ gap: 6, marginBottom: duration || notes ? 10 : 0 }}>{proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
           {duration && <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{duration}</b></div>}
@@ -238,12 +240,12 @@ export const DScreens = (function () {
 
       {studies.length > 0 && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="balance" size={18} color="var(--color-primary)" /> الدراسات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({studies.length} — كلّ مُعدّ مستقلّ ومعزول)</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} icon="balance" title={"الدراسة القانونية " + (studies.length > 1 ? (i + 1) : "")} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} />)}</div>
+        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} icon="balance" title={"الدراسة القانونية " + (studies.length > 1 ? (i + 1) : "")} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} foundRec={s.foundRec} foundReq={s.foundReq} />)}</div>
       </div>}
 
       {assessments.length > 0 && <div style={{ marginTop: 18 }}>
         <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="psychology" size={18} color="var(--color-primary)" /> التقييمات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({assessments.length})</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} notes={a.notes} when={a.when} />)}</div>
+        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} />)}</div>
       </div>}
 
       <AttachmentsPanel secret={q.secret} editable={!!attachEditable} onView={onView} viewed={viewed} />

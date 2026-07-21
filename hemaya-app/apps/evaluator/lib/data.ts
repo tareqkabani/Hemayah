@@ -39,7 +39,7 @@ export async function getPortalData(role: "studier" | "evaluator") {
         .in("case_id", caseIds),
       supabase
         .from("recommendations")
-        .select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at")
+        .select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details")
         .in("case_id", caseIds),
     ]);
     for (const id of caseIds) {
