@@ -24,6 +24,7 @@ export const DScreens = (function () {
   const STATUS = {
     preparing:      { t: "قيد إعداد القرار",           tone: "neutral", icon: "edit_note" },
     pending_deputy: { t: "بانتظار اعتماد النائب",       tone: "warning", icon: "approval" },
+    pending_chair:  { t: "بانتظار اعتماد الرئيس",       tone: "warning", icon: "workspace_premium" },
     approved:       { t: "معتمَد — بانتظار الطرح",      tone: "info",    icon: "task_alt" },
     voting:         { t: "مطروح للتصويت",               tone: "info",    icon: "how_to_vote" },
     issued:         { t: "صدر القرار",                  tone: "success", icon: "verified" },

@@ -46,8 +46,8 @@ const App = (function () {
     </div>
   );
 
-  const modeFor = (scope, me, q) => scope === "preparer" ? "prepare" : (scope === "leadership" && dOf(q.secret).status === "pending_deputy") ? "approve" : "session";
-  const isApprovalAction = (scope, me, q) => scope === "leadership" && me === "deputy" && dOf(q.secret).status === "pending_deputy";
+  const modeFor = (scope, me, q) => scope === "preparer" ? "prepare" : (scope === "leadership" && ["pending_deputy", "pending_chair"].includes(dOf(q.secret).status)) ? "approve" : "session";
+  const isApprovalAction = (scope, me, q) => { const s = dOf(q.secret).status; return scope === "leadership" && ((me === "deputy" && s === "pending_deputy") || (me === "chair" && s === "pending_chair")); };
   const poolOf = (scope) => scope === "preparer" ? allCases().filter((q) => { const d = dOf(q.secret); return d.mine || d.unclaimed; }) : allCases();
 
   // ————————————————— الإشعارات — مشتقّة من حالة المخزن الحقيقية —————————————————
@@ -64,14 +64,21 @@ const App = (function () {
         // «عاجل» بمهلة م10: المعدّ (إعداد/طرح) · النائب (اعتماد) · الرئيس (إصدار بعد الإغلاق)
         const urgent = (scope === "preparer" && (d.status === "preparing" || d.status === "approved"))
           || (seat === "deputy" && d.status === "pending_deputy")
+          || (seat === "chair" && d.status === "pending_chair")
           || (seat === "chair" && d.status === "voting" && res.closed && !d.issued);
         const dest = isApprovalAction(scope, seat, q) ? "approvals" : "cases";
-        const when = d.status === "voting" ? d.votingStartedAt : d.status === "pending_deputy" ? d.submittedAt : d.status === "approved" ? (d.approvals && d.approvals.deputy && d.approvals.deputy.when) : "";
-        const whenTs = d.status === "voting" ? d.votingStartedAtTs : d.status === "pending_deputy" ? d.submittedAtTs : d.status === "approved" ? (d.approvals && d.approvals.deputy && d.approvals.deputy.whenTs) : null;
+        const when = d.status === "voting" ? d.votingStartedAt
+          : d.status === "pending_deputy" ? d.submittedAt
+          : d.status === "pending_chair" ? (d.approvals && d.approvals.deputy && d.approvals.deputy.when) || d.submittedAt
+          : d.status === "approved" ? (d.approvals && (d.approvals.chair || d.approvals.deputy) && (d.approvals.chair || d.approvals.deputy).when) : "";
+        const whenTs = d.status === "voting" ? d.votingStartedAtTs
+          : d.status === "pending_deputy" ? d.submittedAtTs
+          : d.status === "pending_chair" ? (d.approvals && d.approvals.deputy && d.approvals.deputy.whenTs) || d.submittedAtTs
+          : d.status === "approved" ? (d.approvals && (d.approvals.chair || d.approvals.deputy) && (d.approvals.chair || d.approvals.deputy).whenTs) : null;
         out.push({
           id: (urgent ? "urgent" : "task") + ":" + q.secret + ":" + d.status,
           cat: urgent ? "urgent" : "task",
-          icon: urgent ? "timer" : d.status === "voting" ? "how_to_vote" : d.status === "pending_deputy" ? "approval" : d.status === "approved" ? "task_alt" : "assignment",
+          icon: urgent ? "timer" : d.status === "voting" ? "how_to_vote" : d.status === "pending_deputy" || d.status === "pending_chair" ? "approval" : d.status === "approved" ? "task_alt" : "assignment",
           tone: urgent ? "error" : "warning",
           t: urgent ? "مهلة نظامية جارية — إجراء مطلوب منك" : "بند يتطلّب إجراءك",
           d: "الإجراء المطلوب منك: " + act + " — الرمز السري " + q.secret + ".",
@@ -82,7 +89,7 @@ const App = (function () {
       }
       if (scope === "preparer" && d.status === "preparing" && (d.rejections || []).length && (d.mine || d.unclaimed)) {
         const last = d.rejections[d.rejections.length - 1];
-        out.push({ id: "task:" + q.secret + ":returned:" + d.rejections.length, cat: "task", icon: "undo", tone: "warning", t: "أُعيد إليك القرار من نائب الرئيس", d: "الطلب " + q.secret + " — " + (last.note || "بملاحظات النائب") + ".", time: last.when || "", ts: last.whenTs, group: dayGroup(last.whenTs), action: "cases", actionLabel: "تعديل وإعادة رفع" });
+        out.push({ id: "task:" + q.secret + ":returned:" + d.rejections.length, cat: "task", icon: "undo", tone: "warning", t: "أُعيد إليك القرار من القيادة", d: "الطلب " + q.secret + " — " + (last.note || "بملاحظات القيادة") + ".", time: last.when || "", ts: last.whenTs, group: dayGroup(last.whenTs), action: "cases", actionLabel: "تعديل وإعادة رفع" });
       }
       if (d.issued) {
         out.push({ id: "task:" + q.secret + ":issued", cat: "task", icon: "gavel", tone: "info", t: "صدر قرار المركز: " + d.issued.type, d: "صدر القرار في الطلب " + q.secret + " وأُشعِر الطرفان (م10).", time: d.issued.when || "", ts: d.issued.whenTs, group: dayGroup(d.issued.whenTs), action: "log", actionLabel: "سجل القرارات" });
@@ -121,10 +128,11 @@ const App = (function () {
         </div>
       </Card> : <React.Fragment>
         <DecisionView decision={d} foreign={q.foreign} />
-        {d.status === "pending_deputy" && <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="warning" title="بانتظار اعتماد نائب رئيس المركز">رُفع القرار المُعَدّ للاطّلاع والاعتماد. بعد اعتماده يعود إليك لطرحه على أعضاء المجلس للتصويت، أو يُعاد إليك للتعديل بملاحظاته.</InlineAlert></Card>}
+        {d.status === "pending_deputy" && <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="warning" title="بانتظار اعتماد نائب رئيس المركز">رُفع القرار المُعَدّ للاطّلاع والاعتماد — الحلقة الأولى (النائب) ثم الثانية (الرئيس)، وبعدهما يعود إليك لطرحه على أعضاء المجلس للتصويت، أو يُعاد إليك للتعديل بملاحظات القيادة.</InlineAlert></Card>}
+        {d.status === "pending_chair" && <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="warning" title="بانتظار اعتماد رئيس المركز">اعتمده نائب الرئيس{d.approvals && d.approvals.deputy ? " (" + d.approvals.deputy.when + ")" : ""} وهو الآن في حلقة اعتماد الرئيس — بعدها يعود إليك للطرح.</InlineAlert></Card>}
         {d.status === "approved" && <Card className="card pad" style={{ marginTop: 16 }}>
           <p className="sec-h"><I name="how_to_vote" size={18} color="var(--color-primary)" /> طرح القرار للتصويت</p>
-          <InlineAlert kind="success" title={"اعتمده نائب رئيس المركز" + (d.approvals && d.approvals.deputy ? " · " + d.approvals.deputy.when : "")} style={{ marginBottom: 14 }}>عاد القرار إليك بعد الاعتماد. بطرحه يُعرض على أعضاء المجلس للتصويت المستقلّ وتبدأ مهلة يوم العمل.</InlineAlert>
+          <InlineAlert kind="success" title={"اعتمده النائب والرئيس" + (d.approvals && d.approvals.chair ? " · " + d.approvals.chair.when : "")} style={{ marginBottom: 14 }}>اكتملت حلقتا المراجعة (نائب الرئيس ثم الرئيس) وعاد القرار إليك. بطرحه يُعرض على أعضاء المجلس للتصويت المستقلّ وتبدأ مهلة يوم العمل.</InlineAlert>
           <div className="row" style={{ justifyContent: "flex-end" }}>
             <button className="btn btn-primary" onClick={() => { HD.openVoting(q.secret); back(); }}><I name="how_to_vote" size={17} /> طرح على أعضاء المجلس للتصويت</button>
           </div>
@@ -141,19 +149,20 @@ const App = (function () {
     const d = dOf(q.secret);
     const [rejecting, setRejecting] = useState(false);
     const [note, setNote] = useState("");
-    const myTurn = me === "deputy" && d.status === "pending_deputy";
+    const myTurn = (me === "deputy" && d.status === "pending_deputy") || (me === "chair" && d.status === "pending_chair");
     return (<div>
       <button className="link" onClick={back} style={{ marginBottom: 12 }}><I name="arrow_forward" size={16} /> رجوع للاعتمادات</button>
       <CaseHead q={q} timer={<Tag tone={STATUS[d.status].tone} size="md" iconLeft={<I name={STATUS[d.status].icon} size={14} />}>{STATUS[d.status].t}</Tag>} />
       <Card className="card pad" style={{ marginBottom: 16 }}><ReviewPackage q={q} /></Card>
       <DecisionView decision={d} foreign={q.foreign} />
       <Card className="card pad" style={{ marginTop: 16 }}>
-        <p className="sec-h"><I name="approval" size={18} color="var(--color-primary)" /> اطّلاع نائب الرئيس واعتماده</p>
-        {me === "chair" && <InlineAlert kind="info" title="الاعتماد بيد نائب الرئيس" style={{ marginBottom: 12 }}>يعتمد القرار المُعَدّ نائب رئيس المركز؛ وللرئيس الاطّلاع والمتابعة، ثم إصدار القرار بعد اكتمال التصويت.</InlineAlert>}
-        {me === "deputy" && <InlineAlert kind="info" title="اعتماد النائب" style={{ marginBottom: 12 }}>باعتمادك يعود القرار إلى معدّ القرار ليطرحه على أعضاء المجلس للتصويت.</InlineAlert>}
+        <p className="sec-h"><I name="approval" size={18} color="var(--color-primary)" /> حلقتا المراجعة والاعتماد — النائب ثم الرئيس</p>
+        {me === "deputy" && <InlineAlert kind="info" title="حلقة النائب (الأولى)" style={{ marginBottom: 12 }}>باعتمادك يمرّ القرار إلى رئيس المركز لمراجعته واعتماده، ثم يعود للمعدّ ليطرحه على أعضاء المجلس للتصويت.</InlineAlert>}
+        {me === "chair" && <InlineAlert kind="info" title="حلقة الرئيس (الثانية)" style={{ marginBottom: 12 }}>القرار يصلك بعد اعتماد النائب{d.approvals && d.approvals.deputy ? " (" + d.approvals.deputy.when + ")" : ""}؛ باعتمادك يعود للمعدّ ليطرحه على أعضاء المجلس للتصويت.</InlineAlert>}
         {!myTurn ? <InlineAlert kind={["approved", "voting", "issued"].includes(d.status) ? "success" : "warning"} title="لا إجراء مطلوباً منك الآن">
-          {d.status === "pending_deputy" && me === "chair" && "بانتظار اعتماد النائب."}
-          {d.status === "approved" && "اعتُمِد القرار وعاد للمعدّ لطرحه للتصويت."}
+          {d.status === "pending_deputy" && me === "chair" && "في حلقة النائب — يصلك بعد اعتماده."}
+          {d.status === "pending_chair" && me === "deputy" && "اعتمدتَه وهو الآن في حلقة اعتماد الرئيس."}
+          {d.status === "approved" && "اكتملت الحلقتان وعاد للمعدّ لطرحه للتصويت."}
           {(d.status === "voting" || d.status === "issued") && "اكتمل الاعتماد وطُرح للتصويت."}
           {d.status === "preparing" && "أُعيد للمعدّ للتعديل."}
         </InlineAlert> : rejecting ? <React.Fragment>
@@ -164,7 +173,9 @@ const App = (function () {
           </div>
         </React.Fragment> : <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
           <button className="btn btn-ghost" onClick={() => setRejecting(true)}><I name="undo" size={17} /> إعادة للمعدّ للتعديل</button>
-          <button className="btn btn-primary" onClick={() => { HD.approve(q.secret); back(); }}><I name="verified" size={18} /> اعتماد وإعادة للمعدّ لطرحه</button>
+          {me === "deputy"
+            ? <button className="btn btn-primary" onClick={() => { HD.approve(q.secret); back(); }}><I name="verified" size={18} /> اعتماد وتمرير لرئيس المركز</button>
+            : <button className="btn btn-primary" onClick={() => { HD.approveChair(q.secret); back(); }}><I name="verified" size={18} /> اعتماد وإعادة للمعدّ لطرحه</button>}
         </div>}
       </Card>
     </div>);
@@ -238,13 +249,13 @@ const App = (function () {
     const stats = scope === "preparer" ? [
       ["edit_note", st("preparing"), "بانتظار الإعداد", "var(--warning-10)", "var(--color-warning)", "cases"],
       ["task_alt", st("approved"), "بانتظار الطرح", "var(--green-10)", "var(--color-primary)", "cases"],
-      ["how_to_vote", st("pending_deputy") + st("voting"), "قيد الدورة", "var(--info-10)", "var(--color-info)", "cases"],
+      ["how_to_vote", st("pending_deputy") + st("pending_chair") + st("voting"), "قيد الدورة", "var(--info-10)", "var(--color-info)", "cases"],
     ] : scope === "members" ? [
       ["how_to_vote", pendingMyVote, "بانتظار صوتك", "var(--warning-10)", "var(--color-warning)", "cases"],
       ["inbox", st("voting"), "مطروح للتصويت", "var(--info-10)", "var(--color-info)", "cases"],
       ["gavel", st("issued"), "قرارات صدرت", "var(--green-10)", "var(--color-primary)", "log"],
     ] : [
-      ["approval", st("pending_deputy"), "بانتظار اعتماد النائب", "var(--warning-10)", "var(--color-warning)", "approvals"],
+      ["approval", st("pending_deputy") + st("pending_chair"), "في حلقتي الاعتماد", "var(--warning-10)", "var(--color-warning)", "approvals"],
       ["how_to_vote", st("voting"), "مطروح للتصويت", "var(--info-10)", "var(--color-info)", "cases"],
       ["done_all", readyToIssue, "جاهز للإصدار", "var(--error-10)", "var(--color-error)", "cases"],
       ["gavel", st("issued"), "قرارات صدرت", "var(--green-10)", "var(--color-primary)", "log"],
@@ -361,11 +372,11 @@ const App = (function () {
 
   // ————————————————— القيادة: الاعتمادات —————————————————
   function Approvals({ me, open }) {
-    const pending = me === "deputy" ? allCases().filter((q) => dOf(q.secret).status === "pending_deputy") : [];
-    const later = allCases().filter((q) => { const s = dOf(q.secret).status; return me === "deputy" ? ["approved", "voting", "issued"].includes(s) : ["pending_deputy", "approved", "voting", "issued"].includes(s); });
+    const pending = allCases().filter((q) => dOf(q.secret).status === (me === "deputy" ? "pending_deputy" : "pending_chair"));
+    const later = allCases().filter((q) => { const s = dOf(q.secret).status; return me === "deputy" ? ["pending_chair", "approved", "voting", "issued"].includes(s) : ["pending_deputy", "approved", "voting", "issued"].includes(s); });
     return (<div>
       <h2 className="h2">اعتماد القرارات المُعَدّة</h2>
-      <p className="lede">{me === "deputy" ? "تطّلع على قرار المركز المُعَدّ وتعتمده، فيعود إلى معدّ القرار ليطرحه على أعضاء المجلس للتصويت." : "الاعتماد بيد نائب رئيس المركز؛ ولك الاطّلاع والمتابعة ثم إصدار القرار بعد اكتمال التصويت."}</p>
+      <p className="lede">{me === "deputy" ? "الحلقة الأولى: تطّلع على قرار المركز المُعَدّ وتعتمده فيمرّ إلى رئيس المركز، ثم يعود للمعدّ ليطرحه على أعضاء المجلس للتصويت." : "الحلقة الثانية: يصلك القرار بعد اعتماد النائب لتراجعه وتعتمده، فيعود للمعدّ ليطرحه على أعضاء المجلس للتصويت."}</p>
       <Card className="card" style={{ overflow: "hidden", marginBottom: 16 }}><div className="tbl-wrap"><table>
         <thead><tr><th>الرمز السري</th><th>الفئة</th><th>المعدّ</th><th>تصنيف الخطر</th><th></th></tr></thead>
         <tbody>{pending.length ? pending.map((q) => (
@@ -708,6 +719,7 @@ export function DecisionPortal({ scope, initialData }) {
       saveDecision: DecActions.saveDecision,
       submitForApproval: DecActions.submitForApproval,
       approve: DecActions.approve,
+      approveChair: DecActions.approveChair,
       rejectApproval: DecActions.rejectApproval,
       openVoting: DecActions.openVoting,
       castVote: DecActions.castVote,
