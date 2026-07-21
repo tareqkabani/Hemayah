@@ -429,6 +429,7 @@ begin
          'crime_desc','اختلاس وتلاعب مالي منظّم بمستندات رسمية مزوّرة.',
          'threat_type','تهديد مباشر بالقتل', 'harm_type','اعتداء جسدي', 'extends_who','الزوج والأبناء',
          'alt_solutions','لا توجد',
+         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
          'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
       ('C-2026-0492',
        jsonb_build_object(
@@ -447,6 +448,7 @@ begin
          'crime_desc','مخالفات مالية وإدارية جسيمة وإساءة استعمال سلطة.',
          'threat_type','تهديد ومضايقة وظيفية', 'harm_type','مضايقات وتلويح بالفصل', 'extends_who','الأسرة',
          'alt_solutions','لا توجد',
+         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
          'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
       ('C-2026-0488',
        jsonb_build_object(
@@ -465,6 +467,7 @@ begin
          'crime_desc','استغلال وإيذاء جسدي من شبكة منظّمة عابرة.',
          'threat_type','تهديد بالإيذاء الجسدي', 'harm_type','إيذاء جسدي موثّق طبّياً', 'extends_who','الأقارب من الدرجة الأولى',
          'alt_solutions','لا توجد',
+         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
          'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','طلب الحماية المسبّب'))),
       ('C-2026-0475',
        jsonb_build_object(
@@ -483,6 +486,7 @@ begin
          'crime_desc','استغلال وإيذاء من شبكة منظّمة.',
          'threat_type','تهديد بالإيذاء', 'harm_type','إيذاء موثّق', 'extends_who','الأقارب من الدرجة الأولى',
          'alt_solutions','لا توجد',
+         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
          'attachments', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب'))),
       ('C-2026-0470',
        jsonb_build_object(
@@ -501,6 +505,7 @@ begin
          'crime_desc','تزوير محرّرات رسمية واستعمالها.',
          'threat_type','تهديد وترهيب', 'harm_type','لا يوجد بعد', 'extends_who','لا يمتدّ',
          'alt_solutions','لا توجد',
+         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
          'attachments', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب')))
     ) as t(secret, req_extra, rec_details)
   loop

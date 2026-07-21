@@ -28,7 +28,13 @@ export function buildSubmitParams(role, task, f) {
         ]
       : null;
   const duration = f.dur && f.dur.startsWith("ثلاثون") ? "30 days" : null;
-  const notes = [f.dur === "مدة محدّدة" && f.durText ? `المدة المقترحة: ${f.durText}` : null, f.kama || null]
+  // interval لا يعبّر عن «إلى حين انتهاء القضية» — تُسجَّل صراحةً في الملاحظات
+  // (وإلا ضاعت بصمت: null لا يُميَّز عن عدم الاختيار وحزمة المجلس تخفيها)
+  const notes = [
+    f.dur === "مدة محدّدة" && f.durText ? `المدة المقترحة: ${f.durText}` : null,
+    f.dur === "إلى حين انتهاء القضية" ? "المدة المقترحة: إلى حين انتهاء القضية" : null,
+    f.kama || null,
+  ]
     .filter(Boolean)
     .join(" — ");
   return {

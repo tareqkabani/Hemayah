@@ -108,7 +108,11 @@ export async function getDecisionData() {
         deputy: cd.deputy_approved_at ? { when: fmt(cd.deputy_approved_at), whenTs: cd.deputy_approved_at } : null,
         chair: cd.chair_approved_at ? { when: fmt(cd.chair_approved_at), whenTs: cd.chair_approved_at } : null,
       },
-      rejections: (Array.isArray(cd.rejections) ? cd.rejections : []).map((r: any) => ({ note: r.note || "", when: fmt(r.at || null) || "—", whenTs: r.at || null })),
+      rejections: (Array.isArray(cd.rejections) ? cd.rejections : []).map((r: any) => ({
+        note: r.note || "", when: fmt(r.at || null) || "—", whenTs: r.at || null,
+        // من أعادها فعلاً — النائب من حلقته أو الرئيس من حلقته (سوء الإسناد كان يحرج القيادة)
+        bySeat: (r.by && idToSeat[r.by]) || null,
+      })),
       votingStartedAt: fmt(cd.voting_started_at),
       votingStartedAtTs: cd.voting_started_at || null,
       deadlineClosed: !!cd.deadline_closed,

@@ -71,6 +71,14 @@ describe("القبول (كلي/جزئي) والأنواع والمدة", () => {
     expect(p2._notes).toBe("المدة المقترحة: ستة أشهر — ملاحظة");
   });
 
+  it("«إلى حين انتهاء القضية» تُسجَّل صراحةً في الملاحظات (لا تضيع بصمت)", () => {
+    const p = buildSubmitParams("studier", TASK, {
+      ...BASE, rec: "قبول كلي", dur: "إلى حين انتهاء القضية", kama: "ملاحظة",
+    }).params;
+    expect(p._proposed_duration).toBeNull();
+    expect(p._notes).toBe("المدة المقترحة: إلى حين انتهاء القضية — ملاحظة");
+  });
+
   it("القبول الجزئي يمرّر سببه", () => {
     const p = buildSubmitParams("studier", TASK, { ...BASE, rec: "قبول جزئي", partial: "يُستثنى تغيير الإقامة" }).params;
     expect(p._partial_reason).toBe("يُستثنى تغيير الإقامة");

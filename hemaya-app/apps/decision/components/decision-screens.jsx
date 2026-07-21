@@ -256,7 +256,7 @@ export const DScreens = (function () {
   function DecisionTimeline({ d }) {
     const events = [];
     if (d.submittedAt) events.push({ icon: "send", t: "رُفع لاعتماد نائب الرئيس", when: d.submittedAt, ts: d.submittedAtTs, who: PREPARERS.prep1.name });
-    (d.rejections || []).forEach((r) => events.push({ icon: "undo", t: "أُعيد للمعدّ للتعديل", m: r.note, when: r.when, ts: r.whenTs, who: SEATS.deputy.name }));
+    (d.rejections || []).forEach((r) => events.push({ icon: "undo", t: "أُعيد للمعدّ للتعديل" + (r.bySeat === "chair" ? " — من حلقة الرئيس" : r.bySeat === "deputy" ? " — من حلقة النائب" : ""), m: r.note, when: r.when, ts: r.whenTs, who: (SEATS[r.bySeat] || {}).name || "قيادة المركز" }));
     if (d.approvals && d.approvals.deputy) events.push({ icon: "approval", t: "اعتمده نائب الرئيس (الحلقة الأولى)", when: d.approvals.deputy.when, ts: d.approvals.deputy.whenTs, who: SEATS.deputy.name });
     if (d.approvals && d.approvals.chair) events.push({ icon: "workspace_premium", t: "اعتمده رئيس المركز (الحلقة الثانية)", when: d.approvals.chair.when, ts: d.approvals.chair.whenTs, who: SEATS.chair.name });
     if (d.votingStartedAt) events.push({ icon: "how_to_vote", t: "طُرح على أعضاء المجلس للتصويت", when: d.votingStartedAt, ts: d.votingStartedAtTs, who: PREPARERS.prep1.name });

@@ -116,7 +116,7 @@ const App = (function () {
       <Card className="card pad" style={{ marginBottom: 16 }}><ReviewPackage q={q} attachEditable={canEdit} /></Card>
       {canEdit ? <Card className="card pad">
         <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> إعداد قرار المركز</p>
-        {lastReject && <InlineAlert kind="warning" title="أُعيد إليك من نائب الرئيس للتعديل" style={{ marginBottom: 14 }}>{lastReject.note} <span className="muted">({lastReject.when})</span></InlineAlert>}
+        {lastReject && <InlineAlert kind="warning" title={"أُعيد إليك للتعديل من " + (lastReject.bySeat === "chair" ? "رئيس المركز" : lastReject.bySeat === "deputy" ? "نائب الرئيس" : "القيادة")} style={{ marginBottom: 14 }}>{lastReject.note} <span className="muted">({lastReject.when})</span></InlineAlert>}
         <InlineAlert kind="info" title="دورك: إعدادٌ محايد — لا توصية ولا تصويت" style={{ marginBottom: 14 }}>تُعِدّ القرار من الدراسات والتقييمات أعلاه ثم ترفعه لنائب رئيس المركز للاطّلاع والاعتماد؛ وبعد اعتماده يعود إليك لطرحه على أعضاء المجلس للتصويت. القرار خالصٌ للمجلس (م4/8).</InlineAlert>
         <div className="fld"><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
           <div className="chips">{PROTECTION_TYPES.map((t) => <button key={t} className={"chip" + (types.includes(t) ? " on" : "")} onClick={() => toggleType(t)}>{t}</button>)}</div></div>
@@ -715,7 +715,7 @@ const App = (function () {
 
 // ————— الغلاف: يحقن أفعال الخادم ويُغذّي المخزن من props ثم يرندر —————
 export function DecisionPortal({ scope, initialData }) {
-  useState(() => { HD.hydrate(initialData); return true; }); // تغذية أولى متطابقة خادم/عميل
+  useState(() => { HD.hydrate(initialData, { silent: true }); return true; }); // تغذية أولى متطابقة خادم/عميل — بلا بثّ أثناء الرسم
   const router = useRouter();
   // مصالحة حقيقة الخادم: revalidatePath بعد كل فعلٍ يعيد initialData محدثة —
   // فيُعاد الترطيب: نجاح الفعل يثبت، وفشله (رفض آلة الحالة) يرتدّ آلياً

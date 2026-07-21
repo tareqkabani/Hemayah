@@ -47,7 +47,7 @@ export const HemayaDecision = (function () {
   function logErr(tag) { return function (r) { if (r && r.ok === false) console.error("[decision:" + tag + "]", r.error); return r; }; }
 
   function setActions(a) { actions = a; }
-  function hydrate(data) {
+  function hydrate(data, opts) {
     if (!data) return;
     store.requests    = data.requests    || [];
     store.decisions   = data.decisions   || {};
@@ -56,7 +56,8 @@ export const HemayaDecision = (function () {
     store.votes       = data.votes       || {};
     store.messages    = data.messages    || [];
     store.me          = data.me          || null;
-    emit();
+    // silent: للترطيب الأول داخل الرسم — البثّ أثناء render يحذّر React
+    if (!(opts && opts.silent)) emit();
   }
 
   function reqBySecret(s) { for (var i = 0; i < store.requests.length; i++) if (store.requests[i].secret === s) return store.requests[i]; return null; }
