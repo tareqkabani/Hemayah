@@ -188,6 +188,10 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
     const caseId = typeof task === "object" ? task.caseId : (rows.find((r) => r.secret === task) || {}).caseId;
     if (caseId) await supabase.rpc("record_secret_reveal", { _case_id: caseId });
   };
+  // فتح مرفق في العارض = صف تدقيق (من · أي مستند · متى) — م15/16
+  const openDoc = async (task, doc) => {
+    await supabase.rpc("record_attachment_open", { _case_id: task.caseId, _doc: doc });
+  };
   const toggleCollapsed = async () => {
     const v = !collapsed;
     setCollapsed(v);
@@ -266,6 +270,9 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
       _proposed_duration: duration,
       _notes: notes || null,
       _partial_reason: f.rec === "قبول جزئي" ? f.partial || null : null,
+      // بندا الاطّلاع: «بالاطّلاع على الطلب المرافق تبيّن الآتي» (يوجد/لا يوجد)
+      _found_recommendation: f.recExists ? f.recExists === "يوجد" : null,
+      _found_request: f.reqExists ? f.reqExists === "يوجد" : null,
     });
     setBusy(false);
     if (error) {
@@ -305,6 +312,7 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
         back={() => setSel(null)}
         onSubmit={submitOutput}
         onReveal={revealSecret}
+        onOpenDoc={openDoc}
         busy={busy}
       />
     ) : (

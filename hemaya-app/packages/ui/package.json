@@ -6,7 +6,8 @@
     ".": "./src/index.ts",
     "./shell": "./src/shell/index.js",
     "./styles.css": "./styles/styles.css",
-    "./shell.css": "./styles/shell.css"
+    "./shell.css": "./styles/shell.css",
+    "./pp-study-eval.css": "./styles/pp-study-eval.css"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

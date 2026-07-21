@@ -1,0 +1,38 @@
+/* ===== طبقة هوية النيابة — بوابتا الدارس والمقيّم (تحديث مراجع 2026-07-21) =====
+   كريمي + برونزي فوق توكنز «كود» — تُستورد في globals.css للبوابتين حصراً،
+   فلا تمسّ بقية البوابات. المرجع: design-reference/…/study-eval.css §هوية النيابة. */
+:root {
+  --pp-cream: #F7F2EA;
+  --pp-cream-strong: #EEE7DF;
+  --pp-bronze: #AC936D;
+  --pp-bronze-deep: #8A6F49;
+  --pp-bronze-line: #DCCBAE;
+}
+body { background: var(--pp-cream); }
+.topbar { background: color-mix(in srgb, #FDFBF6 92%, transparent); border-bottom: 1px solid var(--pp-bronze-line); }
+.card { border-color: #E8DFCF; }
+thead th { background: #F5EFE5; }
+
+/* أرقام أقسام التوصية */
+.grp-n {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+  background: var(--pp-cream-strong); color: var(--pp-bronze-deep);
+  border: 1px solid var(--pp-bronze);
+}
+
+/* شريط التوقيع (نفاذ) وشرائط الإرشاد */
+.pp-strip {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--pp-bronze-line); border-inline-start: 4px solid var(--pp-bronze);
+  border-radius: var(--radius-md); background: #FBF7F0; flex-wrap: wrap;
+}
+.pp-ribbon {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--pp-bronze-line); border-inline-start: 4px solid var(--pp-bronze);
+  border-radius: var(--radius-md); background: #FBF7F0;
+  font-size: 12.5px; color: var(--text-body); line-height: 1.75;
+}
