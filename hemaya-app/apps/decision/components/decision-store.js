@@ -64,7 +64,7 @@ export const HemayaDecision = (function () {
   function allCases() { return store.requests.slice(); }
   function getDecision(secret) { return store.decisions[secret] || null; }
   function dOf(secret) {
-    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", approvals: { deputy: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
+    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", approvals: { deputy: null, chair: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
   }
 
   // حصيلة التصويت (للقيادة — العضو لا يرى أصوات غيره فتُحسب له من voteOpen فقط)
@@ -167,24 +167,32 @@ export const HemayaDecision = (function () {
     submitForApproval: function (secret, patch) {
       var d = dOf(secret); var cid = caseIdOf(secret);
       d.types = patch.types; d.duration = patch.duration; d.reasoning = patch.reasoning;
-      d.approvals = { deputy: null }; d.status = "pending_deputy"; d.submittedAt = nowLabel();
+      d.approvals = { deputy: null, chair: null }; d.status = "pending_deputy"; d.submittedAt = nowLabel();
       store.decisions[secret] = d; emit();
       if (cid && actions && actions.submitForApproval) return actions.submitForApproval(cid, d.types, d.duration, d.reasoning).then(logErr("submit"));
       return Promise.resolve(null);
     },
-    // نائب الرئيس حصراً: اعتماد — يعود للمعدّ لطرحه
+    // النائب: اعتماد — يمرّ لحلقة اعتماد الرئيس
     approve: function (secret) {
       var d = dOf(secret); var cid = caseIdOf(secret);
       if (d.status !== "pending_deputy") return Promise.resolve(null);
-      d.approvals = { deputy: { when: nowLabel() } }; d.status = "approved"; emit();
+      d.approvals = { deputy: { when: nowLabel() }, chair: null }; d.status = "pending_chair"; emit();
       if (cid && actions && actions.approve) return actions.approve(cid).then(logErr("approve"));
       return Promise.resolve(null);
     },
-    // نائب الرئيس حصراً: إعادة بملاحظة إلزامية
+    // الرئيس: الحلقة الثانية — بعدها يعود للمعدّ لطرحه
+    approveChair: function (secret) {
+      var d = dOf(secret); var cid = caseIdOf(secret);
+      if (d.status !== "pending_chair") return Promise.resolve(null);
+      d.approvals = { deputy: d.approvals && d.approvals.deputy, chair: { when: nowLabel() } }; d.status = "approved"; emit();
+      if (cid && actions && actions.approveChair) return actions.approveChair(cid).then(logErr("approveChair"));
+      return Promise.resolve(null);
+    },
+    // القيادة (كلٌّ من حلقته): إعادة بملاحظة إلزامية
     rejectApproval: function (secret, note) {
       var d = dOf(secret); var cid = caseIdOf(secret);
       d.rejections = (d.rejections || []).concat([{ note: note || "", when: nowLabel() }]);
-      d.approvals = { deputy: null }; d.status = "preparing"; d.submittedAt = null; emit();
+      d.approvals = { deputy: null, chair: null }; d.status = "preparing"; d.submittedAt = null; emit();
       if (cid && actions && actions.rejectApproval) return actions.rejectApproval(cid, note || "").then(logErr("return"));
       return Promise.resolve(null);
     },

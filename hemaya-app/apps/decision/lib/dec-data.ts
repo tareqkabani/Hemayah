@@ -35,7 +35,7 @@ export async function getDecisionData() {
   const caseResp = await supabase
     .from("protection_cases")
     .select(`id, ref_no, secret_code, category, status, classification, source, created_at,
-      council_decisions(status, preparer_id, types, duration, reasoning, submitted_at, deputy_approved_at,
+      council_decisions(status, preparer_id, types, duration, reasoning, submitted_at, deputy_approved_at, chair_approved_at,
         voting_started_at, deadline_closed, rejections, issued_type, issued_reason, issued_at, updated_at),
       protection_requests(details, channel, submitted_at),
       studies(recommendation, partial_reason, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at),
@@ -105,7 +105,10 @@ export async function getDecisionData() {
       reasoning: cd.reasoning || "",
       submittedAt: fmt(cd.submitted_at),
       submittedAtTs: cd.submitted_at || null,
-      approvals: { deputy: cd.deputy_approved_at ? { when: fmt(cd.deputy_approved_at), whenTs: cd.deputy_approved_at } : null },
+      approvals: {
+        deputy: cd.deputy_approved_at ? { when: fmt(cd.deputy_approved_at), whenTs: cd.deputy_approved_at } : null,
+        chair: cd.chair_approved_at ? { when: fmt(cd.chair_approved_at), whenTs: cd.chair_approved_at } : null,
+      },
       rejections: (Array.isArray(cd.rejections) ? cd.rejections : []).map((r: any) => ({ note: r.note || "", when: fmt(r.at || null) || "—", whenTs: r.at || null })),
       votingStartedAt: fmt(cd.voting_started_at),
       votingStartedAtTs: cd.voting_started_at || null,
