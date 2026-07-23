@@ -190,7 +190,7 @@ const HTML = `
       <div class="f-cols">
         <div class="f-col"><h5>المنصّة</h5><a href="#about">عن المركز</a><a href="#covered">من نحمي</a><a href="#measures">تدابير الحماية</a></div>
         <div class="f-col"><h5>الخدمات</h5><a href="#" data-nafath data-role="seeker">تقديم طلب حماية</a><a href="#" data-nafath>الدخول عبر نفاذ</a><a href="#enter">المدخل الموحّد</a></div>
-        <div class="f-col"><h5>مراجع</h5><a href="#">الأنظمة واللوائح</a><a href="#">أطلس الإجراءات</a><a href="#">الأسئلة الشائعة</a></div>
+        <div class="f-col"><h5>مراجع</h5><a href="#">الأنظمة واللوائح</a><a href="#">أطلس الإجراءات</a><a href="#">مخرجات المشروع للفريق</a></div>
       </div>
     </div>
     <div class="f-bottom">
