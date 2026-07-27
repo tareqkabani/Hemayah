@@ -42,7 +42,9 @@ const DEMO: Record<string, Spec> = {
   "2000000062": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "2000000063": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "2000000064": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
-  "3000000001": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة", attrs: { authority: "competent" } },
+  // سمات الجهة يقرؤها RLS: entity لدوال cb_entity، وlevel لسياسات clerk/head/hq —
+  // وbranch_id يُحلّ عند الدخول من جدول branches (انظر ensureCompetentBranch أدناه)
+  "3000000001": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة", attrs: { authority: "competent", entity: "prosecution", level: "clerk" } },
   "3000000002": { role: "moh_specialist", portal: ORIGIN.health, label: "وزارة الصحة", attrs: { authority: "health" } },
   "3000000003": { role: "hr_specialist", portal: ORIGIN.hr, label: "الموارد البشرية", attrs: { authority: "hr" } },
   "3000000004": { role: "security_manager", portal: ORIGIN.security, label: "الإدارة الأمنية", attrs: { authority: "security" } },
@@ -75,6 +77,28 @@ const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   advisor: { portal: ORIGIN.technical, label: "المستشارون" },
   tech_manager: { portal: ORIGIN.technical, label: "مدير المكتب الفني" },
 };
+
+// حساب الجهة المختصة بلا branch_id لا يرى شيئاً — كل سياسات RLS على
+// recommendations موجَّهة بالفرع (cb_branch / cb_entity_branches). نُكمل
+// السمة من جدول branches عند الدخول (فرع الرياض إن وُجد، وإلا أول فرع للجهة).
+async function ensureCompetentBranch(admin: ReturnType<typeof createServiceClient>, userId: string) {
+  const { data: roleRow } = await admin
+    .from("user_roles").select("attributes")
+    .eq("user_id", userId).eq("role", "competent_body" as never)
+    .maybeSingle();
+  const attrs = ((roleRow as { attributes?: Record<string, unknown> } | null)?.attributes ?? {}) as Record<string, unknown>;
+  if (attrs.branch_id) return;
+  const entity = (attrs.entity as string) || "prosecution";
+  const { data: branches } = await admin
+    .from("branches").select("id, region")
+    .eq("entity", entity as never);
+  const branch = branches?.find((b) => (b as { region: string }).region === "RUH") ?? branches?.[0];
+  if (!branch) return; // لا فروع مزروعة لهذه الجهة — تُترك السمة ويكشفها الفحص لاحقاً
+  await admin
+    .from("user_roles")
+    .update({ attributes: { ...attrs, branch_id: (branch as { id: string }).id } } as never)
+    .eq("user_id", userId).eq("role", "competent_body" as never);
+}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -125,6 +149,7 @@ export async function POST(req: Request) {
       } else if (spec.attrs) {
         await admin.from("user_roles").update({ attributes: spec.attrs } as never).eq("user_id", userId).eq("role", spec.role as never);
       }
+      if (spec.role === "competent_body") await ensureCompetentBranch(admin, userId);
     }
     spec ??= DEFAULT;
 
