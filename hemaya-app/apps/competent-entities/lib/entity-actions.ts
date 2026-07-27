@@ -16,6 +16,34 @@ export type RecommendationInput = {
   details?: Record<string, unknown>;
 };
 
+export type LinkedRecommendationInput = {
+  caseId: string;         // الطلب المُحال من الفرز — التوصية تُسجَّل عليه لا على سجل جديد
+  provide: boolean;
+  factors9?: Record<string, unknown>;
+  types?: string[];
+  durationDays?: number | null;
+  notes?: string;
+};
+
+// طلبٌ مُحالٌ من المركز (م5/4): التوصية تُقيَّد على التوصية المعلّقة للطلب نفسه
+// عبر record_recommendation — لا يُنشأ سجل قضية مكرر (فجوة الربط).
+export async function recordLinkedRecommendation(input: LinkedRecommendationInput) {
+  if (!input.caseId) return { ok: false as const, error: "لا طلب مرتبط." };
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("record_recommendation", {
+    _case_id: input.caseId,
+    _decision: input.provide ? "توفير" : "عدم توفير",
+    _channel: "electronic",
+    _factors9: (input.factors9 || {}) as Json,
+    _proposed_type: (input.types || []) as unknown as Json,
+    _proposed_duration: input.durationDays ? `${input.durationDays} days` : undefined,
+    _notes: (input.notes || null) as string,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  const row = Array.isArray(data) ? data[0] : data;
+  return { ok: true as const, status: (row as { status?: string } | undefined)?.status };
+}
+
 export async function submitRecommendation(input: RecommendationInput) {
   if (!input.crime?.trim() || !input.reason?.trim()) {
     return { ok: false as const, error: "الجريمة والمسوّغات مطلوبة." };
