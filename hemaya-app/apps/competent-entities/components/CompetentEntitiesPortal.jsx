@@ -59,7 +59,7 @@ function Dashboard({ go, openRec, ent, br, recIn = [], recSent = [] }) {
             <tbody>
               {incoming.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: '28px 16px' }}>لا طلبات واردة لهذه الجهة حالياً.</td></tr>}
               {incoming.map((r) => (
-                <tr key={r.secret} className="clk" onClick={() => openRec(r)}>
+                <tr key={r.id || r.secret} className="clk" onClick={() => openRec(r)}>
                   <td className="mono" style={{ fontWeight: 600 }}>{r.secret}</td>
                   <td><Tag tone="info" size="sm">{r.cat}</Tag></td>
                   <td className="mono">{r.caseNo}</td>
@@ -101,7 +101,7 @@ function Incoming({ openRec, ent, br, recIn = [] }) {
             <tbody>
               {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: '28px 16px' }}>لا طلبات مطابقة لهذه الجهة.</td></tr>}
               {rows.map((r) => (
-                <tr key={r.secret} className="clk" onClick={() => openRec(r)}>
+                <tr key={r.id || r.secret} className="clk" onClick={() => openRec(r)}>
                   <td className="mono" style={{ fontWeight: 600 }}>{r.secret}</td>
                   <td><Tag tone="info" size="sm">{r.cat}</Tag></td>
                   <td className="mono">{r.caseNo}</td>
@@ -132,7 +132,7 @@ function Responses({ ent, br, recSent = [] }) {
             <tbody>
               {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: '28px 16px' }}>لم ترفع هذه الجهة توصيات بعد.</td></tr>}
               {rows.map((r) => (
-                <tr key={r.secret}>
+                <tr key={r.id || r.secret}>
                   <td className="mono" style={{ fontWeight: 600 }}>{r.secret}</td>
                   <td><Tag tone="info" size="sm">{r.cat}</Tag></td>
                   <td className="mono">{r.caseNo}</td>
