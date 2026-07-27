@@ -118,10 +118,15 @@ export function RealRequestDetail({ request, back, go }) {
   const dec = view && view.decision;               // null قبل الإصدار
   const grv = view && view.grievance;              // null إن لا تظلّم
   const status = c.status || request.status;
-  const isAccept = dec && dec.issued_type === 'accept';
-  const isReject = dec && dec.issued_type === 'reject';
+  // قبول التظلّم (م21) يقلب المآل قبولاً وإن بقي قرار المجلس الأصلي رفضاً —
+  // فالاتفاقية تُفتح بأيهما، وأنواعها من بتّ المكتب حين يكون هو مصدر القبول.
+  const upheld = grv && grv.status === 'upheld';
+  const isAccept = (dec && dec.issued_type === 'accept') || upheld;
+  const isReject = dec && dec.issued_type === 'reject' && !upheld;
   const signed = status === 'signed' || status === 'active';
-  const types = (dec && Array.isArray(dec.types)) ? dec.types : [];
+  const grvTypes = (grv && Array.isArray(grv.types)) ? grv.types : [];
+  const decTypes = (dec && Array.isArray(dec.types)) ? dec.types : [];
+  const types = upheld && grvTypes.length ? grvTypes : decTypes;
 
   const back2detail = () => { setMode('detail'); load(); };
 
@@ -156,7 +161,7 @@ export function RealRequestDetail({ request, back, go }) {
           <div className="agr-h">اتفاقية توفير الحماية — إدارة برنامج الحماية</div>
           <div className="row" style={{ gap: 18, marginTop: 10, marginBottom: 12 }}>
             <span className="muted">الرمز السري: <b className="mono" style={{ color: 'var(--text-strong)' }}>{c.secret_code}</b></span>
-            {dec.duration && <span className="muted">المدّة: <b style={{ color: 'var(--text-strong)' }}>{dec.duration}</b></span>}
+            {dec && dec.duration && <span className="muted">المدّة: <b style={{ color: 'var(--text-strong)' }}>{dec.duration}</b></span>}
           </div>
           <div className="ci-label" style={{ marginBottom: 8 }}>أنواع الحماية المقرّرة (م14)</div>
           <div className="row" style={{ gap: 8, marginBottom: 6 }}>{types.map((t) => <span className="chip-type" key={t}><I name="shield" size={13} fill color="var(--color-primary)" />{t}</span>)}</div>
@@ -270,7 +275,7 @@ export function RealRequestDetail({ request, back, go }) {
             </div>
             <p className="muted" style={{ margin: '0 0 6px' }}>محل الاعتراض: {grv.against}</p>
             {grv.tech_opinion && <p className="muted" style={{ margin: '6px 0 0' }}>رأي المكتب الفني: {grv.tech_opinion}</p>}
-            {grv.status === 'upheld' && <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={() => setMode('agreement')}><I name="draw" size={18} /> مراجعة وتوقيع اتفاقية الحماية</button>}
+            {grv.status === 'upheld' && !signed && <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={() => setMode('agreement')}><I name="draw" size={18} /> مراجعة وتوقيع اتفاقية الحماية</button>}
           </Card>
         );
       })()}
