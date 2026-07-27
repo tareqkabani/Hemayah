@@ -293,11 +293,13 @@ const CHECK_ITEMS = [
   { id: 'noprior', label: 'لا يوجد طلب سابق أو قرار سابق بشأن الشخص', ref: 'إجرائي' },
   { id: 'verified', label: 'تم التحقق من الطالب عبر محضر اتصال موثّق', ref: 'م7' },
 ];
+// القبول في البرنامج ركنان نظاماً: طلبٌ مسبّبٌ من الشخص، وتوصيةٌ من الجهة
+// المختصة. فما دامت التوصية لم تَرِد، فأقصى ما يصحّ ترشيحه هو الإحالة لطلبها —
+// لا القبول. والقبول يُرشَّح في القرار الثاني بعد ورودها (المسار recDriven).
 function suggestDecision(checks) {
   if (checks.juris === 'no') return { id: 'closeJuris', label: 'حفظ الطلب لعدم الاختصاص' };
   if (checks.noprior === 'no') return { id: 'closePrior', label: 'حفظ الطلب لوجود طلب/قرار سابق' };
-  if (CHECK_ITEMS.every((it) => checks[it.id] === 'yes')) return { id: 'accept', label: 'قبول وإسناد للدراسة والتقييم' };
-  if (checks.juris === 'yes' && checks.case !== 'yes') return { id: 'refer', label: 'إحالة لجهة مختصة لطلب توصية' };
+  if (checks.juris === 'yes') return { id: 'refer', label: 'إحالة لجهة مختصة لطلب توصية' };
   return null;
 }
 function FormalCheck({ checks, setChecks }) {
@@ -354,8 +356,10 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
   const noAnswerDays = new Set(logs.filter((l) => l.result === 'noanswer').map((l) => (l.date || '').split(' ')[0])).size;
   const noReplyOk = noAnswerDays >= 3;                               // 3 محاولات موثّقة على أيام مختلفة
 
+  // لا «قبول» في القرار الأوّل: القبول في البرنامج مشروطٌ نظاماً بورود توصية
+  // الجهة المختصة، فتُعرض الإحالة لطلبها أو الحفظ. ويظهر القبول في القرار
+  // الثاني بعد ورود التوصية (مسار recDriven أعلاه).
   const DEC = [
-    { id: 'accept', label: 'قبول وإسناد للدراسة والتقييم', icon: 'check_circle' },
     { id: 'refer', label: 'إحالة لجهة مختصة لطلب توصية', icon: 'send' },
     { id: 'save', label: 'حفظ وإغلاق الطلب', icon: 'inventory_2', danger: true },
   ];
