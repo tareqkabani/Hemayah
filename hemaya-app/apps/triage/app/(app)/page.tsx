@@ -4,7 +4,8 @@ import { TriagePortal } from "@/components/TriagePortal";
 import { getTriageData } from "@/lib/data";
 
 export default async function Page() {
-  const { roleKey, me, initialRows, prefs, initialReadKeys, initialMessages } = await getTriageData();
+  const { roleKey, me, initialRows, prefs, initialReadKeys, initialMessages,
+          registerTotal, registerTruncated } = await getTriageData();
   return (
     <TriagePortal
       roleKey={roleKey}
@@ -14,6 +15,8 @@ export default async function Page() {
       basePath="/triage"
       initialReadKeys={initialReadKeys}
       initialMessages={initialMessages}
+      registerTotal={registerTotal}
+      registerTruncated={registerTruncated}
     />
   );
 }

@@ -7,4 +7,7 @@ export declare function TriagePortal(props: {
   basePath?: string;
   initialReadKeys?: string[];
   initialMessages?: unknown[];
+  /** إجمالي المطابق في القاعدة — يُعلَن حين يتجاوز المعروض */
+  registerTotal?: number;
+  registerTruncated?: boolean;
 }): JSX.Element;

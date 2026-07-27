@@ -114,12 +114,22 @@ export function mapCases(rows, now = new Date()) {
   });
 }
 
-/** جلب السجلّ (يصلح للخادم والعميل — RLS واحدة). */
-export async function fetchRegister(supabase, now = new Date()) {
-  const { data } = await supabase
+/** أحدث ما يُعرض من السجلّ المشترك دفعةً واحدة. حدٌّ صريحٌ مقصود: بدونه
+ *  يقطع PostgREST عند سقفه الافتراضي (1000) بلا أيّ إشارة، فتبدو القائمة
+ *  كاملةً وهي ناقصة — وذلك أخطر من العرض الجزئيّ المُعلَن. */
+export const REGISTER_PAGE_SIZE = 300;
+
+/** جلب السجلّ (يصلح للخادم والعميل — RLS واحدة).
+ *  يعيد {rows, totalCount, truncated} — كائنٌ صريحٌ لأنّ خصائص المصفوفة
+ *  تسقط عند تسلسل بيانات الخادم إلى العميل. */
+export async function fetchRegister(supabase, now = new Date(), limit = REGISTER_PAGE_SIZE) {
+  const { data, count } = await supabase
     .from("protection_cases")
-    .select(CASE_SELECT)
+    .select(CASE_SELECT, { count: "exact" })
     .in("status", REGISTER_STATUSES)
-    .order("created_at", { ascending: false });
-  return mapCases(data || [], now);
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = mapCases(data || [], now);
+  const totalCount = typeof count === "number" ? count : rows.length;
+  return { rows, totalCount, truncated: totalCount > rows.length };
 }
