@@ -508,7 +508,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
             <InlineAlert kind="warning" title="محاولات غير كافية" style={{ marginTop: 12 }}>يتطلّب هذا القرار 3 محاولات «لم يُرَد» موثّقة على أيام مختلفة (المسجّل حالياً: {noAnswerDays}).</InlineAlert>}
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16, gap: 10 }}>
             <button className="btn btn-ghost" onClick={back}>إلغاء</button>
-            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? (entity + ' — ' + branchLabelT(entity, branch)) : undefined, needsChecks ? checks : undefined)}>
+            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: entity + ' — ' + branchLabelT(entity, branch), entity, region: branch } : undefined, needsChecks ? checks : undefined)}>
               اعتماد القرار <I name="arrow_back" size={18} />
             </button>
           </div>
@@ -785,25 +785,30 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   const onResolve = async (rec, decision, extra, checks) => {
     const map = { reassign: 'أُعيد إسناد الطلب لموظف آخر', accept: 'قُبل الطلب وأُسند للدراسة والتقييم', refer: 'أُحيل لجهة مختصة لطلب توصية', closeReq: 'حُفظ الطلب بطلب من طالب الحماية', closeNoReply: 'حُفظ الطلب — لعدم الرد على التواصل', closePrior: 'حُفظ الطلب — لوجود طلب/قرار سابق', closeJuris: 'حُفظ الطلب — لعدم الاختصاص', closeNocase: 'حُفظ الطلب — لا قضية قائمة', reverse: 'أُلغي القرار وأُعيد الطلب للمعالجة' };
     const statusMap = { accept: 'study', refer: 'pending', closeReq: 'closed', closeNoReply: 'closed', closePrior: 'closed', closeJuris: 'closed', closeNocase: 'closed', reverse: 'triage' };
+    // الإحالة تحمل {label, entity, region} لربط التوصية بالفرع في القاعدة؛ غيرها نصٌّ حر
+    const refInfo = decision === 'refer' && extra && typeof extra === 'object' ? extra : null;
+    const extraLabel = refInfo ? refInfo.label : extra;
 
     // القضايا الفعليّة (Supabase): افرض آلة الحالة عبر triage_decide ذرّياً.
     if (rec.real && rec.caseId) {
       const rpcDec = decision === 'accept' ? 'study' : decision === 'refer' ? 'refer'
         : (String(decision).startsWith('close') ? 'close' : null);
       if (rpcDec) {
-        const reason = rpcDec === 'close' ? (map[decision] || 'حُفظ الطلب') : (rpcDec === 'refer' ? (extra || '') : '');
-        const res = await triageDecide(rec.caseId, rpcDec, reason, checks || {}, decision === 'refer' ? (extra || null) : null);
+        const reason = rpcDec === 'close' ? (map[decision] || 'حُفظ الطلب') : (rpcDec === 'refer' ? (extraLabel || '') : '');
+        const res = await triageDecide(rec.caseId, rpcDec, reason, checks || {},
+          decision === 'refer' ? (extraLabel || null) : null,
+          refInfo ? refInfo.entity : null, refInfo ? refInfo.region : null);
         if (!res.ok) { setToast('تعذّر حفظ القرار: ' + res.error); setTimeout(() => setToast(''), 4200); return; }
       }
     }
 
     setRows((rs) => rs.map((r) => {
       if (r.secret !== rec.secret) return r;
-      if (decision === 'reassign') return { ...r, clerk: extra || r.clerk };
-      if (decision === 'refer') return { ...r, status: 'pending', entity: extra || r.entity };
+      if (decision === 'reassign') return { ...r, clerk: extraLabel || r.clerk };
+      if (decision === 'refer') return { ...r, status: 'pending', entity: extraLabel || r.entity };
       return statusMap[decision] ? { ...r, status: statusMap[decision] } : r;
     }));
-    setToast(decision === 'refer' && extra ? 'أُحيل إلى ' + extra + ' لطلب توصية (م5/4)' : (map[decision] || 'تم اعتماد القرار')); setSel(null);
+    setToast(decision === 'refer' && extraLabel ? 'أُحيل إلى ' + extraLabel + ' لطلب توصية (م5/4)' : (map[decision] || 'تم اعتماد القرار')); setSel(null);
     setTimeout(() => setToast(''), 3200);
   };
 

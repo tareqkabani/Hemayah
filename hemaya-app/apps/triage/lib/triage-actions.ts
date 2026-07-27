@@ -18,11 +18,13 @@ export async function addContactLog(caseId: string, channel: string, result: str
 export async function triageDecide(
   caseId: string, decision: "study" | "refer" | "close",
   reason: string, formalCheck: Record<string, boolean>, authority?: string,
+  entityName?: string, region?: string,
 ) {
   const supabase = createServerClient();
   const { error, data } = await supabase.rpc("triage_decide", {
     _case_id: caseId, _decision: decision, _reason: (reason || null) as string, // الدالة تقبل NULL فعلياً
     _formal_check: formalCheck, _authority: authority || undefined,
+    _entity_name: entityName || undefined, _region: region || undefined,
   });
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/triage");
