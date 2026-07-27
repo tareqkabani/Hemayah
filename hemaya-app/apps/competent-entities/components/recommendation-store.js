@@ -18,7 +18,7 @@ const norm = (r) => {
   const decided = r.approval_status && r.approval_status !== "preparing";
   const status = decided ? "sent" : ((r.decision && r.decision.trim()) ? "pending" : "awaiting");
   return {
-    id: r.id, secret: pc.secret_code || "—", cat: CAT[pc.category] || pc.category || "—",
+    id: r.id, caseId: r.case_id, secret: pc.secret_code || "—", cat: CAT[pc.category] || pc.category || "—",
     caseNo: pc.ref_no || "—", entity: br.entity || "prosecution", region: br.region || "RUH",
     days, status, decision: r.decision || "", outcome: r.decision || "",
     linked: true, _real: true, sentAt: r.raised_at,

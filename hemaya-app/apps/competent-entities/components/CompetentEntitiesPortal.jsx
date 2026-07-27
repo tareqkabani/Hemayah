@@ -9,7 +9,7 @@ import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, RiskLevel } from "@h
 import { RecommendationForm, UrgentForm } from "./RecommendationForm";
 import { HemayaBranch } from "./branch-roles";
 import { useRecommendations } from "./recommendation-store";
-import { submitRecommendation } from "@/lib/entity-actions";
+import { submitRecommendation, recordLinkedRecommendation } from "@/lib/entity-actions";
 import "./entities.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -395,6 +395,29 @@ function App() {
     if (rec && rec.linked === false) { setRec(null); setGuard(true); (typeof window!=='undefined' && window.scrollTo(0,0)); return; }
     const r = rec;
     const fd = f || {};
+    // طلبٌ مُحالٌ من المركز: التوصية تُقيَّد على الطلب نفسه عبر record_recommendation
+    // فيعود للفرز لقرارٍ ثانٍ — لا سجل قضية مكرر (فجوة الربط م5/4).
+    if (r && r._real && r.linked && r.caseId) {
+      const res = await recordLinkedRecommendation({
+        caseId: r.caseId,
+        provide: fd.provide ? fd.provide === 'توفير' : true,
+        factors9: {
+          contacted: fd.contacted, contact_kind: fd.contactKind, crime_type: fd.crimeType,
+          waqia: (fd.waqia || []).filter(Boolean), hidden_m2: fd.hidden2, threat: fd.threatExists,
+          risk_level: fd.riskLevel, harm: fd.harmExists, harm_type: fd.harmType,
+          extends_others: fd.extends, extends_who: fd.extendsWho, adapt: fd.adapt,
+        },
+        types: (fd.types || []).filter(Boolean),
+        durationDays: fd.duration === '30 يوماً' ? 30 : null,
+        notes: [fd.reasons || [fd.why1, fd.why2, fd.why3].filter(Boolean).join(' · '),
+                fd.caseSummary, fd.duration ? 'المدة المقترحة: ' + (fd.duration === 'مدة أخرى' ? (fd.durationNote || 'مدة أخرى') : fd.duration) : '']
+          .filter(Boolean).join(' — '),
+      });
+      if (!res.ok) { showToast('تعذّر تسجيل التوصية: ' + res.error); return; }
+      setRec(null); setActive('incoming');
+      showToast('سُجِّلت التوصية على الطلب ' + r.secret + ' وعاد للفرز لاستكمال قراره.');
+      return;
+    }
     // رفعٌ حقيقيّ للقاعدة: قضيةٌ بمصدر «جهة» تدخل طابور الفرز (RPC مقيّد بـ competent_body).
     const res = await submitRecommendation({
       role: fd.role || r?.cat || 'شاهد',
