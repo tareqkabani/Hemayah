@@ -63,7 +63,7 @@ function SrcChip({ source }) {
   return <span className="src" style={{ color: s.c }}><I name={s.icon} size={15} /> {source}</span>;
 }
 // ===== القائمة المشتركة =====
-function Queue({ rows, open, viewOnly, acct }) {
+function Queue({ rows, open, viewOnly, acct, regInfo }) {
   const [filter, setFilter] = useState('all');
   const shown = rows.filter((r) => filter === 'all'
     || (filter === 'triage' && r.status === 'triage')
@@ -81,6 +81,10 @@ function Queue({ rows, open, viewOnly, acct }) {
         <button className={'chip' + (filter === 'replied' ? ' on' : '')} onClick={() => setFilter('replied')}>وردت التوصية</button>
         <button className={'chip' + (filter === 'closed' ? ' on' : '')} onClick={() => setFilter('closed')}>مُنجزة</button>
       </div>
+      {regInfo && regInfo.truncated &&
+        <InlineAlert kind="info" title="عرضٌ جزئيّ للسجلّ" style={{ marginBottom: 16 }}>
+          يُعرض أحدث <b>{rows.length}</b> من أصل <b>{regInfo.total}</b> طلباً مطابقاً. استخدم المرشِّحات لبلوغ ما لم يُعرض — ولا يُقتطع شيءٌ من القاعدة.
+        </InlineAlert>}
       <Card className="card">
         <div className="tbl-wrap">
           <table>
@@ -694,7 +698,7 @@ function notifsOf(rows, cfg, viewOnly, readIds) {
 }
 
 // ===== التطبيق — تركيب القشرة الموحّدة =====
-function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initialMessages }) {
+function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initialMessages, registerTotal, registerTruncated }) {
   const cfg = PORTAL_CONFIGS[roleKey] || PORTAL_CONFIGS.triage;
   const viewOnly = roleKey === 'triage-lead';
   const supabase = useRef(createClient()).current;
@@ -719,6 +723,9 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
     const seen = new Set(real.map((r) => r.secret));
     return [...real, ...SEED.filter((r) => !seen.has(r.secret))];
   });
+
+  // إجمالي المطابق في القاعدة مقابل المعروض — لإعلان العرض الجزئيّ بدل اقتطاعٍ صامت
+  const [regInfo, setRegInfo] = useState({ total: registerTotal, truncated: !!registerTruncated });
 
   const notifs = notifsOf(rows, cfg, viewOnly, readIds);
   const markRead = async (id) => {
@@ -754,7 +761,11 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
 
   // ريل-تايم: تغيّر القضايا/التوصيات يعيد جلب السجلّ تحت RLS؛ الرسائل تُلحق مباشرة
   useEffect(() => {
-    const reload = async () => setRows(await fetchRegister(supabase));
+    const reload = async () => {
+      const reg = await fetchRegister(supabase);
+      setRows(reg.rows);
+      setRegInfo({ total: reg.totalCount, truncated: reg.truncated });
+    };
     const ch = supabase
       .channel('triage-shell')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'protection_cases' }, reload)
@@ -848,7 +859,7 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   let body;
   if (active === 'queue') body = sel
     ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} onReveal={revealAudit} onAddLog={onAddLog} />
-    : <Queue rows={rows} open={setSel} viewOnly={viewOnly} acct={acct} />;
+    : <Queue rows={rows} open={setSel} viewOnly={viewOnly} acct={acct} regInfo={regInfo} />;
   else if (active === 'dashboard') body = <Dashboard cfg={cfg} rows={rows} viewOnly={viewOnly} openCase={openCase} go={goNav} notifs={notifs} onOpenNotif={openNotif} />;
   else if (active === 'profile') body = <Profile actor={acct} viewOnly={viewOnly} />;
   else if (active === 'notifications') body = <NotificationsScreen config={cfg} items={notifs} onOpen={openNotif} onMarkAllRead={markAllRead} />;
@@ -890,6 +901,6 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   );
 }
 
-export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [] }) {
-  return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} initialReadKeys={initialReadKeys} initialMessages={initialMessages} />;
+export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [], registerTotal, registerTruncated = false }) {
+  return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} initialReadKeys={initialReadKeys} initialMessages={initialMessages} registerTotal={registerTotal} registerTruncated={registerTruncated} />;
 }
