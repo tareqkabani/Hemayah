@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# يمنع الدفع المباشر إلى main — إنفاذاً لمعيار العمل «لا دمج/دفع مباشر على main».
+# (حماية الفرع في GitHub تتطلّب خطّة مدفوعة للمستودعات الخاصة، فهذا بديلها محلياً.)
+#
+# التثبيت:  git config core.hooksPath .githooks
+# التجاوز عند الضرورة:  ALLOW_MAIN_PUSH=1 git push origin main
+
+protected="main"
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/$protected" ] && [ "${ALLOW_MAIN_PUSH:-0}" != "1" ]; then
+    echo "" >&2
+    echo "⛔ دفعٌ مباشرٌ إلى $protected مرفوض." >&2
+    echo "   الشغل يمرّ عبر فرعٍ وPR يُراجَع (معيار العمل المتّفق عليه)." >&2
+    echo "" >&2
+    echo "   للدمج:      gh pr create  →  gh pr merge --squash" >&2
+    echo "   للتجاوز:    ALLOW_MAIN_PUSH=1 git push origin main" >&2
+    echo "" >&2
+    exit 1
+  fi
+done
+exit 0

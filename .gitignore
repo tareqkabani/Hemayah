@@ -55,3 +55,6 @@ dist/
 *.bak
 deploy/staging/.bridge-password
 !/deploy/
+
+# حُرّاس git المشتركة (تُثبَّت بـ git config core.hooksPath .githooks)
+!/.githooks/
