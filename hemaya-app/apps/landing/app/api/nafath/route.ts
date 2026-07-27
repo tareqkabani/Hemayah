@@ -125,6 +125,12 @@ export async function POST(req: Request) {
       } else if (spec.attrs) {
         await admin.from("user_roles").update({ attributes: spec.attrs } as never).eq("user_id", userId).eq("role", spec.role as never);
       }
+      // طالب حماية وثّق هويته الآن عبر نفاذ: ضُمّ إليه حالاته الورقية غير المملوكة
+      // (المُدخلة بوحدة الاستقبال بهويةٍ غير موثّقة) — وعد «تُفعَّل عبر نفاذ لاحقاً».
+      if (spec.role === "subject") {
+        const { error: clErr } = await admin.rpc("claim_paper_cases" as never, { _user_id: userId, _nid: nid } as never);
+        if (clErr) console.error("claim_paper_cases:", clErr.message);
+      }
     }
     spec ??= DEFAULT;
 
