@@ -4,6 +4,7 @@ export { requireUser, requireRole } from "./guard";
 export { fieldSource } from "./intg";
 export type { IntgCtx, FieldSourceState } from "./intg";
 export { getNafath, getSpl, getHrdf, integrationModes } from "./adapters";
+export { bridgePassword } from "./bridge-password";
 export type {
   NafathAdapter, SplAdapter, HrdfAdapter,
   NafathIdentity, NationalAddress, Employment, IntgMode,

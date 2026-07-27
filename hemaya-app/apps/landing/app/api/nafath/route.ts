@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { getNafath } from "@hemaya/auth";
+import { getNafath, bridgePassword } from "@hemaya/auth";
 import { createServiceClient, createServerClient } from "@hemaya/supabase";
 
 // جسر الدخول الموحّد عبر نفاذ (mock) — يُنشئ جلسة Supabase حقيقيّة على localhost
 // (الكوكي مشتركةٌ بين منافذ التطوير) فتقبلها البوّابة الوجهة دون طلب دخولٍ ثانٍ.
 // خريطة الهوية→الدور نموذجٌ تجريبيّ يُستبدل بـRBAC من القاعدة في الإنتاج.
 
-const DEV_PASSWORD = process.env.NAFATH_BRIDGE_PASSWORD ?? "nafath-staff-2026";
+// كلمة الجسر من مصدرٍ واحد يرفض الافتراضيّ في الإنتاج (@hemaya/auth)
+const DEV_PASSWORD = bridgePassword();
 const emailFor = (nid: string) => `${nid}@nafath.local`;
 
 // المسارات موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones) — التحويل نسبيّ فيصحّ محلياً وفي الإنتاج

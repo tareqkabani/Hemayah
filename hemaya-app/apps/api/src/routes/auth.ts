@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { createClient } from "@supabase/supabase-js";
 // deep import: نتفادى barrel @hemaya/auth الذي يجرّ وحدات Next عبر guard.
 import { getNafath } from "@hemaya/auth/src/adapters";
+import { bridgePassword } from "@hemaya/auth/src/bridge-password";
 import type { Env } from "../types";
 import { createServiceClient } from "../lib/supabase";
 import { NafathStartSchema, NafathConfirmSchema } from "../schemas";
@@ -24,7 +25,7 @@ const emailFor = (nid: string) => `${nid}@nafath.local`;
 // كلمة سرّ جسر التطوير — **موحّدة** مع البوّابة الموحّدة (landing) والبذور
 // (`nafath-staff-2026`) كي لا يتضارب دخول الويب ودخول الجوّال على المستخدم نفسه
 // (كلٌّ كان يعيد ضبط كلمة السرّ لقيمته فيكسر الآخر). في الإنتاج: نفاذ OIDC، بلا كلمة سرّ.
-const BRIDGE_PASSWORD = process.env.NAFATH_BRIDGE_PASSWORD ?? "nafath-staff-2026";
+const BRIDGE_PASSWORD = bridgePassword();
 
 auth.post("/nafath/start", zValidator("json", NafathStartSchema, validationHook), async (c) => {
   const { nationalId } = c.req.valid("json");
