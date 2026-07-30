@@ -9,6 +9,7 @@ import { SecretChip } from "@hemaya/ui/shell";
 import { HemayaBus } from "./referral-bus";
 import { HemayaHandoff } from "./execution-handoff";
 import { execClient, refetchHandoffs } from "./execution-live";
+import { refetchCenterReferrals, referralCreate, referralClose, referralUpdate } from "@/lib/referral-actions";
 import "./execution.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -346,8 +347,8 @@ function Profile() {
 
 // ═══════════════ ناقل الإحالات: تدابير م14 → الجهات المنفّذة ═══════════════
 const { M13, AUTH, STATUS } = HemayaBus;
-// بذر إحالة قانونية تجريبية (القسم الداخلي) — مرّة واحدة
-HemayaBus.seed([]); // لا إحالة قانونية مُلفّقة
+// إعادة الجلب من الخادم ثم hydrate — تُستدعى بعد كل إجراء وعند أحداث Realtime.
+const rehydrate = () => refetchCenterReferrals().then((rows) => { if (Array.isArray(rows)) HemayaBus.hydrate(rows); }).catch(() => {});
 const AUTH_GROUPS = [
   { key: 'health', items: ['psych', 'social', 'medical'] },
   { key: 'hr', items: ['transfer', 'alt', 'dismissal', 'housing', 'finance'] },
@@ -364,13 +365,26 @@ function useBus() { const [, bump] = useState(0); React.useEffect(() => HemayaBu
 function MeasureDispatch({ b }) {
   useBus();
   const refs = HemayaBus.list({ caseRef: b.secret });
-  const have = new Set(refs.map((r) => r.service));
+  // المقفلة لا تحجز التدبير — يجوز إعادة الإصدار بعد الإقفال (يطابق حارس referral_create)
+  const have = new Set(refs.filter((r) => r.status !== 'closed').map((r) => r.service));
   const [sel, setSel] = useState([]);
   const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const toggle = (k) => setSel((s) => s.includes(k) ? s.filter((x) => x !== k) : [...s, k]);
-  const dispatch = () => {
-    sel.forEach((k) => HemayaBus.create({ caseRef: b.secret, name: b.secret, cat: b.cat, risk: b.risk, service: k, summary: note.trim() || (M13[k].ar + ' — ' + b.secret) }));
-    setSel([]); setNote('');
+  const dispatch = async () => {
+    setBusy(true); setErr('');
+    const fails = [];
+    // إصدار حقيقي عبر referral_create (قضية نشطة + لا ازدواج + تدقيق) — لا كتابة محلية
+    for (const k of sel) {
+      try {
+        const res = await referralCreate(b.secret, k, M13[k].authority, note.trim() || (M13[k].ar + ' — ' + b.secret));
+        if (!res || !res.ok) fails.push(M13[k].ar + ': ' + ((res && res.error) || 'تعذّر الإصدار'));
+      } catch (e) { fails.push(M13[k].ar + ': تعذّر الاتصال بالخادم'); }
+    }
+    await rehydrate();
+    setBusy(false); setSel([]); setNote('');
+    if (fails.length) setErr(fails.join(' · '));
   };
   return (
     <Card className="card pad" style={{ marginBottom: 16 }}>
@@ -399,8 +413,9 @@ function MeasureDispatch({ b }) {
           <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="موجز يوضّح حاجة المشمول للتدبير…"></textarea>
         </div>
       )}
+      {err && <InlineAlert kind="error" title="لم تصدر بعض الإحالات" style={{ marginBottom: 10 }}>{err}</InlineAlert>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" disabled={!sel.length} onClick={dispatch}><I name="send" size={17} /> إصدار {sel.length || ''} إحالة</button>
+        <button className="btn btn-primary" disabled={!sel.length || busy} onClick={dispatch}><I name={busy ? 'hourglass_top' : 'send'} size={17} /> {busy ? 'جارٍ الإصدار…' : `إصدار ${sel.length || ''} إحالة`}</button>
       </div>
 
       {refs.length > 0 && (
@@ -477,7 +492,12 @@ function ExecutionDesk() {
   const nOverdue = rows.filter((r) => r.overdue).length;
   const nNew = rows.filter((r) => r.status === 'new').length;
   const nAwaitClose = rows.filter((r) => r.status === 'done').length;
-  const close = (r) => HemayaBus.update(r.id, { status: 'closed', closedBy: 'موظف التنفيذ', _by: 'موظف التنفيذ' }, 'اطّلع المركز على النتيجة وأدرجها في الملف');
+  // إقفال حقيقي عبر referral_close (done→closed حصراً + تدقيق) ثم إعادة hydrate
+  const close = async (r) => {
+    if (!r._rid) return;
+    try { await referralClose(r._rid, 'اطّلع المركز على النتيجة وأدرجها في الملف'); } catch (e) {}
+    await rehydrate();
+  };
   const actionCell = (r) => (
     r.status === 'done' ? <button className="btn btn-primary btn-sm" onClick={() => close(r)}><I name="task_alt" size={15} /> الاطّلاع وإدراج النتيجة</button>
     : r.status === 'closed' ? <span className="pill" style={{ background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}><I name="verified" size={13} /> {r.closedBy || 'المركز'}</span>
@@ -619,7 +639,10 @@ function App({ initialData }) {
     // مزامنة حيّة: أي قضيّةٍ يصدر قبولها تظهر في التنفيذ لحظيّاً (بلا إعادة تحميل).
     const apply = () => refetchHandoffs(supabase).then((h) => { if (Array.isArray(h)) HemayaHandoff.hydrate(h); }).catch(() => {});
     const ch = supabase.channel('exec-cases').on('postgres_changes', { event: '*', schema: 'public', table: 'protection_cases' }, apply).subscribe();
-    return () => { try { supabase.removeChannel(ch); } catch (e) {} };
+    // مزامنة حيّة للإحالات: تحديث الجهة (استلام/رفع/اعتماد) يظهر في «متابعة التنفيذ» لحظيّاً.
+    // (بلا مُرشِّح على القناة — إعادة الجلب تحترم RLS؛ المُرشِّح على postgres_changes يمنع الأحداث في هذه النسخة.)
+    const chRef = supabase.channel('exec-referrals').on('postgres_changes', { event: '*', schema: 'public', table: 'referrals' }, () => rehydrate()).subscribe();
+    return () => { try { supabase.removeChannel(ch); supabase.removeChannel(chRef); } catch (e) {} };
   }, [supabase]);
   const [active, setActive] = useState('dashboard');
   const [sel, setSel] = useState(null);
@@ -711,9 +734,18 @@ function App({ initialData }) {
 }
 
 export function ExecutionPortal({ initialData }) {
-  // بوابة تأجيل حتى التركيب (المخازن تقرأ localStorage على العميل).
+  // بوابة تأجيل حتى التركيب (المخازن تعيش على العميل — SSR يمرّر البيانات الأوّلية).
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => {
+    if (initialData && initialData.referrals) HemayaBus.hydrate(initialData.referrals);
+    // مُثبِّت القسم القانوني الداخليّ: تحديثات LegalDesk (استلام/رفع/اعتماد) تمرّ
+    // عبر referral_update المفروضة (المركز سلطة legal) — الإصدار والإقفال لهما RPC مباشر.
+    HemayaBus.setPersister((row, patch, note, by) => {
+      const result = { sched: row.sched || null, result: row.result || null, _by: by || null };
+      referralUpdate(row._rid, row.status, row.assignee || null, result, note || "");
+    });
+    setMounted(true);
+  }, []);
   if (!mounted) return null;
   return <App initialData={initialData} />;
 }

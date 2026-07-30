@@ -1,12 +1,18 @@
 /* ============================================================
-   ناقل الإحالات المشترك — منقول من lib/referral-bus.js (IIFE→وحدة ES).
-   المركز يُصدر إحالات تدابير م14 → الجهة المنفّذة. localStorage محروسٌ للـSSR.
+   ناقل الإحالات المشترك — المحرّك الداخليّ: ذاكرة (in-memory) + حدث محليّ.
+   لا localStorage: مصدر الحقيقة هو Postgres (hydrate/persister)، والمزامنة
+   الحيّة بين البوّابات عبر Supabase Realtime (يُشترك في المكوّن). المركز
+   يُصدر إحالات تدابير م14 (referral_create) ويُقفلها بعد اعتماد الجهة
+   (referral_close)، والقسم القانوني الداخليّ يمرّ عبر referral_update.
    ============================================================ */
 export const HemayaBus = (function () {
   const KEY = 'hemaya.referrals.v1';
   const KEY_REV = 'hemaya.reviews.v1';
-  const hasLS = () => typeof localStorage !== 'undefined';
   const hasWin = () => typeof window !== 'undefined';
+  var _store = [];          // إحالات م14 (في الذاكرة)
+  var _storeRev = [];       // مراجعات دورة الحياة (في الذاكرة)
+  var _persist = null;      // مُثبِّت خادميّ لإحالات م14 (referral_update)
+  var _persistRev = null;   // مُثبِّت خادميّ لمراجعات دورة الحياة (raise/decide)
 
   const M13 = {
     transfer:  { ar: 'النقل من مكان العمل',       ref: 'م14/3',    authority: 'hr',     icon: 'move_up' },
@@ -34,11 +40,12 @@ export const HemayaBus = (function () {
     progress: { ar: 'قيد المعالجة',            tone: 'info' },
     review:   { ar: 'بانتظار اعتماد المدير',   tone: 'warning' },
     done:     { ar: 'مكتملة ومُبلَّغة',         tone: 'success' },
+    closed:   { ar: 'أُقفلت — اطّلع المركز',    tone: 'success' },
   };
 
-  function read() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+  function read() { return _store.slice(); }
   function writeAll(arr) {
-    try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch (e) {}
+    _store = arr || [];
     try { if (hasWin()) window.dispatchEvent(new CustomEvent('hemaya-bus', { detail: { key: KEY } })); } catch (e) {}
   }
   function now() { try { return new Date().toLocaleString('ar-SA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }); } catch (e) { return 'الآن'; } }
@@ -61,8 +68,17 @@ export const HemayaBus = (function () {
     const all = read(); const i = all.findIndex((r) => r.id === id); if (i < 0) return null;
     all[i] = Object.assign({}, all[i], patch, { updatedAt: Date.now() });
     if (note) all[i].history = (all[i].history || []).concat([{ at: now(), by: patch._by || 'الجهة المنفّذة', note }]);
-    delete all[i]._by; writeAll(all); return all[i];
+    var by = patch._by; delete all[i]._by; var row = all[i]; writeAll(all);
+    if (_persist && row._real && row._rid) { try { _persist(row, patch, note, by); } catch (e) {} }
+    return row;
   }
+  // استبدال المخزن ببيانات خادميّة حقيقيّة (تُعيّن _real) — يُستدعى عند التركيب وعند كل حدث Realtime.
+  function hydrate(rows) {
+    var mapped = (rows || []).map(function (r) { return Object.assign({ _real: true }, r); });
+    writeAll(mapped); return mapped.length;
+  }
+  function setPersister(fn) { _persist = fn; }
+  function setReviewPersister(fn) { _persistRev = fn; }
   function seed(records) {
     const all = read(); const have = new Set(all.map((r) => r.id)); let added = 0;
     records.forEach((rec) => {
@@ -75,9 +91,9 @@ export const HemayaBus = (function () {
     if (added) writeAll(all); return added;
   }
 
-  function readRev() { try { return JSON.parse(localStorage.getItem(KEY_REV) || '[]'); } catch (e) { return []; } }
+  function readRev() { return _storeRev.slice(); }
   function writeAllRev(arr) {
-    try { localStorage.setItem(KEY_REV, JSON.stringify(arr)); } catch (e) {}
+    _storeRev = arr || [];
     try { if (hasWin()) window.dispatchEvent(new CustomEvent('hemaya-bus', { detail: { key: KEY_REV } })); } catch (e) {}
   }
   function raiseReview(rec) {
@@ -85,7 +101,14 @@ export const HemayaBus = (function () {
     const row = Object.assign({ status: 'raised', createdAt: Date.now(),
       history: [{ at: now(), by: rec.officer || 'الإدارة الأمنية', note: 'رفع توصية دورة الحياة للمجلس' }] }, rec);
     if (i < 0) all.push(row); else all[i] = Object.assign({}, all[i], rec, { status: 'raised', updatedAt: Date.now() });
-    writeAllRev(all); return row;
+    writeAllRev(all);
+    if (_persistRev && rec._rid) { try { _persistRev(rec); } catch (e) {} }
+    return row;
+  }
+  // استبدال مخزن المراجعات ببيانات خادميّة (لريل‑تايم lifecycle_reviews).
+  function hydrateReviews(rows) {
+    var mapped = (rows || []).map(function (r) { return Object.assign({ _real: true }, r); });
+    writeAllRev(mapped); return mapped.length;
   }
   function listReviews(filter) {
     let a = readRev();
@@ -98,14 +121,14 @@ export const HemayaBus = (function () {
     all[i].history = (all[i].history || []).concat([{ at: now(), by: 'مجلس المركز', note: 'بتّ المجلس: ' + (decision.type || '') }]);
     writeAllRev(all); return all[i];
   }
+  // اشتراكٌ محليّ (نفس التبويب) — يُطلقه أيّ writeAll/hydrate. المزامنة بين
+  // البوّابات يتكفّل بها Supabase Realtime في المكوّن (يستدعي hydrate).
   function subscribe(cb) {
     if (!hasWin()) return () => {};
-    const onStorage = (e) => { if (!e || e.key === KEY || e.key === KEY_REV) cb(); };
     const onLocal = () => cb();
-    window.addEventListener('storage', onStorage);
     window.addEventListener('hemaya-bus', onLocal);
-    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('hemaya-bus', onLocal); };
+    return () => { window.removeEventListener('hemaya-bus', onLocal); };
   }
 
-  return { KEY, KEY_REV, M13, AUTH, STATUS, list, create, update, seed, read, subscribe, raiseReview, listReviews, decideReview };
+  return { KEY, KEY_REV, M13, AUTH, STATUS, list, create, update, seed, read, subscribe, raiseReview, listReviews, decideReview, hydrate, hydrateReviews, setPersister, setReviewPersister };
 })();

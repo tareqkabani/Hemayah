@@ -45,6 +45,24 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       approval_chains: {
         Row: {
           active: boolean | null
@@ -87,6 +105,8 @@ export type Database = {
           recommendation: string | null
           reject_reasons: Json | null
           submitted_at: string | null
+          superseded_at: string | null
+          superseded_reason: string | null
         }
         Insert: {
           case_id: string
@@ -102,6 +122,8 @@ export type Database = {
           recommendation?: string | null
           reject_reasons?: Json | null
           submitted_at?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
         }
         Update: {
           case_id?: string
@@ -117,6 +139,8 @@ export type Database = {
           recommendation?: string | null
           reject_reasons?: Json | null
           submitted_at?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
         }
         Relationships: [
           {
@@ -407,6 +431,7 @@ export type Database = {
       council_decisions: {
         Row: {
           case_id: string
+          chair_approved_at: string | null
           created_at: string | null
           deadline_closed: boolean
           deputy_approved_at: string | null
@@ -427,6 +452,7 @@ export type Database = {
         }
         Insert: {
           case_id: string
+          chair_approved_at?: string | null
           created_at?: string | null
           deadline_closed?: boolean
           deputy_approved_at?: string | null
@@ -447,6 +473,7 @@ export type Database = {
         }
         Update: {
           case_id?: string
+          chair_approved_at?: string | null
           created_at?: string | null
           deadline_closed?: boolean
           deputy_approved_at?: string | null
@@ -1542,6 +1569,8 @@ export type Database = {
           reject_reasons: Json | null
           studier_id: string
           submitted_at: string | null
+          superseded_at: string | null
+          superseded_reason: string | null
         }
         Insert: {
           case_id: string
@@ -1557,6 +1586,8 @@ export type Database = {
           reject_reasons?: Json | null
           studier_id: string
           submitted_at?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
         }
         Update: {
           case_id?: string
@@ -1572,6 +1603,8 @@ export type Database = {
           reject_reasons?: Json | null
           studier_id?: string
           submitted_at?: string | null
+          superseded_at?: string | null
+          superseded_reason?: string | null
         }
         Relationships: [
           {
@@ -1709,6 +1742,14 @@ export type Database = {
       _actor_name: { Args: { _uid: string }; Returns: string }
       _next_decision_ref: { Args: never; Returns: string }
       _next_grv_ref: { Args: never; Returns: string }
+      _notify_deputies: {
+        Args: { _body: string; _case_id: string; _title: string }
+        Returns: undefined
+      }
+      _notify_deputies_once_daily: {
+        Args: { _body: string; _case_id: string; _title: string }
+        Returns: undefined
+      }
       _scope_ar: { Args: { _scope: string }; Returns: string }
       advisor_decide_grievance: {
         Args: {
@@ -1733,6 +1774,10 @@ export type Database = {
         Args: { _case_id: string; _per_role?: number }
         Returns: undefined
       }
+      business_days_between: {
+        Args: { _from: string; _to: string }
+        Returns: number
+      }
       case_has_grievance: { Args: { _case_id: string }; Returns: boolean }
       case_in_decision: { Args: { _case_id: string }; Returns: boolean }
       case_triage_active: { Args: { _case_id: string }; Returns: boolean }
@@ -1748,7 +1793,17 @@ export type Database = {
       }
       cb_entity_branches: { Args: never; Returns: string[] }
       cb_level: { Args: never; Returns: string }
+      claim_paper_cases: {
+        Args: { _nid: string; _user_id: string }
+        Returns: number
+      }
       council_approve: {
+        Args: { _case_id: string }
+        Returns: {
+          status: string
+        }[]
+      }
+      council_approve_chair: {
         Args: { _case_id: string }
         Returns: {
           status: string
@@ -1837,6 +1892,7 @@ export type Database = {
         Returns: boolean
       }
       has_coord: { Args: { _key: string }; Returns: boolean }
+      has_open_case: { Args: { _uid: string }; Returns: boolean }
       has_role: {
         Args: { _role: Database["public"]["Enums"]["app_role"]; _user: string }
         Returns: boolean
@@ -1969,6 +2025,59 @@ export type Database = {
         }[]
       }
       record_secret_reveal: { Args: { _case_id: string }; Returns: undefined }
+      referral_close: {
+        Args: { _id: string; _note: string }
+        Returns: {
+          assignee: string | null
+          authority: Database["public"]["Enums"]["referral_authority"]
+          case_id: string
+          created_at: string | null
+          history: Json | null
+          id: string
+          ref: string | null
+          result: Json | null
+          sched: string | null
+          service: string
+          status: Database["public"]["Enums"]["referral_status"]
+          summary: string | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "referrals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      referral_create: {
+        Args: {
+          _authority: Database["public"]["Enums"]["referral_authority"]
+          _secret: string
+          _service: string
+          _summary: string
+        }
+        Returns: {
+          assignee: string | null
+          authority: Database["public"]["Enums"]["referral_authority"]
+          case_id: string
+          created_at: string | null
+          history: Json | null
+          id: string
+          ref: string | null
+          result: Json | null
+          sched: string | null
+          service: string
+          status: Database["public"]["Enums"]["referral_status"]
+          summary: string | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "referrals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       referral_update: {
         Args: {
           _assignee: string
@@ -2057,6 +2166,13 @@ export type Database = {
       source_ar: {
         Args: { _s: Database["public"]["Enums"]["case_source"] }
         Returns: string
+      }
+      study_eval_watchdog: {
+        Args: never
+        Returns: {
+          exhausted: number
+          reassigned: number
+        }[]
       }
       submit_assessment: {
         Args: {
@@ -2157,13 +2273,16 @@ export type Database = {
           _authority?: string
           _case_id: string
           _decision: string
+          _entity_name?: string
           _formal_check?: Json
           _reason: string
+          _region?: string
         }
         Returns: {
           status: Database["public"]["Enums"]["case_status"]
         }[]
       }
+      watchdog_enabled: { Args: never; Returns: boolean }
     }
     Enums: {
       app_category: "reporter" | "witness" | "expert" | "victim" | "related"
@@ -2228,7 +2347,13 @@ export type Database = {
         | "competent"
         | "ag"
         | "technical"
-      referral_status: "new" | "assigned" | "progress" | "review" | "done"
+      referral_status:
+        | "new"
+        | "assigned"
+        | "progress"
+        | "review"
+        | "done"
+        | "closed"
       region_code:
         | "RUH"
         | "MAK"
@@ -2441,7 +2566,14 @@ export const Constants = {
         "ag",
         "technical",
       ],
-      referral_status: ["new", "assigned", "progress", "review", "done"],
+      referral_status: [
+        "new",
+        "assigned",
+        "progress",
+        "review",
+        "done",
+        "closed",
+      ],
       region_code: [
         "RUH",
         "MAK",
