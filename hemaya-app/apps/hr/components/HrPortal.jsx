@@ -1,6 +1,6 @@
 'use client';
 /* ============================================================
-   بوابة وزارة الموارد البشرية — تدابير الحماية الوظيفية والمعيشية (م13/م14).
+   بوابة وزارة الموارد البشرية — تدابير الحماية الوظيفية والمعيشية (م14).
    منقول من «بوابة وزارة الموارد البشرية/البوابة.html». window/HP → @hemaya/ui، HemayaBus → referral-bus.
    دوران: مختص · مدير الخدمات. ربط حيّ بناقل الإحالات.
    ============================================================ */
@@ -14,17 +14,17 @@ import "./hr.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
 
-// ===== الخدمات (تدابير م13) =====
+// ===== الخدمات (تدابير م14) =====
 const SERVICE = {
-  transfer:  { t: 'النقل من مكان العمل', short: 'نقل عمل', icon: 'move_up', ref: 'م13/3', bg: 'var(--info-10)', fg: 'var(--color-info)',
+  transfer:  { t: 'النقل من مكان العمل', short: 'نقل عمل', icon: 'move_up', ref: 'م14/3', bg: 'var(--info-10)', fg: 'var(--color-info)',
              desc: 'نقل المشمول من جهة عمله مؤقتاً أو دائماً بالتنسيق مع جهة العمل.' },
-  alt:       { t: 'توفير عمل بديل', short: 'عمل بديل', icon: 'work', ref: 'م13/4', bg: 'var(--green-10)', fg: 'var(--color-primary)',
+  alt:       { t: 'توفير عمل بديل', short: 'عمل بديل', icon: 'work', ref: 'م14/4', bg: 'var(--green-10)', fg: 'var(--color-primary)',
              desc: 'إيجاد وظيفة بديلة مناسبة عند تعذّر بقاء المشمول في عمله.' },
-  dismissal: { t: 'معالجة الفصل التعسفي', short: 'فصل تعسفي', icon: 'gavel', ref: 'م13/4', bg: 'var(--warning-10)', fg: 'var(--warning-70)',
+  dismissal: { t: 'معالجة الفصل التعسفي', short: 'فصل تعسفي', icon: 'gavel', ref: 'م14/4', bg: 'var(--warning-10)', fg: 'var(--warning-70)',
              desc: 'مراجعة فصل المشمول بسبب تعاونه وإعادته للعمل أو تسوية وضعه.' },
-  housing:   { t: 'مسكن عاجل / إعادة توطين', short: 'إسكان', icon: 'home', ref: 'م13/8،11', bg: 'var(--error-10)', fg: 'var(--color-error)',
+  housing:   { t: 'مسكن عاجل / إعادة توطين', short: 'إسكان', icon: 'home', ref: 'م14/8،11', bg: 'var(--error-10)', fg: 'var(--color-error)',
              desc: 'توفير سكن بديل عاجل أو إعادة التوطين في مدينة أخرى.' },
-  finance:   { t: 'مساعدة مالية', short: 'دعم مالي', icon: 'payments', ref: 'م13/12', bg: 'var(--success-10)', fg: 'var(--color-success)',
+  finance:   { t: 'مساعدة مالية', short: 'دعم مالي', icon: 'payments', ref: 'م14/12', bg: 'var(--success-10)', fg: 'var(--color-success)',
              desc: 'دعم مالي عند تعطّل قدرة المشمول على الاكتساب.' },
 };
 // تهيئة نموذج المعالجة حسب الخدمة
@@ -47,6 +47,7 @@ const ST = {
   progress: { t: 'قيد المعالجة', tone: ['var(--info-10)','var(--color-info)'], icon: 'pending' },
   review:   { t: 'بانتظار اعتماد المدير', tone: ['var(--warning-10)','var(--warning-70)'], icon: 'rate_review' },
   done:     { t: 'مُعتمَد ومُبلَّغ للمركز', tone: ['var(--success-10)','var(--success-70)'], icon: 'task_alt' },
+  closed:   { t: 'اطّلع المركز وأقفل الملف', tone: ['var(--green-10)','var(--green-80)'], icon: 'verified' },
 };
 
 const STAFF = [];
@@ -89,13 +90,13 @@ function Dashboard({ persona, openReq, go, region }) {
   const nProg = scoped.filter((r) => r.status === 'assigned' || r.status === 'progress').length;
   const nRev = scoped.filter((r) => r.status === 'review').length;
   const nDone = scoped.filter((r) => r.status === 'done').length;
-  const queue = pool.filter((r) => r.status !== 'done').slice(0, 6);
+  const queue = pool.filter((r) => r.status !== 'done' && r.status !== 'closed').slice(0, 6);
   const allRegions = [...new Set(REQUESTS.map((r) => r.region || 'RUH'))];
   return (
     <div>
       <h2 className="h2">لوحة المعلومات</h2>
       <p className="lede">{persona === 'staff'
-        ? 'تدابير الحماية الوظيفية والمعيشية المُسنَدة إليك. تُحال الطلبات من مركز الحماية، وتُنفَّذ بالتنسيق مع الجهات ثم تُعتمَد من المدير قبل الرد على المركز (تدابير م13).'
+        ? 'تدابير الحماية الوظيفية والمعيشية المُسنَدة إليك. تُحال الطلبات من مركز الحماية، وتُنفَّذ بالتنسيق مع الجهات ثم تُعتمَد من المدير قبل الرد على المركز (تدابير م14).'
         : 'إشراف على فريق تدابير الحماية: توزيع الطلبات الواردة من المركز، ومتابعة التنفيذ، واعتماد النتائج قبل ردّها للمركز.'}</p>
       <div className="stats">
         <Stat icon="inbox" v={nNew} l="طلبات واردة غير مُسنَدة" bg="var(--warning-10)" fg="var(--color-warning)" />
@@ -160,7 +161,7 @@ function Requests({ persona, openReq, initFilter, region }) {
     filter === 'new' ? r.status === 'new' :
     filter === 'active' ? (r.status === 'assigned' || r.status === 'progress') :
     filter === 'review' ? r.status === 'review' :
-    r.status === 'done');
+    (r.status === 'done' || r.status === 'closed'));
   const tabs = [['all', 'الكل'], ['new', 'وارد'], ['active', 'قيد المعالجة'], ['review', 'بانتظار الاعتماد'], ['done', 'مكتملة']];
   return (
     <div>
@@ -200,7 +201,7 @@ function Requests({ persona, openReq, initFilter, region }) {
 }
 
 // ===== تفاصيل الطلب =====
-const TRACK = { new: 0, assigned: 1, progress: 2, review: 3, done: 4 };
+const TRACK = { new: 0, assigned: 1, progress: 2, review: 3, done: 4, closed: 5 };
 function Detail({ r, persona, onBack, act }) {
   const svc = SERVICE[r.service];
   const stage = TRACK[r.status];
@@ -333,10 +334,10 @@ function ActionPanel({ r, persona, act }) {
       </Card>
     );
   }
-  if (r.status === 'done') {
+  if (r.status === 'done' || r.status === 'closed') {
     return (
       <Card className="card pad" style={{ borderColor: 'var(--success-50)' }}>
-        <div className="row" style={{ gap: 8 }}><I name="task_alt" size={20} color="var(--color-success)" fill /><b style={{ color: 'var(--text-strong)' }}>مُعتمَد ومُبلَّغ للمركز</b></div>
+        <div className="row" style={{ gap: 8 }}><I name={r.status === 'closed' ? 'verified' : 'task_alt'} size={20} color="var(--color-success)" fill /><b style={{ color: 'var(--text-strong)' }}>{r.status === 'closed' ? 'اطّلع المركز وأقفل الملف' : 'مُعتمَد ومُبلَّغ للمركز'}</b></div>
       </Card>
     );
   }
@@ -536,7 +537,7 @@ function App() {
             );
           })}
         </nav>
-        <div className="side-foot">تدابير م13: النقل (3)، العمل البديل ومعالجة الفصل (4)، الإسكان (8، 11)، والمساعدة المالية (12). تبادل مؤمّن مع مركز الحماية. مبنية على نظام Platforms Code.</div>
+        <div className="side-foot">تدابير م14: النقل (3)، العمل البديل ومعالجة الفصل (4)، الإسكان (8، 11)، والمساعدة المالية (12). تبادل مؤمّن مع مركز الحماية. مبنية على نظام Platforms Code.</div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
