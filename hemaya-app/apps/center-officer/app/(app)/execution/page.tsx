@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 const CAT_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
 
 export default async function Page() {
-  await requireRole("case_officer" as any, { denyPath: "/403" });
+  const { user } = await requireRole("case_officer" as any, { denyPath: "/403" });
+  const me = { name: String((user.user_metadata as Record<string, unknown>)?.name ?? "أخصائي تنفيذ الحماية") };
 
   // القضايا التي صدر قبولها (تتدفّق للتنفيذ) — RLS: co_execution_read.
   const supabase = createServerClient();
@@ -35,5 +36,5 @@ export default async function Page() {
     };
   });
 
-  return <ExecutionPortal initialData={{ handoffs }} />;
+  return <ExecutionPortal initialData={{ handoffs, me }} />;
 }
