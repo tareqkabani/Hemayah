@@ -1,5 +1,6 @@
 import { requireRole } from "@hemaya/auth";
 import { createServerClient } from "@hemaya/supabase";
+import { getCenterReferrals } from "@/lib/referrals-data";
 import { ExecutionPortal } from "@/components/ExecutionPortal";
 export const dynamic = "force-dynamic";
 
@@ -36,5 +37,8 @@ export default async function Page() {
     };
   });
 
-  return <ExecutionPortal initialData={{ handoffs, me }} />;
+  // إحالات م14 من الجدول الحقيقي (سياسة referral_center_read) — مصدر ناقل المركز.
+  const referrals = await getCenterReferrals();
+
+  return <ExecutionPortal initialData={{ handoffs, me, referrals }} />;
 }
