@@ -25,4 +25,6 @@ export const REJECT_REASONS = [
   { k: "r5", t: "أخرى", note: true },
 ];
 
-export const DURATIONS = ["ثلاثون يوماً", "إلى حين انتهاء القضية", "مدة محدّدة"];
+// المدد الموحّدة انتقلت إلى @hemaya/domain (تشاركها توصية الجهات المختصة)؛
+// يبقى التصدير هنا حفاظاً على المستوردين.
+export { DURATIONS } from "@hemaya/domain";
