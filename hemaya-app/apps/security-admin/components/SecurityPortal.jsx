@@ -6,6 +6,7 @@
    ============================================================ */
 import React, { useState, useEffect } from "react";
 import { Card, Tag, InlineAlert } from "@hemaya/ui";
+import { REGION_LABEL as REGIONS, regionDisp } from "@hemaya/domain";
 import { HemayaBus } from "./referral-bus";
 import { referralUpdate, raiseLifecycleReview, refetchReferrals } from "../lib/referral-actions";
 import { createClient } from "@hemaya/supabase/src/browser";
@@ -27,8 +28,6 @@ const ROLES = {
              perm: 'إسناد الضباط · اعتماد التوصية ورفعها لمجلس المركز' },
 };
 
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'المنطقة الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
-const regionDisp = (code) => { const n = REGIONS[code] || code; return (n.charAt(0) === 'ا' && n.charAt(1) === 'ل') ? n : 'منطقة ' + n; };
 const OFFICERS = {
   o1: { name: 'العقيد عبدالعزيز الحربي', unit: 'وزارة الداخلية', short: 'ع. الحربي', region: 'RUH' },
   o2: { name: 'المقدّم سعد القحطاني', unit: 'أمن الدولة', short: 'س. القحطاني', region: 'EAS' },

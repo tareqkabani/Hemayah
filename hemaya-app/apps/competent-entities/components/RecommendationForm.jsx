@@ -5,6 +5,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
+import { PROTECTION_TYPES_14 as PROTECTION_TYPES } from "@hemaya/domain";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) =>
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -63,12 +64,6 @@ const ENTITIES = {
   nazaha:         { name: 'نزاهة',           drafter: 'المحقق المختص',    approver: 'مدير الإدارة المختصة' },
 };
 const WAQIA = ['الاعتداء على الأشخاص', 'الآداب العامة', 'الأموال', 'المخدرات', 'الجرائم الاقتصادية', 'الماسة بالثقة العامة', 'الأسرة والأحداث', 'الاتجار بالأشخاص', 'الجرائم المعلوماتية', 'الأمن الوطني'];
-const PROTECTION_TYPES = [
-  'الحماية الأمنية', 'إخفاء البيانات الشخصية', 'النقل من العمل (مؤقّت/دائم)', 'إيجاد عمل بديل',
-  'الإرشاد القانوني/النفسي/الاجتماعي', 'توفير وسائل الإبلاغ الفوري', 'تغيير أرقام الاتصال',
-  'تغيير محل الإقامة', 'المرافقة الأمنية', 'الإدلاء بوسائط إلكترونية (تغيير الصوت وإخفاء الوجه)',
-  'حماية المسكن', 'المساعدة المالية', 'أخرى (ما تراه الإدارة مناسباً)',
-];
 
 export function RecommendationForm({ rec, onApprove, onBack }) {
   const linked = rec.linked !== false;

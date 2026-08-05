@@ -9,6 +9,7 @@ import { Constants } from "@hemaya/supabase";
 import { CASE_STATUS, CATEGORY, RISK_LEVEL, CASE_SOURCE } from "./enums";
 import { ROLE_LABEL, PORTALS } from "./roles";
 import { REFERRAL_AUTHORITY_LABEL, REFERRAL_SERVICES } from "./materials";
+import { REGION_LABEL } from "./regions";
 import { CASE_TRANSITIONS } from "./case-state";
 
 const ENUMS = Constants.public.Enums;
@@ -22,6 +23,7 @@ const COVERAGE: Array<[string, Record<string, string>, readonly string[]]> = [
   ["RISK_LEVEL ↔ risk_level", RISK_LEVEL, ENUMS.risk_level],
   ["CASE_SOURCE ↔ case_source", CASE_SOURCE, ENUMS.case_source],
   ["REFERRAL_AUTHORITY_LABEL ↔ referral_authority", REFERRAL_AUTHORITY_LABEL, ENUMS.referral_authority],
+  ["REGION_LABEL ↔ region_code", REGION_LABEL, ENUMS.region_code],
 ];
 
 describe("تغطية التسميات العربية لقيم القاعدة", () => {

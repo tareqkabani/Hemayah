@@ -6,6 +6,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, RiskLevel } from "@hemaya/ui";
+import { REGION_LABEL as REGIONS, regionDisp } from "@hemaya/domain";
 import { HemayaBus } from "./referral-bus";
 import { referralUpdate, refetchReferrals } from "../lib/referral-actions";
 import { createClient } from "@hemaya/supabase/src/browser";
@@ -26,9 +27,6 @@ const SERVICE = {
              desc: 'علاج الإصابات الجسدية الناتجة عن الاعتداء المرتبط بالشهادة/الإبلاغ.' },
 };
 const CAT = { 'شاهد': 'شاهد', 'مبلّغ': 'مبلّغ', 'خبير': 'خبير', 'ضحية': 'ضحية' };
-// المناطق/الوحدات الإقليمية — تُقدّم الخدمة في منطقة المشمول؛ المدير يشرف على كل المناطق
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'المنطقة الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
-const regionDisp = (code) => { const n = REGIONS[code] || code; return (n.charAt(0) === 'ا' && n.charAt(1) === 'ل') ? n : 'منطقة ' + n; };
 
 // ===== الحالة (من منظور الجهة الصحية) =====
 const ST = {

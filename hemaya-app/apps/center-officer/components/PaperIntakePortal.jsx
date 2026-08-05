@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween } from "@hemaya/domain";
+import { businessDaysBetween, PROTECTION_TYPES_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,
@@ -58,15 +58,7 @@ const ENTITIES = {
   state_security: { name: 'رئاسة أمن الدولة',            drafter: 'الضابط المختص',  approver: 'مدير الإدارة المختصة' },
   nazaha:         { name: 'هيئة الرقابة ومكافحة الفساد', drafter: 'المحقق المختص',  approver: 'مدير الإدارة المختصة' },
 };
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
 const WAQIA = ['الاعتداء على الأشخاص', 'الآداب العامة', 'الأموال', 'المخدرات', 'الجرائم الاقتصادية', 'الماسة بالثقة العامة', 'الأسرة والأحداث', 'الاتجار بالأشخاص', 'الجرائم المعلوماتية', 'الأمن الوطني'];
-// أنواع الحماية الـ(13) المنصوص عليها في المادة الرابعة عشرة
-const PROTECTION_TYPES = [
-  'الحماية الأمنية', 'إخفاء البيانات الشخصية', 'النقل من العمل (مؤقّت/دائم)', 'إيجاد عمل بديل',
-  'الإرشاد القانوني/النفسي/الاجتماعي', 'توفير وسائل الإبلاغ الفوري', 'تغيير أرقام الاتصال',
-  'تغيير محل الإقامة', 'المرافقة الأمنية', 'الإدلاء بوسائط إلكترونية (تغيير الصوت وإخفاء الوجه)',
-  'حماية المسكن', 'المساعدة المالية', 'أخرى (ما تراه الإدارة مناسباً)',
-];
 
 // ── قيد الورود الورقيّ — تُحسب مُهل م10 وSLA من تاريخ الورود لا من لحظة الإدخال ──
 const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
