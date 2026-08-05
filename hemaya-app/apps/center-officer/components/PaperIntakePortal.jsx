@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween, PROTECTION_TYPES_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS } from "@hemaya/domain";
+import { businessDaysBetween, PROTECTION_TYPES_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,
@@ -704,7 +704,7 @@ function Intake() {
       <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600 }}><I name="logout" size={17} /> تسجيل الخروج</button>
     </div>
     <div className="rm"><I name="schedule" size={18} /><span><b>وحدةٌ مؤقّتة لفترة التحوّل الرقميّ.</b> تُدخِل الطلبات الواردة ورقياً حتى يكتمل التقديم الرقميّ عبر البوابات — ومصمَّمةٌ لتُستغنى عنها لاحقاً بحذف هذه الوحدة وحدها دون أثرٍ على بقية النظام.</span></div>
-    <div className="kick">بوابة موظف المركز · الإدخال اليدوي للطلبات</div>
+    <div className="kick">بوابة موظف المركز · {PAPER_INTAKE_LABEL}</div>
     <h1>إدخال طلبٍ ورقيّ</h1>
     <p className="sub">اختر مصدر الطلب الورقيّ الوارد. تُدخَل الحقول نفسها المعتمدة في البوابة الرقمية، فلا يضيع شيء عند الرقمنة.</p>
     <div className="pick">
