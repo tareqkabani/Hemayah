@@ -87,4 +87,14 @@
 .flags { display: inline-flex; flex-direction: column; gap: 8px; text-align: start; margin: 16px auto 0; }
 .flag { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-body); }
 .flag .material-symbols-rounded { font-size: 17px; color: var(--color-primary); }
+/* خطوة الربط الإلزامية — توصية على طلبٍ مُحال */
+.lnk { display: grid; gap: 8px; }
+.lnk-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--border-subtle); border-radius: 12px; background: var(--surface-card); cursor: pointer; text-align: start; font-family: var(--font-sans); font-size: 13.5px; width: 100%; }
+.lnk-row:hover { border-color: var(--color-primary); }
+.lnk-row.on { border-color: var(--color-primary); background: var(--green-10); }
+.lnk-main { flex: 1; min-width: 0; }
+.lnk-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 11.5px; color: var(--text-secondary); }
+.lnk-due { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: var(--radius-full); background: var(--green-10); color: var(--color-primary); }
+.lnk-due.over { background: var(--error-10); color: var(--color-error); }
+
 @media (max-width: 920px) { .rf-grid2, .rf-attach-grid, .pick { grid-template-columns: 1fr; } }
