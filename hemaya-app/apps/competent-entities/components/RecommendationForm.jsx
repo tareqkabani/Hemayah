@@ -5,7 +5,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { PROTECTION_TYPES_14 as PROTECTION_TYPES, DURATIONS, isCustomDuration } from "@hemaya/domain";
+import { PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, DURATIONS, isCustomDuration } from "@hemaya/domain";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) =>
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
