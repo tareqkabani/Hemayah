@@ -1,10 +1,16 @@
+import type { ReferralAuthority } from "@hemaya/supabase";
+
 // جهات الإحالة والخدمات — مرجعٌ للتوصيات والتدابير (م14 + اللائحة).
-export const REFERRAL_AUTHORITY_LABEL: Record<string, string> = {
+// Record<ReferralAuthority, ...> يُلزم المترجم بتغطية كل قيمة يضيفها enum القاعدة.
+export const REFERRAL_AUTHORITY_LABEL: Record<ReferralAuthority, string> = {
   hr: "وزارة الموارد البشرية",
   health: "وزارة الصحة",
   legal: "الجهة القضائية",
   security: "الإدارة الأمنية",
   moi: "وزارة الداخلية",
+  competent: "الجهة المختصة",
+  ag: "النائب العام",
+  technical: "المكتب الفني",
 };
 
 export const REFERRAL_SERVICES = [
