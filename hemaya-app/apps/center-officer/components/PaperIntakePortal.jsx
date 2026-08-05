@@ -106,11 +106,11 @@ function RecommendationForm({ rec, onApprove, onBack }) {
     <div className="rf">
       {/* رأس */}
       <div className="rf-top">
-        <button className="link" onClick={onBack}><I name="arrow_forward" size={18} /> رجوع إلى اختيار المصدر</button>
+        <button className="link" onClick={onBack}><I name="arrow_forward" size={18} /> رجوع</button>
         <div className="rf-top-main">
           <div>
-            <div className="rf-kicker">{linked ? 'نموذج التوصية' : 'طلب حماية نيابةً عن الشخص'}</div>
-            <h2 className="rf-h">{linked ? 'توصية الجهة المختصة بشأن طلب حماية' : 'إنشاء طلب حماية نيابةً عن الشخص'}</h2>
+            <div className="rf-kicker">{linked ? 'تفريغ خطاب التوصية الوارد' : 'تفريغ النموذج الورقي'}</div>
+            <h2 className="rf-h">{linked ? 'توصية الجهة المختصة — واردة بخطاب بريدي' : 'تفريغ طلب حماية نيابةً عن الشخص (وارد من الجهة)'}</h2>
           </div>
           <div className="rf-top-meta">
             <SecretCode code={rec.secret} canReveal={false} />
@@ -119,23 +119,20 @@ function RecommendationForm({ rec, onApprove, onBack }) {
         </div>
       </div>
 
-      <InlineAlert kind="info" title="مصدر البيانات" style={{ marginBottom: 18 }}>
+      <InlineAlert kind="info" title="تفريغ حرفيّ — مصدر البيانات النموذج الورقي" style={{ marginBottom: 18 }}>
         {linked
-          ? <>توصية واردة بخطاب رسمي على طلبٍ مُحال قائم: هوية مقدّم الطلب <b>موروثة موثّقة</b> من الطلب القائم — مقفلة، لا تُدخل يدوياً. أنت تُفرِّغ ما ورد في خطاب الجهة (القضية والتقييم والمسوّغات) وتُرفق صورته.</>
-          : <>استقبالٌ ورقيّ: تُدخَل بيانات مقدّم الطلب (الهوية والعنوان والعمل) <b>يدوياً</b> من الخطاب الوارد وتُرفق صورته — <b>غير موثّقة</b> بعد، وتُفعَّل عبر نفاذ حين يدخل الشخص بحسابه لاحقاً (لازمٌ للاتفاقية م11 والتظلّم م21). ثمّ تُكمِل الجهة القضية والتقييم والمسوّغات.</>}
+          ? <>انقل محتوى توصية الجهة من <b>الخطاب الوارد</b> كما ورد — هوية مقدم الطلب <b>موروثة موثّقة</b> من طلبه القائم ولا تُدخَل يدوياً.</>
+          : <>انقل حقول <b>النموذج الورقي المرفق بخطاب الجهة</b> كما وردت — دون تلخيص أو تصحيح — وأرفق صورة النموذج والخطاب. البيانات غير موثّقة حتى يفعّل الشخص حسابه عبر نفاذ.</>}
       </InlineAlert>
 
-      {/* بطاقة ضابط الاتصال المسؤول */}
-      <div className="rf-officer">
-        <div className="rf-officer-ico"><I name="support_agent" size={20} color="var(--color-primary)" fill /></div>
+      {/* بيان الخطاب الوارد بالبريد — القناة المؤقّتة (لا ربط تقنيّ بعد) */}
+      <div className="rf-officer" style={{ background: 'var(--warning-10)', borderColor: 'var(--warning-50)' }}>
+        <div className="rf-officer-ico"><I name="mail" size={20} color="var(--warning-70)" fill /></div>
         <div className="rf-officer-main">
-          <div className="rf-officer-role">ضابط الاتصال المسؤول <span className="rf-officer-ent">· {ent.name}</span></div>
-          <div className="rf-officer-sub">نقطة التواصل الوحيدة مع المركز — يوزّع داخلياً ويتابع المهلة.</div>
+          <div className="rf-officer-role">خطاب رسمي وارد بالبريد <span className="rf-officer-ent">· {ent.name}</span></div>
+          <div className="rf-officer-sub">لا ربط تقنيّ بعد — يُدخل موظف المركز محتوى الخطاب نيابةً عن الجهة، ويُعيّن ضابط اتصال معتمد عند إطلاق الربط.</div>
         </div>
-        <div className="rf-officer-meta">
-          <Tag tone="success" size="sm" iconLeft={<I name="circle" size={10} fill />}>متاح</Tag>
-          <span className="rf-officer-alt">بديل عند الغياب: مسؤول المناوبة</span>
-        </div>
+        <div className="rf-officer-meta"><Tag tone="warning" size="sm">قناة مؤقّتة — بريد ورقي</Tag></div>
       </div>
       <Sec n="١" title="بيانات مقدم الطلب">
         {linked ? (
@@ -145,8 +142,10 @@ function RecommendationForm({ rec, onApprove, onBack }) {
               <Locked label="رقم الهوية" value="••••••••••" src="الطلب القائم" />
               <Locked label="الجنس" value="••••" src="الطلب القائم" />
               <Locked label="الجنسية" value="•••••••" src="الطلب القائم" />
+              <Locked label="الحالة الاجتماعية" value="••••••" src="الطلب القائم" />
               <Locked label="مقر الإقامة" value="•••• — العنوان الوطني" src="الطلب القائم" />
               <Locked label="جهة العمل" value="••••••••" src="الطلب القائم" />
+              <Locked label="المستوى التعليمي" value="••••••" src="الطلب القائم" />
             </div>
             <div className="rf-divider"><I name="edit_note" size={16} color="var(--text-secondary)" /> ما ورد في خطاب الجهة (يخصّ القضية والتقييم)</div>
           </>
@@ -159,8 +158,8 @@ function RecommendationForm({ rec, onApprove, onBack }) {
           </div>
         ) : (
           <div className="rf-fetch unverified">
-            <div className="row" style={{ gap: 9, marginBottom: 6 }}><I name="running_with_errors" size={20} color="var(--color-warning)" fill /><b style={{ fontSize: 15, color: 'var(--text-strong)' }}>بيانات تُدخَل يدوياً من الخطاب الوارد — غير موثّقة بعد</b></div>
-            <p className="muted" style={{ margin: '0 0 12px' }}>يُدخل موظف المركز بيانات الشخص من الخطاب الوارد وترفق صورة هويته وكل المتطلبات؛ ويأخذ الطلب مجراه فوراً. تُوثّق الهوية حين يدخل الشخص بحسابه عبر نفاذ ويُفعّل الطلب.</p>
+            <div className="row" style={{ gap: 9, marginBottom: 6 }}><I name="running_with_errors" size={20} color="var(--color-warning)" fill /><b style={{ fontSize: 15, color: 'var(--text-strong)' }}>بيانات منقولة من النموذج الورقي — غير موثّقة بعد</b></div>
+            <p className="muted" style={{ margin: '0 0 12px' }}>انقل بيانات الشخص كما وردت في النموذج الورقي المرفق بخطاب الجهة — دون تلخيص أو تصحيح — وأرفق صورة هويته؛ ويأخذ الطلب مجراه فوراً. تُوثّق الهوية حين يدخل الشخص بحسابه عبر نفاذ ويُفعّل الطلب.</p>
             <div className="rf-grid2">
               <Field label="الاسم الرباعي" req><input value={f.obName} onChange={(e) => set('obName', e.target.value)} dir="auto" placeholder="كما في الخطاب الوارد" /></Field>
               <Field label="رقم الهوية / الإقامة" req><input value={f.obNid} onChange={(e) => set('obNid', e.target.value.replace(/\D/g, '').slice(0, 10))} className="mono" inputMode="numeric" placeholder="1XXXXXXXXX" dir="ltr" /></Field>
@@ -278,8 +277,8 @@ function RecommendationForm({ rec, onApprove, onBack }) {
 
       {/* ⑥ مدة الحماية */}
       <Sec n="٦" title="مدة الحماية المقترحة" fed>
-        <Choice value={f.duration} set={(v) => set('duration', v)} options={['30 يوماً', 'إلى حين انتهاء القضية', 'مدة أخرى']} />
-        {f.duration === 'مدة أخرى' && <Field label="حدّد المدة" hint=""><input value={f.durationNote} onChange={(e) => set('durationNote', e.target.value)} dir="auto" style={{ maxWidth: 320 }} /></Field>}
+        <Choice value={f.duration} set={(v) => set('duration', v)} options={['ثلاثون يوماً', 'إلى حين انتهاء القضية', 'مدة محدّدة']} />
+        {f.duration === 'مدة محدّدة' && <Field label="حدّد المدة" hint=""><input value={f.durationNote} onChange={(e) => set('durationNote', e.target.value)} dir="auto" style={{ maxWidth: 320 }} /></Field>}
       </Sec>
 
       {/* المرفقات — مستندات مسمّاة، لكل مستند حقل إرفاق (PDF) يُرفع عند وجوده */}
@@ -303,14 +302,14 @@ function RecommendationForm({ rec, onApprove, onBack }) {
 
       {/* الاعتماد */}
       <Card className="card pad" style={{ marginTop: 8, borderColor: 'var(--green-20)' }}>
-        <div className="row" style={{ gap: 9, marginBottom: 10 }}><I name="approval" size={22} color="var(--color-primary)" fill /><b style={{ fontSize: 16, color: 'var(--text-strong)' }}>{linked ? 'تسجيل التوصية الواردة' : 'الاعتماد ورفع الطلب'}</b></div>
+        <div className="row" style={{ gap: 9, marginBottom: 10 }}><I name="approval" size={22} color="var(--color-primary)" fill /><b style={{ fontSize: 16, color: 'var(--text-strong)' }}>الإقرار والتسجيل</b></div>
         <div className="rf-grid2" style={{ marginBottom: 14 }}>
-          <div className="rf-sign"><span className="muted">{ent.drafter} (المُحرِّر في الجهة)</span><b>{rec.letterBy || 'كما في الخطاب الوارد'}</b><Tag tone="info" size="sm">خطاب رسمي</Tag></div>
-          <div className="rf-sign"><span className="muted">المُدخِل (موظف المركز)</span><b>أنت — نيابةً عن الجهة</b><Tag tone="warning" size="sm">يُسجَّل في التدقيق</Tag></div>
+          <div className="rf-sign"><span className="muted">{ent.drafter} (مُعِدّ التوصية في الجهة)</span><b>{rec.letterBy || 'كما ورد في الخطاب الرسمي'}</b><Tag tone="info" size="sm">من الخطاب</Tag></div>
+          <div className="rf-sign"><span className="muted">الرئيس المباشر (المعتمِد)</span><b>ورد الخطاب معتمداً</b><Tag tone="success" size="sm">معتمد في الخطاب</Tag></div>
         </div>
-        <label className="rf-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>{linked ? 'أقرّ بأنّ التوصية فُرِّغت مطابقةً لخطاب الجهة الوارد وصورته مُرفقة، وتُدمج في سجلّ الطلب المُحال نفسه، ويُسجَّل إدخالي في التدقيق باسمي ووقته.' : 'أقرّ بأنّ البيانات أُدخلت مطابقةً للخطاب الوارد واكتمال المسوّغات، وأرفع الطلب ليأخذ مجراه في الفرز المبدئي.'}</span></label>
+        <label className="rf-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>أقرّ بأنّ محتوى التوصية أُدخل مطابقاً للخطاب الرسمي الوارد وصورته مُرفقة، ويُسجل إدخالي في التدقيق باسمي ووقته.</span></label>
         <div className="row" style={{ marginTop: 16, gap: 10 }}>
-          <button className="btn btn-primary" disabled={!ack || (linked && !f.provide) || (!linked && !(f.attachMap || {})['الهوية الوطنية لطالب الحماية والتابعين'])} onClick={() => onApprove(f)}><I name="send" size={18} /> {linked ? 'تسجيل التوصية ودمجها في الطلب' : 'رفع الطلب'}</button>
+          <button className="btn btn-primary" disabled={!ack || (linked && !f.provide) || (!linked && !(f.attachMap || {})['الهوية الوطنية لطالب الحماية والتابعين'])} onClick={() => onApprove(f)}><I name="send" size={18} /> تسجيل وإحالة</button>
         </div>
         {linked && !f.provide && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>حدّد توصية الجهة (توفير / عدم توفير) كما وردت في الخطاب.</p>}
       </Card>
@@ -401,6 +400,10 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
           <Field label="اسم الجهة المختصة" hint="(م1/5 · جهة التحقيق أو المحاكمة)" req><select value={s.entity} onChange={set('entity')}><option value="">— اختر —</option>{ENTS.map(([, n]) => <option key={n}>{n}</option>)}</select></Field>
         </div>
         <Field label="رقم القضية" hint="(إن وجد)"><input value={s.caseNo} onChange={set('caseNo')} dir="auto" placeholder="مثال: 1447/…" /></Field>
+        {legacy && <div className="rf-grid2" style={{ marginTop: 4 }}>
+          <Field label="نوع الطلب" req hint="(كما في نموذج الموقع القديم)"><Choice value={s.reqType} set={set('reqType')} options={['طلب جديد']} /></Field>
+          {s.reqType === 'يوجد طلب سابق' && <Field label="رقم الطلب السابق"><input value={s.prevRef} onChange={set('prevRef')} className="mono" dir="ltr" placeholder="رقم الطلب في الموقع القديم" /></Field>}
+        </div>}
       </Sec>
 
       <Sec n="٤" title="المرفقات" sub="المرفقات اختيارية — أضفها إن توفّرت تعزيزاً لسند التدقيق.">
@@ -489,7 +492,7 @@ function Intake() {
     try {
       if (isRec) {
         // توصية ورقية مربوطة بطلبٍ مُحال قائم — تُدمج في سجلّه (لا سجلّ مكرّر).
-        const durationDays = d.duration === '30 يوماً' ? 30 : null;
+        const durationDays = d.duration === 'ثلاثون يوماً' ? 30 : null;
         const res = await submitPaperRecommendation({
           caseId: linkSel.caseId,
           provide: d.provide === 'توفير',
@@ -543,6 +546,7 @@ function Intake() {
           ...(d.extras || []),
         ];
         if (d.channel === 'inperson') details.interview = { date: d.ivDate, note: d.ivNote };
+        if (d.channel === 'legacy') details.legacy_request = { type: d.reqType || 'طلب جديد', prevRef: d.prevRef || '' };
         details.assess = { caseStage: '' };
         details.applicant_kind = d.role || '';
       } else {
@@ -573,7 +577,7 @@ function Intake() {
         entity: src === 'entity' ? entName : (d.entity || ''),
         crime: src === 'entity' ? (d.crimeDesc || d.reasons || d.caseSummary || 'خطاب جهة (ورقيّ)') : (d.crime || ''),
         reason: src === 'entity' ? ([d.why1, d.why2, d.why3].filter(Boolean).join(' · ') || d.reasons || 'مسوّغات الخطاب الوارد') : (d.reason || ''),
-        priorSubmit: src === 'entity' ? true : (d.priorSubmit === 'نعم'),
+        priorSubmit: src === 'entity' ? true : (d.priorSubmit === 'نعم' || d.reqType === 'يوجد طلب سابق'),
         caseNo: d.caseNo || '',
         receivedDate: meta.receivedDate,
         regNo: meta.regNo,

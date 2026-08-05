@@ -154,7 +154,7 @@ function AuthRec({ secret, detail }) {
         <Grp n="٤" title="أنواع الحماية والمدة المقترحة من الجهة">
           {Block('الأنواع المقترحة', Array.isArray(rc.types) && rc.types.length ? rc.types.join(' · ') : '—')}
           {R('الحلول البديلة', dash(rc.alternatives))}
-          {R('مدة الحماية المقترحة', rc.duration === 'مدة أخرى' ? dash(rc.durationNote) : dash(rc.duration))}
+          {R('مدة الحماية المقترحة', (rc.duration === 'مدة محدّدة' || rc.duration === 'مدة أخرى') ? dash(rc.durationNote) : dash(rc.duration))}
         </Grp>
         <div className="ro-field" style={{ marginTop: 16 }}><span className="row" style={{ gap: 8 }}><I name="account_balance" size={17} color="var(--color-primary)" /><span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>{dash(detail && detail.entity)}</span></span><Tag tone="neutral" size="sm" iconLeft={<I name="lock_clock" size={13} />}>وردت ورقياً</Tag></div>
       </div>)}
