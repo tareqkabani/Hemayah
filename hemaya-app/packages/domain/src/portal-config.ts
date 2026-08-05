@@ -8,6 +8,12 @@
 import type { AppRole } from "@hemaya/supabase";
 import { grievanceNextAction } from "./grievance";
 
+/**
+ * مسمّى وحدة الإدخال اليدوي (بوابة موظف المركز) — المصدر الواحد؛
+ * يستهلكه جسر نفاذ وبطاقة موظف المركز وترويسة الشاشة وملاحظة الفرز.
+ */
+export const PAPER_INTAKE_LABEL = "الإدخال اليدوي للطلبات";
+
 /** دورة الحياة النظامية الست — شريط «المرحلة N من M» في اللوحات. */
 export const STAGE_FLOW = [
   "استلام الطلب",

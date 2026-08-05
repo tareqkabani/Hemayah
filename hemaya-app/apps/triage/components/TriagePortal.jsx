@@ -8,7 +8,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp } from "@hemaya/domain";
+import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import { fetchRegister } from "@/lib/register";
@@ -390,7 +390,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
 
       {rec.paper &&
         <InlineAlert kind="warning" title="ورودٌ ورقيّ — هوية غير موثّقة" style={{ marginBottom: 14 }}>
-          أُدخل هذا الطلب يدوياً عبر وحدة الاستقبال الورقيّ. الهوية <b>غير موثّقة</b> وتُفعَّل عبر نفاذ لاحقاً (لازمة للاتفاقية م11 والتظلّم م21)، وصورة المستند الورقيّ ضمن المرفقات.
+          أُدخل هذا الطلب يدوياً عبر وحدة {PAPER_INTAKE_LABEL}. الهوية <b>غير موثّقة</b> وتُفعَّل عبر نفاذ لاحقاً (لازمة للاتفاقية م11 والتظلّم م21)، وصورة المستند الورقيّ ضمن المرفقات.
         </InlineAlert>}
 
       {revealed &&

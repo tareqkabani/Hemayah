@@ -42,7 +42,8 @@
   var PORTALS = {
     'seeker-main':      { role: 'seeker',    label: 'بوّابة طالب الحماية',      href: APP.seeker },
     'seeker-apply':     { role: 'seeker',    label: 'تقديم طلب جديد',           href: APP.seeker },
-    'center-intake':    { role: 'center',    label: 'الاستقبال الورقيّ',        href: APP.center },
+    // ملف ثابت لا يستورد — النص مطابق لـPAPER_INTAKE_LABEL في @hemaya/domain
+    'center-intake':    { role: 'center',    label: 'الإدخال اليدوي للطلبات',   href: APP.center },
     'center-triage':    { role: 'center',    label: 'الفرز المبدئي',            href: APP.triage },
     'center-studier':   { role: 'center',    label: 'الدراسة — الدارس',         href: APP.studier },
     'center-evaluator': { role: 'center',    label: 'التقييم — المقيّم',        href: APP.evaluator },

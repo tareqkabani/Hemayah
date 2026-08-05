@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardBody, Tag, InlineAlert } from "@hemaya/ui";
+import { PAPER_INTAKE_LABEL } from "@hemaya/domain";
 
 const SECTIONS: { t: string; href?: string; external?: boolean }[] = [
   // الفرز المبدئي انتقل لبوابته الموحّدة (منطقة /triage) — رابط خام يعبر المناطق
@@ -11,7 +12,7 @@ const SECTIONS: { t: string; href?: string; external?: boolean }[] = [
   { t: "التنفيذ والتجديد — دورة حياة المشمولين", href: "/execution" },
   { t: "قيادة المركز — رئيس المركز (إشراف)", href: "/oversight" },
   { t: "قيادة المركز — نائب رئيس المركز", href: "/oversight-deputy" },
-  { t: "الاستقبال الورقيّ (وحدة مؤقّتة)", href: "/paper-intake" },
+  { t: `${PAPER_INTAKE_LABEL} (وحدة مؤقّتة)`, href: "/paper-intake" },
 ];
 
 export default function Page() {
@@ -22,7 +23,7 @@ export default function Page() {
         <p>أقسام البوابة أدناه. القاعدة والصلاحيات والتصميم مربوطة.</p>
       </div>
       <InlineAlert kind="info" title="حالة البوابة">
-        الفرز المبدئي والدراسة والتقييم والاستقبال الورقيّ مُفعَّلة هنا. مرحلة «القرار والإشعار» تُدار في بوابة القرار الموحّدة بدورة الاعتماد الجديدة (إعداد ← اعتماد النائب ← طرح ← تصويت ← إصدار).
+        الفرز المبدئي والدراسة والتقييم والإدخال اليدوي للطلبات مُفعَّلة هنا. مرحلة «القرار والإشعار» تُدار في بوابة القرار الموحّدة بدورة الاعتماد الجديدة (إعداد ← اعتماد النائب ← طرح ← تصويت ← إصدار).
       </InlineAlert>
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 18 }}>
         {SECTIONS.map((s, i) => {
