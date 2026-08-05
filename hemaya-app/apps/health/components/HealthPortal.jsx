@@ -37,6 +37,7 @@ const ST = {
   progress: { t: 'قيد المعالجة', tone: ['var(--info-10)','var(--color-info)'], icon: 'pending' },
   review:   { t: 'بانتظار اعتماد المدير', tone: ['var(--warning-10)','var(--warning-70)'], icon: 'rate_review' },
   done:     { t: 'مُعتمَد ومُبلَّغ للمركز', tone: ['var(--success-10)','var(--success-70)'], icon: 'task_alt' },
+  closed:   { t: 'اطّلع المركز وأقفل الملف', tone: ['var(--green-10)','var(--green-80)'], icon: 'verified' },
 };
 
 const STAFF = [];
@@ -78,7 +79,7 @@ function Dashboard({ persona, openReq, go, region }) {
   const nProg = scoped.filter((r) => r.status === 'assigned' || r.status === 'progress').length;
   const nRev = scoped.filter((r) => r.status === 'review').length;
   const nDone = scoped.filter((r) => r.status === 'done').length;
-  const queue = pool.filter((r) => r.status !== 'done').slice(0, 6);
+  const queue = pool.filter((r) => r.status !== 'done' && r.status !== 'closed').slice(0, 6);
   const allRegions = [...new Set(REQUESTS.map((r) => r.region || 'RUH'))];
   return (
     <div>
@@ -149,7 +150,7 @@ function Requests({ persona, openReq, initFilter, region }) {
     filter === 'new' ? r.status === 'new' :
     filter === 'active' ? (r.status === 'assigned' || r.status === 'progress') :
     filter === 'review' ? r.status === 'review' :
-    r.status === 'done');
+    (r.status === 'done' || r.status === 'closed'));
   const tabs = [['all', 'الكل'], ['new', 'وارد'], ['active', 'قيد المعالجة'], ['review', 'بانتظار الاعتماد'], ['done', 'مكتملة']];
   return (
     <div>
@@ -189,7 +190,7 @@ function Requests({ persona, openReq, initFilter, region }) {
 }
 
 // ===== تفاصيل الطلب =====
-const TRACK = { new: 0, assigned: 1, progress: 2, review: 3, done: 4 };
+const TRACK = { new: 0, assigned: 1, progress: 2, review: 3, done: 4, closed: 5 };
 function Detail({ r, persona, onBack, act }) {
   const svc = SERVICE[r.service];
   const stage = TRACK[r.status];
@@ -322,10 +323,10 @@ function ActionPanel({ r, persona, act }) {
       </Card>
     );
   }
-  if (r.status === 'done') {
+  if (r.status === 'done' || r.status === 'closed') {
     return (
       <Card className="card pad" style={{ borderColor: 'var(--success-50)' }}>
-        <div className="row" style={{ gap: 8 }}><I name="task_alt" size={20} color="var(--color-success)" fill /><b style={{ color: 'var(--text-strong)' }}>مُعتمَد ومُبلَّغ للمركز</b></div>
+        <div className="row" style={{ gap: 8 }}><I name={r.status === 'closed' ? 'verified' : 'task_alt'} size={20} color="var(--color-success)" fill /><b style={{ color: 'var(--text-strong)' }}>{r.status === 'closed' ? 'اطّلع المركز وأقفل الملف' : 'مُعتمَد ومُبلَّغ للمركز'}</b></div>
       </Card>
     );
   }
