@@ -6,8 +6,12 @@ import { createServiceClient, createServerClient } from "@hemaya/supabase";
 // (الكوكي مشتركةٌ بين منافذ التطوير) فتقبلها البوّابة الوجهة دون طلب دخولٍ ثانٍ.
 // خريطة الهوية→الدور نموذجٌ تجريبيّ يُستبدل بـRBAC من القاعدة في الإنتاج.
 
-// كلمة الجسر من مصدرٍ واحد يرفض الافتراضيّ في الإنتاج (@hemaya/auth)
-const DEV_PASSWORD = bridgePassword();
+// كلمة الجسر من مصدرٍ واحد يرفض الافتراضيّ في الإنتاج (@hemaya/auth).
+// كسولةٌ عمداً: نداءٌ بمستوى الوحدة يُنفَّذ أثناء next build (جمع بيانات الصفحات
+// وNODE_ENV=production بلا أسرار وقت بناء الصورة) فيُسقط بناء الـstack — الحارس
+// يظلّ فاعلاً عند أول طلبٍ فعليّ، وهو مقصد #42 (رفض الخدمة لا رفض البناء).
+let _pw: string | null = null;
+const DEV_PASSWORD = () => (_pw ??= bridgePassword());
 const emailFor = (nid: string) => `${nid}@nafath.local`;
 
 // المسارات موحّدة خلف منفذ الشاشة الموحّدة (Multi-Zones) — التحويل نسبيّ فيصحّ محلياً وفي الإنتاج
@@ -119,7 +123,7 @@ export async function POST(req: Request) {
     const admin = createServiceClient();
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email,
-      password: DEV_PASSWORD,
+      password: DEV_PASSWORD(),
       email_confirm: true,
       user_metadata: { name: identity?.name, national_id: nid, source: "nafath-gateway" },
     });
@@ -162,12 +166,12 @@ export async function POST(req: Request) {
 
     // 3) تسجيل الدخول — يضبط كوكي جلسة Supabase على localhost (مشتركة بين المنافذ)
     const supabase = createServerClient();
-    let { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD });
+    let { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD() });
     // معالجة ذاتية: حساب مزروع/قديم بكلمة جسر مختلفة (مثل بذور nafath-staff-2026
     // مع NAFATH_BRIDGE_PASSWORD مخصّصة) — نوحّد كلمته ثم نعيد المحاولة مرة واحدة
     if (sErr && /invalid login credentials/i.test(sErr.message) && userId) {
-      await admin.auth.admin.updateUserById(userId, { password: DEV_PASSWORD });
-      ({ error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD }));
+      await admin.auth.admin.updateUserById(userId, { password: DEV_PASSWORD() });
+      ({ error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD() }));
     }
     if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 });
 
