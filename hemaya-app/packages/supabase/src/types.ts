@@ -21,6 +21,7 @@ export type DecisionType = Enums<"decision_type">;
 export type ReferralStatus = Enums<"referral_status">;
 export type ReferralAuthority = Enums<"referral_authority">;
 export type GrievanceStatus = Enums<"grievance_status">;
+export type RegionCode = Enums<"region_code">;
 
 export type UserRoleRow = Tables<"user_roles">;
 export type ProtectionCaseRow = Tables<"protection_cases">;
