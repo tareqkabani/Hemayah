@@ -70,7 +70,7 @@ const RKIND = {
 const CASES = []; // لا بيانات مُلفّقة
 
 const RISK_TONE = { 'حرج': 'error', 'عالٍ': 'warning', 'متوسط': 'info', 'منخفض': 'neutral' };
-const ST_TONE = { 'متابعة': 'success', 'قيد التنفيذ': 'info', 'وارد': 'warning', 'مرفوع للمجلس': 'neutral' };
+const ST_TONE = { 'متابعة': 'success', 'قيد التنفيذ': 'info', 'وارد': 'warning', 'مرفوع للمجلس': 'neutral', 'مُقفَلة': 'success' };
 const REC_ST = { none: null, draft: { t: 'مسودّة توصية', tone: 'info' }, raised: { t: 'مرفوعة للمجلس', tone: 'warning' }, decided: { t: 'بُتّ فيها', tone: 'success' } };
 
 const SrcPill = ({ s }) => { const c = SRC[s]; return <span className="src-pill" style={{ background: c.bg, color: c.fg }}><I name={c.icon} size={13} /> {s}</span>; };
@@ -87,7 +87,8 @@ function busToCase(r) {
     risk: r.risk || 'متوسط',
     assignedTo: r.assignedTo || 'o1',
     region: (OFFICERS[r.assignedTo || 'o1'] || {}).region || 'RUH',
-    status: full ? 'متابعة' : 'قيد التنفيذ',
+    // «مُقفَلة» = اطّلع المركز وأقفل الملف (closed) — لا تُحتسب حمايةً نشطة
+    status: r.status === 'closed' ? 'مُقفَلة' : (full ? 'متابعة' : 'قيد التنفيذ'),
     order: { from: 'مركز الحماية — تدبير ' + (m.ref || 'م14') + ' (' + (m.ar || '') + ')', date: cd.orderDate || r.referredAt || '—', ref: cd.orderRef || ('EXE-' + String(r.id || '').slice(-4)) },
     types: [m.ar || 'تدبير أمني'],
     done: dn,
@@ -243,7 +244,8 @@ function StepRow({ s, i, isDone, locked, onToggle, canEdit }) {
 
 // ═══════════════ تفاصيل الملف — تنفيذ · متابعة · توصية ═══════════════
 function Detail({ c, role, back }) {
-  const canExec = role === 'officer' && c.assignedTo === ME;
+  const isClosed = c.status === 'مُقفَلة';
+  const canExec = role === 'officer' && c.assignedTo === ME && !isClosed;
   const isManager = role === 'manager';
   const [done, setDone] = useState(c.done);
   const [recKind, setRecKind] = useState(c.rec.kind || '');
@@ -326,6 +328,7 @@ function Detail({ c, role, back }) {
             <button className="to-signout" title="تسجيل الخروج" onClick={signOut}><I name="logout" size={17} /></button>
       </div>
       <p className="note info" style={{ marginTop: 14, marginBottom: 0 }}><I name="badge" size={15} /> مُسنَد إلى: <b>{OFFICERS[c.assignedTo].name}</b> — {OFFICERS[c.assignedTo].unit} · الوحدة الميدانية: {regionDisp(c.region || 'RUH')}.</p>
+      {isClosed && <p className="note ok" style={{ marginTop: 10, marginBottom: 0 }}><I name="verified" size={15} /> اطّلع المركز وأقفل الملف — الملف للاطّلاع فقط ولا يقبل تحديثات ميدانية جديدة.</p>}
     </Card>
 
     {/* بلاغ حماية عاجل (م8) — يُرفع مباشرةً للنائب العام */}
