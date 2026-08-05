@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween, PROTECTION_TYPES_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL } from "@hemaya/domain";
+import { businessDaysBetween, PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,

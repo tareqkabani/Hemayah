@@ -3,7 +3,7 @@
    بتّ القبول يُنشئ حمايةً مؤقّتة ويجعل القضيّة active (تتدفّق للتنفيذ) ويُشعِر طالبَ الحماية. لا تلفيق. */
 import React, { useState } from "react";
 import { Card, InlineAlert, SecretCode } from "@hemaya/ui";
-import { PROTECTION_TYPES_14 as PROTECTION_TYPES } from "@hemaya/domain";
+import { PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES } from "@hemaya/domain";
 import { useUrgent, approveUrgent } from "./urgent-store";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) =>

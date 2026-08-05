@@ -9,7 +9,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, GRIEVANCE_STAGES, GRIEVANCE_SLA_DAYS, PROTECTION_TYPES_14, grievanceStageIndex } from "@hemaya/domain";
+import { PORTAL_CONFIGS, GRIEVANCE_STAGES, GRIEVANCE_SLA_DAYS, PROTECTION_TYPE_LABELS_14, grievanceStageIndex } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { advisorDecide, officeAdopt, officeReturn, sendOfficeMessage } from "@/lib/actions";
 import { fetchGrievances } from "@/lib/grievances";
@@ -198,7 +198,7 @@ function Grievances({ cfg, isHead, rows, advisorName, openCase }) {
 function TypeChips({ value, onToggle, disabled }) {
   return (
     <div className="chips">
-      {PROTECTION_TYPES_14.map((t) => disabled
+      {PROTECTION_TYPE_LABELS_14.map((t) => disabled
         ? (value.includes(t) ? <span className="chip on" key={t} style={{ cursor: 'default' }}>{t}</span> : null)
         : <button key={t} className={'chip' + (value.includes(t) ? ' on' : '')} onClick={() => onToggle(t)}>{t}</button>)}
     </div>
