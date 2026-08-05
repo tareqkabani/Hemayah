@@ -5,6 +5,7 @@
    ============================================================ */
 import React, { useState, useRef } from "react";
 import { Card, Tag, InlineAlert } from "@hemaya/ui";
+import { SecretChip } from "@hemaya/ui/shell";
 import { HemayaBus } from "./referral-bus";
 import { HemayaHandoff } from "./execution-handoff";
 import { execClient, refetchHandoffs } from "./execution-live";
@@ -184,8 +185,13 @@ function Detail({ b, back }) {
       </div>
     </Card>
 
-    {/* تدابير م1٣ — الإحالة للجهات */}
-    <MeasureDispatch b={b} />
+    {/* تدابير م1٣ — الإحالة للجهات — تُفتح فقط بعد اكتمال التفعيل وتوقيع الاتفاقية */}
+    {b.status === 'نشط' ? <MeasureDispatch b={b} /> : (
+      <Card className="card pad" style={{ marginBottom: 16 }}>
+        <p className="sec-h"><I name="hub" size={18} color="var(--text-secondary)" /> تدابير الحماية (م14) — الإحالة للجهات المنفّذة</p>
+        <p className="note warn" style={{ margin: 0 }}><I name="lock" size={15} /> تُفتح الإحالة للجهات المنفّذة بعد اكتمال التفعيل وتوقيع اتفاقية الحماية (م11) — الحالة الآن: {b.status}.</p>
+      </Card>
+    )}
 
     {/* أ) التفعيل — قائمة المهام */}
     <Card className="card pad" style={{ marginBottom: 16 }}>
@@ -279,17 +285,22 @@ function Beneficiaries({ openB }) {
     <h2 className="h2">المشمولون تحت الحماية</h2>
     <p className="lede">جميع المشمولين في البرنامج وتفاصيل تنفيذ حمايتهم ومتابعتها.</p>
     <Card className="card" style={{ overflow: 'hidden' }}><div className="tbl-wrap"><table>
-      <thead><tr><th>الرمز السري</th><th>الفئة</th><th>المصدر</th><th>أنواع الحماية</th><th>الحالة</th><th>المدّة</th><th></th></tr></thead>
-      <tbody>{list.map((b) => (
+      <thead><tr><th>الرمز السري</th><th>الفئة</th><th>المصدر</th><th>أنواع الحماية</th><th>تدابير م14</th><th>الحالة</th><th>المدّة</th><th></th></tr></thead>
+      <tbody>{list.map((b) => {
+        const refs = HemayaBus.list({ caseRef: b.secret });
+        const doneN = refs.filter((r) => r.status === 'done' || r.status === 'closed').length;
+        const pct = refs.length ? Math.round(doneN / refs.length * 100) : 0;
+        return (
         <tr key={b.secret} className="clk" onClick={() => openB(b)}>
           <td className="mono" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{b.secret}</td>
           <td><Tag tone="info" size="sm">{b.cat}</Tag></td>
           <td><SrcPill s={b.src} /></td>
           <td className="muted">{b.types.length} أنواع</td>
+          <td>{refs.length ? <div className="row" style={{ gap: 7 }}><div style={{ width: 56, height: 6, borderRadius: 3, background: 'var(--border-subtle)', overflow: 'hidden' }}><div style={{ width: pct + '%', height: '100%', background: 'var(--color-primary)' }}></div></div><span className="muted" style={{ fontSize: 12 }}>{doneN}/{refs.length}</span></div> : <span className="muted">—</span>}</td>
           <td><Tag tone={ST_TONE[b.status]} size="sm">{b.status}</Tag></td>
           <td className="muted">{b.temp ? `${b.dayLeft} يوماً` : b.duration}</td>
           <td><I name="chevron_left" size={20} color="var(--text-secondary)" /></td>
-        </tr>))}</tbody>
+        </tr>);})}</tbody>
     </table></div></Card>
   </div>);
 }
@@ -451,6 +462,93 @@ function LegalCard({ r, persona }) {
     </Card>
   );
 }
+// ═══════════════ متابعة التنفيذ — كل إحالات م14 عبر المشمولين ═══════════════
+function ExecutionDesk() {
+  useBus();
+  const [mode, setMode] = useState('case');
+  const [f, setF] = useState('all');
+  const all = HemayaBus.list();
+  const rows = (f === 'all' ? all : all.filter((r) => r.authority === f)).map((r) => {
+    const ageDays = Math.floor((Date.now() - (r.createdAt || Date.now())) / 86400000);
+    const overdue = r.status === 'new' && ageDays >= 2;
+    const due = r.status === 'new' ? (overdue ? 'متأخّرة ' + (ageDays - 2) + ' يوماً' : 'باقٍ ' + (2 - ageDays) + ' يوماً للاستلام') : (r.status === 'done' ? 'بانتظار اطّلاع المركز' : '—');
+    return Object.assign({}, r, { overdue, due });
+  });
+  const nOverdue = rows.filter((r) => r.overdue).length;
+  const nNew = rows.filter((r) => r.status === 'new').length;
+  const nAwaitClose = rows.filter((r) => r.status === 'done').length;
+  const close = (r) => HemayaBus.update(r.id, { status: 'closed', closedBy: 'موظف التنفيذ', _by: 'موظف التنفيذ' }, 'اطّلع المركز على النتيجة وأدرجها في الملف');
+  const actionCell = (r) => (
+    r.status === 'done' ? <button className="btn btn-primary btn-sm" onClick={() => close(r)}><I name="task_alt" size={15} /> الاطّلاع وإدراج النتيجة</button>
+    : r.status === 'closed' ? <span className="pill" style={{ background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}><I name="verified" size={13} /> {r.closedBy || 'المركز'}</span>
+    : <span className="muted" style={{ fontSize: 12 }}>—</span>
+  );
+  let cases = [];
+  rows.forEach((r) => { let c = cases.find((x) => x.caseRef === r.caseRef); if (!c) { c = { caseRef: r.caseRef, cat: r.cat, items: [] }; cases.push(c); } c.items.push(r); });
+  let byAuth = {};
+  rows.forEach((r) => { (byAuth[r.authority] = byAuth[r.authority] || []).push(r); });
+  return (<div>
+    <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ flex: 1, minWidth: 240 }}>
+        <h2 className="h2">متابعة التنفيذ</h2>
+        <p className="lede">كل إحالات تدابير م14 (صحة · موارد بشرية · قانوني · أمني) عبر كل المشمولين النشطين، في مكانٍ واحد.</p>
+      </div>
+      <div className="seg"><button className={mode === 'case' ? 'on' : ''} onClick={() => setMode('case')}><I name="folder_shared" size={15} /> بالمشمول</button><button className={mode === 'authority' ? 'on' : ''} onClick={() => setMode('authority')}><I name="apartment" size={15} /> بالجهة</button></div>
+    </div>
+    <div className="stats">
+      <Card className="card stat"><div className="stat-ico" style={{ background: 'var(--error-10)' }}><I name="warning" size={22} color="var(--color-error)" /></div><div><div className="stat-v">{nOverdue}</div><div className="stat-l">متأخّرة عن مهلة الاستلام</div></div></Card>
+      <Card className="card stat"><div className="stat-ico" style={{ background: 'var(--warning-10)' }}><I name="inbox" size={22} color="var(--warning-70)" /></div><div><div className="stat-v">{nNew}</div><div className="stat-l">بانتظار استلام الجهة</div></div></Card>
+      <Card className="card stat"><div className="stat-ico" style={{ background: 'var(--green-10)' }}><I name="fact_check" size={22} color="var(--color-primary)" /></div><div><div className="stat-v">{nAwaitClose}</div><div className="stat-l">مكتملة — بانتظار اطّلاع المركز</div></div></Card>
+    </div>
+    <div className="seg" style={{ marginBottom: 14 }}>
+      <button className={f === 'all' ? 'on' : ''} onClick={() => setF('all')}>الكل</button>
+      {Object.keys(AUTH).map((k) => <button key={k} className={f === k ? 'on' : ''} onClick={() => setF(k)}>{AUTH[k].short}</button>)}
+    </div>
+    {rows.length === 0 && <Card className="card pad"><p className="muted" style={{ margin: 0 }}>لا إحالات بعد — تظهر هنا فور إصدارها من ملف مشمولٍ نشط (تدابير م14).</p></Card>}
+    {mode === 'case' ? cases.map((c) => {
+      const doneN = c.items.filter((r) => r.status === 'done' || r.status === 'closed').length;
+      return (
+        <div key={c.caseRef} style={{ marginBottom: 16, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <div className="row" style={{ justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-subtle)' }}>
+            <span className="row" style={{ gap: 8 }}><span className="mono" style={{ fontWeight: 700 }}>{c.caseRef}</span><Tag tone="info" size="sm">{c.cat}</Tag></span>
+            <span className="pill" style={{ background: doneN === c.items.length ? 'var(--green-10)' : 'var(--surface-card)', color: doneN === c.items.length ? 'var(--green-80)' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{doneN}/{c.items.length} منفَّذة</span>
+          </div>
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>الجهة</th><th>التدبير</th><th>الحالة</th><th>المهلة</th><th>إجراء</th></tr></thead>
+            <tbody>{c.items.map((r) => { const a = AUTH[r.authority] || {}; const m = M13[r.service] || {}; return (<tr key={r.id}>
+              <td><span className="row" style={{ gap: 6 }}><I name={a.icon} size={16} color={a.color} fill /> {a.short}</span></td>
+              <td>{m.ar}{r.result && <div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>{r.result}</div>}</td>
+              <td><StatusPill status={r.status} /></td>
+              <td style={r.overdue ? { color: 'var(--color-error)', fontWeight: 700 } : undefined}>{r.due}</td>
+              <td>{actionCell(r)}</td>
+            </tr>); })}</tbody>
+          </table></div>
+        </div>
+      );
+    }) : Object.keys(byAuth).map((k) => {
+      const a = AUTH[k] || {}; const items = byAuth[k];
+      return (
+        <div key={k} style={{ marginBottom: 16, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <div className="row" style={{ justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-subtle)' }}>
+            <span className="row" style={{ gap: 8 }}><I name={a.icon} size={17} color={a.color} fill /><span style={{ fontWeight: 700 }}>{a.ar}</span></span>
+            <span className="pill" style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{items.length} إحالة</span>
+          </div>
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>الرمز السري</th><th>التدبير</th><th>الحالة</th><th>المهلة</th><th>إجراء</th></tr></thead>
+            <tbody>{items.map((r) => { const m = M13[r.service] || {}; return (<tr key={r.id}>
+              <td className="mono" style={{ fontWeight: 700 }}>{r.caseRef}<div className="muted" style={{ fontSize: 11.5 }}>{r.cat}</div></td>
+              <td>{m.ar}{r.result && <div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>{r.result}</div>}</td>
+              <td><StatusPill status={r.status} /></td>
+              <td style={r.overdue ? { color: 'var(--color-error)', fontWeight: 700 } : undefined}>{r.due}</td>
+              <td>{actionCell(r)}</td>
+            </tr>); })}</tbody>
+          </table></div>
+        </div>
+      );
+    })}
+  </div>);
+}
+
 function LegalDesk() {
   useBus();
   const [persona, setPersona] = useState('staff');
@@ -507,7 +605,8 @@ function Incoming() {
 const NAV = [
   { id: 'dashboard', t: 'لوحة المعلومات', icon: 'dashboard' },
   { id: 'benef', t: 'المشمولون', icon: 'groups' },
-  { id: 'incoming', t: 'الوارِدون للتنفيذ', icon: 'move_to_inbox', badge: (HemayaHandoff ? (HemayaHandoff.pending().length || null) : null) },
+  { id: 'incoming', t: 'الوارِدون للتنفيذ', icon: 'move_to_inbox' },
+  { id: 'exec', t: 'متابعة التنفيذ', icon: 'hub' },
   { id: 'legal', t: 'الاستشارات القانونية', icon: 'balance' },
   { id: 'notifs', t: 'الإشعارات', icon: 'notifications' },
   { id: 'profile', t: 'الملف الشخصي', icon: 'account_circle' },
@@ -525,35 +624,88 @@ function App({ initialData }) {
   const [active, setActive] = useState('dashboard');
   const [sel, setSel] = useState(null);
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
+  const [sos, setSos] = useState(false);
+  useBus();
+  const [, hb] = useState(0);
+  React.useEffect(() => { const h = () => hb((n) => n + 1); window.addEventListener('hemaya-handoff', h); window.addEventListener('storage', h); return () => { window.removeEventListener('hemaya-handoff', h); window.removeEventListener('storage', h); }; }, []);
   const go = (id) => { setActive(id); setSel(null); setOpen(false); };
   const openB = (b) => { setSel(b); window.scrollTo(0, 0); };
-  const cur = NAV.find((n) => n.id === active);
-  let body, title;
-  if (sel) { body = <Detail b={sel} back={() => setSel(null)} />; title = 'تنفيذ ومتابعة المشمول'; }
-  else if (active === 'benef') { body = <Beneficiaries openB={openB} />; title = cur.t; }
-  else if (active === 'incoming') { body = <Incoming />; title = cur.t; }
-  else if (active === 'legal') { body = <LegalDesk />; title = cur.t; }
-  else if (active === 'notifs') { body = <Notifs />; title = cur.t; }
-  else if (active === 'profile') { body = <Profile />; title = cur.t; }
-  else { body = <Dashboard openB={openB} go={go} />; title = cur.t; }
+  const me = (initialData && initialData.me) || { name: 'أخصائي تنفيذ الحماية' };
+  const signout = () => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); };
+  // شارات حيّة من المخازن الفعلية (لا أعداد مُلفّقة)
+  const incomingBadge = HemayaHandoff ? (HemayaHandoff.pending().length || null) : null;
+  const execRows = HemayaBus.list();
+  const execBadge = execRows.filter((r) => (r.status === 'new' && Math.floor((Date.now() - (r.createdAt || Date.now())) / 86400000) >= 2) || r.status === 'done').length || null;
+  const legalBadge = execRows.filter((r) => r.authority === 'legal' && (r.status === 'new' || r.status === 'review')).length || null;
+  const notifsBadge = incomingBadge;
+  const badges = { incoming: incomingBadge, exec: execBadge, legal: legalBadge, notifs: notifsBadge };
+  const urgent = BENEF.filter((b) => b.temp && b.dayLeft <= 7);
+  let body;
+  if (sel) { body = <Detail b={sel} back={() => setSel(null)} />; }
+  else if (active === 'benef') { body = <Beneficiaries openB={openB} />; }
+  else if (active === 'incoming') { body = <Incoming />; }
+  else if (active === 'exec') { body = <ExecutionDesk />; }
+  else if (active === 'legal') { body = <LegalDesk />; }
+  else if (active === 'notifs') { body = <Notifs />; }
+  else if (active === 'profile') { body = <Profile />; }
+  else { body = <Dashboard openB={openB} go={go} />; }
   return (
     <div className="shell">
-      <aside className={'side' + (open ? ' open' : '')}>
-        <div className="brand"><div className="brand-mark"><I name="shield_person" size={22} fill color="#fff" /></div>
-          <div><div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-strong)', lineHeight: 1.2 }}>بوابة موظف المركز</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>التنفيذ والتجديد</div></div></div>
-        <nav className="nav">{NAV.map((n) => (<button key={n.id} className={'nav-item' + (active === n.id && !sel ? ' on' : '')} onClick={() => go(n.id)}><I name={n.icon} size={20} /> <span>{n.t}</span>{n.badge && <span className="nav-badge">{n.badge}</span>}</button>))}</nav>
-        <div className="side-foot">تنفيذ قرارات الشمول ومتابعتها — أيّاً كان مصدرها. التجديد للتدابير العاجلة (م8). مسجّل في التدقيق.</div>
+      <aside className={'side' + (open ? ' open' : '') + (collapsed ? ' collapsed' : '')}>
+        <div className="brand">
+          <div className="brand-mark"><I name="shield_person" size={22} fill color="#fff" /></div>
+          <div className="brand-txt" style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-strong)', lineHeight: 1.2 }}>بوابة موظف المركز</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>التنفيذ والتجديد</div></div>
+          <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'توسيع القائمة' : 'طيّ القائمة'}><I name={collapsed ? 'left_panel_open' : 'left_panel_close'} size={20} /></button>
+        </div>
+        <nav className="nav">{NAV.map((n) => (<button key={n.id} title={collapsed ? n.t : undefined} className={'nav-item' + (active === n.id && !sel ? ' on' : '')} onClick={() => go(n.id)}><I name={n.icon} size={20} /> <span className="nav-lbl">{n.t}</span>{badges[n.id] && <span className="nav-badge">{badges[n.id]}</span>}</button>))}</nav>
+        <div className="side-bottom">
+          <div className="side-user" title={me.name + ' — موظف التنفيذ والتجديد'}>
+            <span className="su-av">{(me.name || '؟').trim().charAt(0)}</span>
+            <span className="nav-lbl" style={{ minWidth: 0 }}>
+              <span className="su-name" style={{ display: 'block' }}>{me.name}</span>
+              <span className="su-badge"><I name="verified_user" size={12} fill /> موثّق عبر نفاذ</span>
+            </span>
+          </div>
+          <button className="logout-btn" onClick={() => setConfirmOut(true)}><I name="logout" size={19} /> <span className="nav-lbl">تسجيل الخروج</span></button>
+        </div>
+        <div className="side-foot">© 2026 النيابة العامة — جميع الحقوق محفوظة.</div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
-        <header className="topbar"><button className="menu-btn" onClick={() => setOpen(true)}><I name="menu" size={22} /></button>
-          <span className="topbar-title">{title}</span>
-          <span className="row" style={{ marginInlineStart: 'auto', gap: 8 }}><Tag tone="error" size="sm" iconLeft={<I name="lock" size={13} />}>سري للغاية</Tag>
-            <button title="تسجيل الخروج" onClick={() => { fetch('/auth/signout', { method: 'POST' }).then(() => { window.location.href = '/'; }).catch(() => { window.location.href = '/'; }); }} style={{ width: 34, height: 34, flexShrink: 0, border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}><I name="logout" size={18} /></button>
+        <header className="topbar">
+          <button className="menu-btn" onClick={() => setOpen(true)}><I name="menu" size={22} /></button>
+          <button className="sos-btn" onClick={() => setSos(true)} title="تدابير عاجلة تستدعي انتباهاً"><I name="e911_emergency" size={17} /> طوارئ{urgent.length > 0 && <span style={{ marginInlineStart: 2 }}>({urgent.length})</span>}</button>
+          <span className="row" style={{ marginInlineStart: 'auto', gap: 10 }}>
+            <button className="qa-btn" title="الإشعارات" onClick={() => go('notifs')}><I name="notifications" size={20} />{notifsBadge > 0 && <span className="qa-badge">{notifsBadge}</span>}</button>
+            {sel && <SecretChip code={sel.secret} />}
           </span>
         </header>
         <main className="content">{body}</main>
       </div>
+      {sos && (
+        <div className="nf-scrim" onClick={() => setSos(false)}>
+          <div className="nf-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ justifyContent: 'center', gap: 8 }}><I name="e911_emergency" size={24} fill color="var(--color-error)" /><b style={{ fontSize: 16, color: 'var(--text-strong)' }}>تدابير عاجلة تستدعي انتباهاً</b></div>
+            {urgent.length ? urgent.map((b) => (
+              <div key={b.secret} className="ro-field" style={{ margin: '14px 0 0' }}><span className="mono" style={{ fontWeight: 700 }}>{b.secret}</span><span className="muted">يتبقّى {b.dayLeft} أيام — يلزم رفع طلب التمديد</span></div>
+            )) : <p className="muted" style={{ margin: '14px 0 0' }}>لا تدابير عاجلة قاربت الانتهاء حالياً.</p>}
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={() => { setSos(false); go('benef'); }}><I name="groups" size={18} /> فتح المشمولون</button>
+            <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setSos(false)}>إغلاق</button>
+          </div>
+        </div>
+      )}
+      {confirmOut && (
+        <div className="nf-scrim" onClick={() => setConfirmOut(false)}>
+          <div className="nf-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ justifyContent: 'center', gap: 8 }}><I name="logout" size={22} color="var(--color-error)" /><b style={{ fontSize: 16, color: 'var(--text-strong)' }}>تسجيل الخروج</b></div>
+            <p className="muted" style={{ margin: '10px 0 18px', lineHeight: 1.6 }}>ستُنهى جلستك الموثّقة، وستحتاج للدخول مجدداً لمتابعة العمل. هل تريد المتابعة؟</p>
+            <button className="btn" style={{ width: '100%', background: 'var(--color-error)', color: '#fff' }} onClick={signout}><I name="logout" size={18} /> تسجيل الخروج</button>
+            <button className="linkbtn" style={{ marginTop: 12 }} onClick={() => setConfirmOut(false)}>إلغاء</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
