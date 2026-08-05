@@ -39,6 +39,7 @@ export const HemayaBus = (function () {
     progress: { ar: 'قيد المعالجة',            tone: 'info' },
     review:   { ar: 'بانتظار اعتماد المدير',   tone: 'warning' },
     done:     { ar: 'مكتملة ومُبلَّغة',         tone: 'success' },
+    closed:   { ar: 'اطّلع المركز وأقفل الملف', tone: 'success' },
   };
 
   function read() { return _store.slice(); }
