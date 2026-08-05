@@ -10,6 +10,7 @@ import { RecommendationForm, UrgentForm } from "./RecommendationForm";
 import { HemayaBranch } from "./branch-roles";
 import { useRecommendations } from "./recommendation-store";
 import { submitRecommendation, recordLinkedRecommendation } from "@/lib/entity-actions";
+import { durationDays, isCustomDuration } from "@hemaya/domain";
 import "./entities.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -408,9 +409,9 @@ function App() {
           extends_others: fd.extends, extends_who: fd.extendsWho, adapt: fd.adapt,
         },
         types: (fd.types || []).filter(Boolean),
-        durationDays: fd.duration === '30 يوماً' ? 30 : null,
+        durationDays: durationDays(fd.duration),
         notes: [fd.reasons || [fd.why1, fd.why2, fd.why3].filter(Boolean).join(' · '),
-                fd.caseSummary, fd.duration ? 'المدة المقترحة: ' + (fd.duration === 'مدة أخرى' ? (fd.durationNote || 'مدة أخرى') : fd.duration) : '']
+                fd.caseSummary, fd.duration ? 'المدة المقترحة: ' + (isCustomDuration(fd.duration) ? (fd.durationNote || fd.duration) : fd.duration) : '']
           .filter(Boolean).join(' — '),
       });
       if (!res.ok) { showToast('تعذّر تسجيل التوصية: ' + res.error); return; }

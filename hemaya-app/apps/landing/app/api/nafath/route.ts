@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getNafath, bridgePassword } from "@hemaya/auth";
 import { createServiceClient, createServerClient } from "@hemaya/supabase";
+import { PAPER_INTAKE_LABEL } from "@hemaya/domain";
 
 // جسر الدخول الموحّد عبر نفاذ (mock) — يُنشئ جلسة Supabase حقيقيّة على localhost
 // (الكوكي مشتركةٌ بين منافذ التطوير) فتقبلها البوّابة الوجهة دون طلب دخولٍ ثانٍ.
@@ -34,7 +35,7 @@ const ORIGIN = {
 type Spec = { role: string; portal: string; label: string; attrs?: Record<string, unknown> };
 const DEMO: Record<string, Spec> = {
   "1000000001": { role: "subject", portal: ORIGIN.seeker, label: "طالب الحماية" },
-  "2000000001": { role: "hotline_operator", portal: ORIGIN.center + "/paper-intake", label: "الاستقبال الورقيّ" },
+  "2000000001": { role: "hotline_operator", portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL },
   "2000000002": { role: "case_officer", portal: ORIGIN.triage, label: "الفرز المبدئي" },
   "2000000003": { role: "studier", portal: ORIGIN.studier, label: "الدراسة — الدارس" },
   "2000000004": { role: "evaluator", portal: ORIGIN.evaluator, label: "التقييم — المقيّم" },
@@ -66,7 +67,7 @@ const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب
 // المخزّن في user_roles بدل زرع دور subject دخيل له. (بلا attrs كي لا تُمسّ سماته الفعلية)
 const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   subject: { portal: ORIGIN.seeker, label: "طالب الحماية" },
-  hotline_operator: { portal: ORIGIN.center + "/paper-intake", label: "الاستقبال الورقيّ" },
+  hotline_operator: { portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL },
   case_officer: { portal: ORIGIN.triage, label: "موظف المركز" },
   studier: { portal: ORIGIN.studier, label: "الدراسة — الدارس" },
   evaluator: { portal: ORIGIN.evaluator, label: "التقييم — المقيّم" },

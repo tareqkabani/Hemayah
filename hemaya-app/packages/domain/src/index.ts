@@ -4,5 +4,7 @@ export * from "./sla";
 export * from "./case-state";
 export * from "./decision-state";
 export * from "./materials";
+export * from "./durations";
+export * from "./regions";
 export * from "./portal-config";
 export * from "./grievance";

@@ -6,6 +6,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, RiskLevel } from "@hemaya/ui";
+import { REGION_LABEL as REGIONS, regionDisp } from "@hemaya/domain";
 import { HemayaBus } from "./referral-bus";
 import { referralUpdate, refetchReferrals } from "../lib/referral-actions";
 import { createClient } from "@hemaya/supabase/src/browser";
@@ -36,9 +37,6 @@ const CFG = {
   finance:   { who: { l: 'قناة الصرف', ph: 'الجهة المالية' }, seg: { l: 'نوع الدعم', opts: ['دعم شهري', 'دفعة واحدة'] }, extra: { l: 'المبلغ المقدّر', ph: 'مثال: 4,000 ر.س شهرياً' }, resL: 'نتيجة الصرف', resP: 'المبلغ المعتمد، المدة، وقناة الصرف…' },
 };
 const CAT = { 'شاهد': 'شاهد', 'مبلّغ': 'مبلّغ', 'خبير': 'خبير', 'ضحية': 'ضحية' };
-// المناطق/الوحدات الإقليمية — يُنفَّذ التدبير في منطقة المشمول عبر مكتب عمل إقليمي؛ المدير يشرف على كل المناطق
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'المنطقة الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
-const regionDisp = (code) => { const n = REGIONS[code] || code; return (n.charAt(0) === 'ا' && n.charAt(1) === 'ل') ? n : 'منطقة ' + n; };
 
 // ===== الحالة (من منظور الجهة) =====
 const ST = {

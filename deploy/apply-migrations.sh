@@ -50,6 +50,9 @@ MIGRATIONS=(
   #   (الدوال التي تستعملها) — القيمة الجديدة لا تُستعمل في معاملة إضافتها نفسها.
   "20260730000001_referral_status_closed.sql"        # قيمة التعداد 'closed'
   "20260730000002_referral_center_wiring.sql"        # referral_create/close + قراءة المركز + تحصين referral_update
+  #   دفعة 2026-08-05
+  "20260805000001_paper_intake_receipt_link.sql"     # قيد الورود + خطوة الربط الإلزامية (كانت ناقصةً هنا منذ PR #49)
+  "20260805000002_notifications_type_check.sql"      # قيد CHECK يحصر notifications.type بالقيم المستعملة فعلاً
 )
 
 echo "─────────────────────────────────────────────"

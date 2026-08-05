@@ -3,17 +3,12 @@
    بتّ القبول يُنشئ حمايةً مؤقّتة ويجعل القضيّة active (تتدفّق للتنفيذ) ويُشعِر طالبَ الحماية. لا تلفيق. */
 import React, { useState } from "react";
 import { Card, InlineAlert, SecretCode } from "@hemaya/ui";
+import { PROTECTION_TYPES_14 as PROTECTION_TYPES } from "@hemaya/domain";
 import { useUrgent, approveUrgent } from "./urgent-store";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) =>
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
 
-const PROTECTION_TYPES = [
-  'الحماية الأمنية', 'إخفاء البيانات الشخصية', 'النقل من العمل (مؤقّت/دائم)', 'إيجاد عمل بديل',
-  'الإرشاد القانوني/النفسي/الاجتماعي', 'توفير وسائل الإبلاغ الفوري', 'تغيير أرقام الاتصال',
-  'تغيير محل الإقامة', 'المرافقة الأمنية', 'الإدلاء بوسائط إلكترونية (تغيير الصوت وإخفاء الوجه)',
-  'حماية المسكن', 'المساعدة المالية', 'أخرى (ما تراه الإدارة مناسباً)',
-];
 
 const catTone = { 'شاهد': ['var(--info-10)', 'var(--color-info)'], 'مبلّغ': ['var(--green-10)', 'var(--green-80)'], 'ضحية': ['var(--warning-10)', 'var(--warning-70)'], 'خبير': ['var(--surface-subtle)', 'var(--text-body)'] };
 const fmtElapsed = (m) => m < 60 ? `${m} دقيقة` : `${Math.floor(m / 60)} س ${m % 60} د`;
