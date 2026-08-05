@@ -9,6 +9,7 @@ import { Constants } from "@hemaya/supabase";
 import { CASE_STATUS, CATEGORY, RISK_LEVEL, CASE_SOURCE } from "./enums";
 import { ROLE_LABEL, PORTALS } from "./roles";
 import { REFERRAL_AUTHORITY_LABEL, REFERRAL_SERVICES } from "./materials";
+import { REGIONS, regionDisp } from "./regions";
 import { CASE_TRANSITIONS } from "./case-state";
 
 const ENUMS = Constants.public.Enums;
@@ -22,6 +23,7 @@ const COVERAGE: Array<[string, Record<string, string>, readonly string[]]> = [
   ["RISK_LEVEL ↔ risk_level", RISK_LEVEL, ENUMS.risk_level],
   ["CASE_SOURCE ↔ case_source", CASE_SOURCE, ENUMS.case_source],
   ["REFERRAL_AUTHORITY_LABEL ↔ referral_authority", REFERRAL_AUTHORITY_LABEL, ENUMS.referral_authority],
+  ["REGIONS ↔ region_code", REGIONS, ENUMS.region_code],
 ];
 
 describe("تغطية التسميات العربية لقيم القاعدة", () => {
@@ -52,5 +54,12 @@ describe("اتساق المراجع المشتقّة", () => {
   it("خدمات الإحالة تُسنَد لجهات معرّفة", () => {
     const authorities = new Set<string>(ENUMS.referral_authority);
     for (const svc of REFERRAL_SERVICES) expect(authorities).toContain(svc.authority);
+  });
+
+  it("regionDisp: سابقة «منطقة» إلا للمعرَّف بـ«ال»، والرمز المجهول يمرّ بالسابقة نفسها", () => {
+    expect(regionDisp("NAJ")).toBe("منطقة نجران");
+    expect(regionDisp("EAS")).toBe("المنطقة الشرقية");
+    expect(regionDisp("RUH")).toBe("الرياض");
+    expect(regionDisp("XXX")).toBe("منطقة XXX");
   });
 });

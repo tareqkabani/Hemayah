@@ -8,7 +8,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW } from "@hemaya/domain";
+import { PORTAL_CONFIGS, STAGE_FLOW, REGIONS, regionDisp } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import { fetchRegister } from "@/lib/register";
@@ -47,9 +47,7 @@ const SRC = {
   'جهة':  { c: 'var(--gold-70)', icon: 'account_balance', t: 'مرفوع من جهة مختصة' },
 };
 // ===== المناطق والفروع — توجيه المركز لفرع المنطقة بالاختصاص المكاني للقضية =====
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'المنطقة الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
 const CITY_REGION = { 'الرياض': 'RUH', 'جدة': 'MAK', 'مكة المكرمة': 'MAK', 'المدينة المنورة': 'MED', 'المدينة': 'MED', 'بريدة': 'QAS', 'الدمام': 'EAS', 'الخبر': 'EAS', 'أبها': 'ASR', 'تبوك': 'TAB', 'حائل': 'HAI', 'عرعر': 'NOR', 'جازان': 'JAZ', 'نجران': 'NAJ', 'الباحة': 'BAH', 'سكاكا': 'JOF' };
-const regionDisp = (code) => { const n = REGIONS[code] || ''; return (n.charAt(0) === 'ا' && n.charAt(1) === 'ل') ? n : 'منطقة ' + n; };
 const ENT_BR_PREFIX = { 'النيابة العامة': 'نيابة', 'رئاسة أمن الدولة': 'فرع', 'وزارة الداخلية': 'فرع', 'هيئة الرقابة ومكافحة الفساد': 'فرع', 'وزارة العدل': 'فرع' };
 const branchLabelT = (entity, code) => (ENT_BR_PREFIX[entity] || 'فرع') + ' ' + regionDisp(code);
 const SEED = []; // القضايا الحقيقيّة فقط من Supabase (initialRows) — لا حالات مُلفّقة

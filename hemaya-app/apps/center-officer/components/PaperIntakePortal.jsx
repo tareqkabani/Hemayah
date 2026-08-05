@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween } from "@hemaya/domain";
+import { businessDaysBetween, REGIONS } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,
@@ -58,7 +58,6 @@ const ENTITIES = {
   state_security: { name: 'رئاسة أمن الدولة',            drafter: 'الضابط المختص',  approver: 'مدير الإدارة المختصة' },
   nazaha:         { name: 'هيئة الرقابة ومكافحة الفساد', drafter: 'المحقق المختص',  approver: 'مدير الإدارة المختصة' },
 };
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
 const WAQIA = ['الاعتداء على الأشخاص', 'الآداب العامة', 'الأموال', 'المخدرات', 'الجرائم الاقتصادية', 'الماسة بالثقة العامة', 'الأسرة والأحداث', 'الاتجار بالأشخاص', 'الجرائم المعلوماتية', 'الأمن الوطني'];
 // أنواع الحماية الـ(13) المنصوص عليها في المادة الرابعة عشرة
 const PROTECTION_TYPES = [

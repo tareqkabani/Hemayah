@@ -5,13 +5,12 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Tag } from "@hemaya/ui";
+import { REGIONS, regionDisp } from "@hemaya/domain";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => (
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>
 );
 
-const REGIONS = { RUH: 'الرياض', MAK: 'مكة المكرمة', MED: 'المدينة المنورة', QAS: 'القصيم', EAS: 'المنطقة الشرقية', ASR: 'عسير', TAB: 'تبوك', HAI: 'حائل', NOR: 'الحدود الشمالية', JAZ: 'جازان', NAJ: 'نجران', BAH: 'الباحة', JOF: 'الجوف' };
-const regionDisp = (code) => { const n = REGIONS[code] || code; return (n.charAt(0) === 'ا' && n.charAt(1) === 'ل') ? n : 'منطقة ' + n; };
 const branchLabel = (ent, code) => (ent === 'prosecution' ? 'نيابة ' : 'فرع ') + regionDisp(code);
 const ENT_BRANCHES = { prosecution: ['RUH', 'MAK', 'EAS', 'QAS'], state_security: ['RUH', 'EAS'], moi: ['RUH', 'MAK'], nazaha: ['RUH', 'EAS'], moj: ['RUH', 'MED'] };
 
