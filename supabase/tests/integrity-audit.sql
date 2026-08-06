@@ -57,6 +57,19 @@ from (
                                 and a.attnum = any(con.conkey)))
   union all select 'توصيات بلا فرع (تُحجب بـRLS عن جهتها)',
          (select count(*) from recommendations where branch_id is null)
+  union all select 'جهات مركزية بغير وحدةٍ واحدة is_hq (درِفت النموذج التنظيمي)',
+         (select count(*)
+            from (values ('state_security'),('moi'),('nazaha'),('moj')) e(code)
+           where (select count(*) from branches b
+                   where b.entity = e.code::competent_entity and coalesce(b.active, true)) <> 1
+              or not exists (select 1 from branches b
+                              where b.entity = e.code::competent_entity
+                                and b.is_hq and coalesce(b.active, true)))
+  union all select 'حسابات جهة (clerk/head) بلا branch_id — لا يرون شيئاً',
+         (select count(*) from user_roles
+           where role = 'competent_body'
+             and attributes->>'level' in ('clerk','head')
+             and coalesce(attributes->>'branch_id','') = '')
 ) q order by n desc, label;
 
 \echo ''

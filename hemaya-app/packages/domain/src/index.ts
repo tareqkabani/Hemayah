@@ -6,5 +6,6 @@ export * from "./decision-state";
 export * from "./materials";
 export * from "./durations";
 export * from "./regions";
+export * from "./entities";
 export * from "./portal-config";
 export * from "./grievance";
