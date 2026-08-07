@@ -220,7 +220,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
     return (
       <div>
         <InlineAlert kind="warning" title="لديك طلب قائم" style={{ marginBottom: 16 }}>
-          لا يمكن تقديم طلب جديد ما دام لديك طلب قيد المعالجة (منعاً للتكرار). تابِع طلبك القائم، أو تواصل مع المركز عبر المراسلات.
+          لا يمكن تقديم طلب جديد ما دام لديك طلب قيد المعالجة. تابِع طلبك القائم، أو تواصل مع المركز عبر المراسلات.
         </InlineAlert>
         <Card padding="lg">
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -240,7 +240,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
     setError("");
     startSubmit(async () => {
       const r = await submitRequest({
-        role: f.role, category: f.category, entity: f.entity,
+        role: f.role, category: f.category, entity: f.priorSubmit === "yes" ? f.entity : "",
         crime: f.crime, reason: f.reason, priorSubmit: f.priorSubmit, caseNo: f.caseNo,
         details: { onBehalf: { id: f.repId, name: f.repName, age: f.repAge }, files: f.files },
       });
@@ -251,7 +251,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
   const onBehalf = f.role && f.role !== "أصيل (المشمول)";
   const isMinor = onBehalf && f.repAge !== "" && Number(f.repAge) < 18;
   const repValid = !onBehalf || (f.repId.trim() && f.repName.trim() && f.repAge.trim());
-  const valid = f.role && f.category && f.entity && f.crime.trim() && f.priorSubmit && f.reason.trim() && f.ackTrue && f.ackTerms && repValid;
+  const valid = f.role && f.category && (f.priorSubmit !== "yes" || f.entity) && f.crime.trim() && f.priorSubmit && f.reason.trim() && f.ackTrue && f.ackTerms && repValid;
 
   if (submitted) {
     return (
@@ -292,7 +292,8 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
           </div>
           <div className="fld">
             <span className="fld-label">هل سبق التقديم إلى الجهة المختصة؟ <span className="req">*</span></span>
-            <select value={f.priorSubmit} onChange={set("priorSubmit")}><option value="">الرجاء اختيار عنصر</option><option value="yes">نعم</option><option value="no">لا</option></select>
+            {/* تبديل الإجابة عن «نعم» يمسح الجهة من الحالة — لا تُرسل قيمة يتيمة */}
+            <select value={f.priorSubmit} onChange={(e) => { const v = e.target.value; setF((s: any) => ({ ...s, priorSubmit: v, ...(v !== "yes" ? { entity: "" } : {}) })); }}><option value="">الرجاء اختيار عنصر</option><option value="yes">نعم</option><option value="no">لا</option></select>
           </div>
           {onBehalf &&
             <div className="fld full">
@@ -305,10 +306,11 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
                 </div>
               </div>
             </div>}
-          <div className="fld">
-            <span className="fld-label">اسم الجهة المختصة <span className="req">*</span></span>
-            <select value={f.entity} onChange={set("entity")}><option value="">الرجاء اختيار الجهة</option>{["النيابة العامة", "رئاسة أمن الدولة", "وزارة الداخلية", "هيئة الرقابة ومكافحة الفساد", "وزارة العدل"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
-          </div>
+          {f.priorSubmit === "yes" &&
+            <div className="fld">
+              <span className="fld-label">اسم الجهة المختصة <span className="req">*</span></span>
+              <select value={f.entity} onChange={set("entity")}><option value="">الرجاء اختيار الجهة</option>{["النيابة العامة", "رئاسة أمن الدولة", "وزارة الداخلية", "هيئة الرقابة ومكافحة الفساد", "وزارة العدل"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+            </div>}
           <div className="fld full">
             <span className="fld-label">نوع الجريمة محل الحماية <span className="req">*</span></span>
             <textarea value={f.crime} onChange={set("crime")} placeholder="وصف موجز لطبيعة الجريمة المشمولة بالنظام…" dir="auto" />
@@ -360,7 +362,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
           <button className="btn btn-ghost"><Ic name="save" size={18} /> حفظ كمسودة</button>
           <span style={{ flex: 1 }} />
           <button className="btn btn-primary" disabled={!valid || pending} onClick={doSubmit}>
-            {pending ? "جارٍ التقديم…" : <>تقديم الطلب <Ic name="arrow_back" size={18} /></>}
+            {pending ? "جارٍ التقديم…" : <>تقديم الطلب <Ic name="check" size={18} /></>}
           </button>
         </div>
       </Card>
