@@ -248,7 +248,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
       setCode(r.secretCode); setRef(r.refNo); setSubmitted(true);
     });
   };
-  const onBehalf = f.role && f.role !== "أصيل (المشمول)";
+  const onBehalf = f.role && !f.role.startsWith("أصيل");
   const isMinor = onBehalf && f.repAge !== "" && Number(f.repAge) < 18;
   const repValid = !onBehalf || (f.repId.trim() && f.repName.trim() && f.repAge.trim());
   const valid = f.role && f.category && (f.priorSubmit !== "yes" || f.entity) && f.crime.trim() && f.priorSubmit && f.reason.trim() && f.ackTrue && f.ackTerms && repValid;
@@ -283,7 +283,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
         <div className="grid2">
           <div className="fld">
             <span className="fld-label">صفة مقدم الطلب <span className="req">*</span></span>
-            <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{["أصيل (المشمول)", "وليّ", "وصيّ", "وكيل", "محامٍ"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+            <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{["أصيل (عن شخصه)", "وليّ", "وصيّ", "وكيل", "محامٍ"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
             {onBehalf && <span className="hint">تقدّم نيابةً عن المشمول — أدخل بياناته الأساسية أدناه.</span>}
           </div>
           <div className="fld">
