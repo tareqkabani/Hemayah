@@ -412,7 +412,7 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
             {R("إخفاء البيانات (م2 من النظام)", rd.hide_identity || "—")}
             {R("وجود خطر يهدّد طالب الحماية", rd.threat_exists || (rd.threat_type ? "يوجد" : "—"), rd.threat_exists === "يوجد" || rd.threat_type ? "error" : undefined)}
             {rd.threat_type && R("نوع الخطر", rd.threat_type)}
-            {R("مستوى الخطر", dd.threat === "مرتفع" ? "شديد" : dd.threat || "—", dd.threat ? "error" : undefined)}
+            {R("مستوى الخطر", dd.threat || "—", dd.threat ? "error" : undefined)}
             {rd.harm_type && R("نوع الضرر", rd.harm_type)}
             {R("امتداد الخطر إلى الغير (م5/4)", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "نعم" : "لا", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "error" : undefined)}
             {rd.extends_who && rd.extends_who !== "لا يمتدّ" && R("إلى من يمتدّ", rd.extends_who)}
