@@ -34,6 +34,10 @@ export function isOpenRequest(r: Pick<SeekerRequest, "status">): boolean {
 
 export const RequestsContext = createContext<SeekerRequest[]>([]);
 
+/** قوائم المحتوى المرجعية (من reference_items عبر الخادم) — مفتاح القائمة → بنودها. */
+export type RefListItem = { key: string; label: string; short: string | null; meta: Record<string, unknown> };
+export const ListsContext = createContext<Record<string, RefListItem[]>>({});
+
 /** إخفاء جزئي لرقم الهوية: `1••••••482` — يظهر أول خانة وآخر ثلاث. */
 export function maskId(id: string | null | undefined): string {
   if (!id || id.length < 5) return id || "—";
