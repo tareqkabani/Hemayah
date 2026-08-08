@@ -1986,6 +1986,51 @@ export type Database = {
         Returns: undefined
       }
       _scope_ar: { Args: { _scope: string }; Returns: string }
+      admin_get_settings: {
+        Args: never
+        Returns: {
+          key: string
+          value: string
+        }[]
+      }
+      admin_grant_role: {
+        Args: {
+          _attrs?: Json
+          _role: Database["public"]["Enums"]["app_role"]
+          _user: string
+        }
+        Returns: undefined
+      }
+      admin_list_staff: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          last_sign_in_at: string
+          name: string
+          roles: Json
+          user_id: string
+        }[]
+      }
+      admin_revoke_role: {
+        Args: { _role: Database["public"]["Enums"]["app_role"]; _user: string }
+        Returns: undefined
+      }
+      admin_set_setting: {
+        Args: { _key: string; _value: string }
+        Returns: undefined
+      }
+      admin_system_health: { Args: never; Returns: Json }
+      admin_tech_audit: {
+        Args: { _limit?: number }
+        Returns: {
+          action: string
+          actor_id: string
+          created_at: string
+          id: number
+          target: string
+        }[]
+      }
       advisor_decide_grievance: {
         Args: {
           _decision: string
@@ -2031,6 +2076,14 @@ export type Database = {
       claim_paper_cases: {
         Args: { _nid: string; _user_id: string }
         Returns: number
+      }
+      content_change_decide: {
+        Args: { _approve: boolean; _id: string; _note?: string }
+        Returns: {
+          status: string
+          target_key: string
+          target_kind: string
+        }[]
       }
       council_approve: {
         Args: { _case_id: string }
@@ -2210,6 +2263,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      notify_from_template: {
+        Args: {
+          _authority?: Database["public"]["Enums"]["referral_authority"]
+          _case_id?: string
+          _crit?: boolean
+          _recipient_id?: string
+          _target_tab?: string
+          _template_key: string
+          _type?: string
+          _vars: Json
+        }
+        Returns: boolean
+      }
       office_adopt_grievance: {
         Args: {
           _grievance_id: string
@@ -2254,6 +2320,7 @@ export type Database = {
         Args: { _case_id: string; _escalation: Json }
         Returns: string
       }
+      recommendations_watchdog: { Args: never; Returns: undefined }
       record_attachment_open: {
         Args: { _case_id: string; _doc: string }
         Returns: undefined
@@ -2388,6 +2455,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      render_template_text: {
+        Args: { _text: string; _vars: Json }
+        Returns: string
       }
       seeker_case_view: { Args: { _ref: string }; Returns: Json }
       seeker_sign_agreement: {
