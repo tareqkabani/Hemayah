@@ -10,6 +10,7 @@
 import React, { useState, useContext, useTransition, useEffect } from "react";
 import { Card, Tag, InlineAlert } from "@hemaya/ui";
 import { SecretCode } from "@hemaya/ui";
+import { STAGE_DONE } from "@hemaya/domain";
 import { IdentityContext, RequestsContext, maskId, isOpenRequest } from "./identity-context";
 import { submitRequest } from "../lib/seeker-actions";
 
@@ -33,12 +34,9 @@ export const STAGES = [
   { t: "قرار إدارة البرنامج", d: "يصدر بالأغلبية ويُشعَر خلال 3 أيام." },
   { t: "تفعيل الحماية", d: "عند صدور قرار المركز بالشمول: توقيع وثيقة الحماية ودخول دورة الحياة." },
 ];
-/* عدد المراحل المُنجزة لكل حالة قاعديّة (المرحلة الجارية = القيمة نفسها كفهرس) */
-export const STAGE_INDEX: Record<string, number> = {
-  submitted: 1, triage: 1, referred: 2, under_study: 3, classified: 3,
-  in_decision: 4, accepted: 5, rejected: 4, signed: 6, active: 6,
-  under_review: 6, terminating: 6, closed: 6,
-};
+/* عدد المراحل المُنجزة لكل حالة قاعديّة — المصدر الواحد STAGE_DONE في الدومين
+   (كانت هنا نسخة متعارضة مع نظيرتها في real-detail). */
+export const STAGE_INDEX: Record<string, number> = STAGE_DONE;
 /* الإجراء المطلوب من المستفيد بحسب حالة الطلب الحقيقية */
 export function realNextAction(r: { status: string }): string | null {
   if (r.status === "accepted") return "مراجعة وتوقيع اتفاقية الحماية";

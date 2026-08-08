@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@hemaya/supabase/src/browser";
+import { DURATIONS, durationDays } from "@hemaya/domain";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, RiskLevel } from "@hemaya/ui";
 import { HemayaDecision } from "./decision-store";
 import { DScreens } from "./decision-screens";
@@ -105,10 +106,18 @@ const App = (function () {
     const d = dOf(q.secret);
     const canEdit = d.status === "preparing";
     const [types, setTypes] = useState(d.types && d.types.length ? d.types : []);
-    const [duration, setDuration] = useState(d.duration || "30 يوماً");
+    // المدة بالصياغة الموحّدة؛ المخزَّن القديم («30 يوماً» أو نصّ حرّ) يُطبَّع أو يُعامل مدةً محدّدة
+    const storedDuration = d.duration
+      ? (DURATIONS.includes(d.duration) ? d.duration : (durationDays(d.duration) === 30 ? DURATIONS[0] : "مدة محدّدة"))
+      : DURATIONS[0];
+    const [duration, setDuration] = useState(storedDuration);
+    const [durationNote, setDurationNote] = useState(
+      d.duration && !DURATIONS.includes(d.duration) && durationDays(d.duration) !== 30 ? d.duration.replace(/^مدة محدّدة — /, "") : ""
+    );
+    const finalDuration = duration === "مدة محدّدة" && durationNote.trim() ? "مدة محدّدة — " + durationNote.trim() : duration;
     const [reasoning, setReasoning] = useState(d.reasoning || HD.REASON_SKELETON);
     const toggleType = (t) => setTypes((x) => x.includes(t) ? x.filter((y) => y !== t) : [...x, t]);
-    const ready = types.length > 0 && duration && reasoning.trim();
+    const ready = types.length > 0 && duration && (duration !== "مدة محدّدة" || durationNote.trim()) && reasoning.trim();
     const lastReject = (d.rejections || []).slice(-1)[0];
     return (<div>
       <button className="link" onClick={back} style={{ marginBottom: 12 }}><I name="arrow_forward" size={16} /> رجوع لقائمة الإعداد</button>
@@ -121,12 +130,13 @@ const App = (function () {
         <div className="fld"><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
           <div className="chips">{PROTECTION_TYPES.map((t) => <button key={t} className={"chip" + (types.includes(t) ? " on" : "")} onClick={() => toggleType(t)}>{t}</button>)}</div></div>
         <div className="fld"><span className="fld-label">مدّة الحماية</span>
-          <div className="chips">{["30 يوماً", "90 يوماً", "إلى حين انتهاء القضية"].map((o) => <button key={o} className={"chip" + (duration === o ? " on" : "")} onClick={() => setDuration(o)}>{o}</button>)}</div></div>
+          <div className="chips">{DURATIONS.map((o) => <button key={o} className={"chip" + (duration === o ? " on" : "")} onClick={() => setDuration(o)}>{o}</button>)}</div>
+          {duration === "مدة محدّدة" && <input value={durationNote} onChange={(e) => setDurationNote(e.target.value)} placeholder="حدّد المدة…" dir="auto" style={{ marginTop: 8, maxWidth: 320 }} />}</div>
         <div className="fld"><span className="fld-label">حيثيات القرار <span style={{ color: "var(--color-error)" }}>· إلزامي</span></span>
           <textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} dir="auto" style={{ minHeight: 120 }} /></div>
         <div className="row" style={{ justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, { types, duration, reasoning }); }}><I name="save" size={17} /> حفظ المسوّدة</button>
-          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, { types, duration, reasoning }); back(); }}><I name="send" size={17} /> رفع لنائب الرئيس للاعتماد</button>
+          <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, { types, duration: finalDuration, reasoning }); }}><I name="save" size={17} /> حفظ المسوّدة</button>
+          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, { types, duration: finalDuration, reasoning }); back(); }}><I name="send" size={17} /> رفع لنائب الرئيس للاعتماد</button>
         </div>
       </Card> : <React.Fragment>
         <DecisionView decision={d} foreign={q.foreign} />

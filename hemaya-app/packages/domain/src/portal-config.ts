@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { AppRole } from "@hemaya/supabase";
+import type { CaseStatus } from "./enums";
 import { grievanceNextAction } from "./grievance";
 
 /**
@@ -23,6 +24,27 @@ export const STAGE_FLOW = [
   "قرار المركز",
   "تفعيل الحماية",
 ] as const;
+
+/**
+ * عدد المراحل المُنجزة من الست لكل حالة قاعديّة — المصدر الواحد لمؤشّر
+ * التقدّم في بوابة طالب الحماية (كان بنسختين متعارضتين في الشاشات).
+ * closed تقديرٌ وسطيّ: الإقفال قد يقع في أي مرحلة والحالة توضحه بوسمها.
+ */
+export const STAGE_DONE: Record<CaseStatus, number> = {
+  submitted: 1,
+  triage: 1,
+  referred: 2,
+  under_study: 3,
+  classified: 4,
+  in_decision: 4,
+  accepted: 5,
+  rejected: 5,
+  signed: 6,
+  active: 6,
+  under_review: 6,
+  terminating: 6,
+  closed: 5,
+};
 
 export type PortalScreenId =
   | "dashboard"

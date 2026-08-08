@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween, PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL } from "@hemaya/domain";
+import { businessDaysBetween, PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL, RISK_LEVEL } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,
@@ -234,7 +234,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
         </div>
         {f.threatExists === 'يوجد' && (
           <Field label="مستوى الخطر" req>
-            <Choice value={f.riskLevel} set={(v) => set('riskLevel', v)} options={['شديد', 'متوسط', 'منخفض']} danger={['شديد']} />
+            <Choice value={f.riskLevel} set={(v) => set('riskLevel', v)} options={[...Object.values(RISK_LEVEL)].reverse()} danger={[RISK_LEVEL.critical, RISK_LEVEL.high]} />
           </Field>
         )}
         <div className="rf-grid2">

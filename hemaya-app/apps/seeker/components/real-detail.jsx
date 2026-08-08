@@ -5,6 +5,7 @@
    ============================================================ */
 import React, { useEffect, useState, useRef } from 'react';
 import { Card, Tag, InlineAlert, SecretCode } from '@hemaya/ui';
+import { STAGE_DONE } from '@hemaya/domain';
 import { createClient } from '@hemaya/supabase/src/browser';
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => (
@@ -20,12 +21,8 @@ const STAGES = [
   { t: 'قرار إدارة البرنامج', d: 'يصدر بالأغلبية ويُشعَر خلال 3 أيام.' },
   { t: 'تفعيل الحماية', d: 'توقيع وثيقة الحماية والدخول في دورة المتابعة.' },
 ];
-// عدد المراحل المكتملة حسب الحالة الحقيقيّة
-const DONE = {
-  submitted: 1, triage: 1, referred: 2, under_study: 3, classified: 4,
-  in_decision: 4, accepted: 5, rejected: 5, signed: 6, active: 6,
-  under_review: 6, terminating: 6, closed: 5,
-};
+// عدد المراحل المكتملة حسب الحالة الحقيقيّة — المصدر الواحد في الدومين
+const DONE = STAGE_DONE;
 
 const OBLIGATIONS = [
   'الالتزام بإجراءات أنواع الحماية المقرّرة وتعليمات الإدارة الأمنية.',

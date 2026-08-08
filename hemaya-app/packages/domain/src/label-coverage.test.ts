@@ -12,6 +12,7 @@ import { REFERRAL_AUTHORITY_LABEL, REFERRAL_SERVICES } from "./materials";
 import { REGION_LABEL } from "./regions";
 import { COMPETENT_ENTITIES } from "./entities";
 import { CASE_TRANSITIONS } from "./case-state";
+import { STAGE_DONE, STAGE_FLOW } from "./portal-config";
 
 const ENUMS = Constants.public.Enums;
 const sorted = (xs: readonly string[]) => [...xs].sort();
@@ -63,6 +64,14 @@ describe("اتساق المراجع المشتقّة", () => {
       expect(spec.label.trim()).not.toBe("");
       expect(["central", "regional"]).toContain(spec.orgModel);
       if (spec.orgModel === "regional") expect(spec.unitPrefix?.trim()).toBeTruthy();
+    }
+  });
+
+  it("مؤشّر المراحل المُنجزة يغطي كل الحالات وقيمه ضمن المراحل الست", () => {
+    expect(sorted(Object.keys(STAGE_DONE))).toEqual(sorted(ENUMS.case_status));
+    for (const n of Object.values(STAGE_DONE)) {
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(STAGE_FLOW.length);
     }
   });
 });

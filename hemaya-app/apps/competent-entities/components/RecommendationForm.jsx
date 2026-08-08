@@ -5,7 +5,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, DURATIONS, isCustomDuration } from "@hemaya/domain";
+import { PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, DURATIONS, isCustomDuration, RISK_LEVEL } from "@hemaya/domain";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) =>
   <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -205,7 +205,7 @@ export function RecommendationForm({ rec, onApprove, onBack }) {
         </div>
         {f.threatExists === 'يوجد' && (
           <Field label="مستوى الخطر" req>
-            <Choice value={f.riskLevel} set={(v) => set('riskLevel', v)} options={['شديد', 'متوسط', 'منخفض']} danger={['شديد']} />
+            <Choice value={f.riskLevel} set={(v) => set('riskLevel', v)} options={[...Object.values(RISK_LEVEL)].reverse()} danger={[RISK_LEVEL.critical, RISK_LEVEL.high]} />
           </Field>
         )}
         <div className="rf-grid2">
