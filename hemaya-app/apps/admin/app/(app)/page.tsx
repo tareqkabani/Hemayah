@@ -17,6 +17,7 @@ export default async function Page() {
       settings={data.settings}
       techAudit={data.techAudit}
       health={data.health}
+      staff={data.staff}
     />
   );
 }

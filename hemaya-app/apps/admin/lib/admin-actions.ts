@@ -141,6 +141,24 @@ export async function setTemplateActive(templateKey: string, active: boolean): P
   return done();
 }
 
+/** منح دور منسوب — لا subject ولا الحساب الذاتي (تفرضه القاعدة). */
+export async function grantRole(userId: string, role: string, attrs?: Record<string, unknown>): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("admin_grant_role", { _user: userId, _role: role, _attrs: attrs ?? null });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** سحب دور منسوب. */
+export async function revokeRole(userId: string, role: string): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("admin_revoke_role", { _user: userId, _role: role });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 /** ضبط مفتاح تشغيل (الإعدادات وأعلام الميزات) — عبر RPC محروسة ومؤثَّرة. */
 export async function setSetting(key: string, value: string): Promise<R> {
   const sb = createServerClient();

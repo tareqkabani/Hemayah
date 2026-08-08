@@ -8,9 +8,11 @@
    ============================================================ */
 import React, { useMemo, useState } from "react";
 import { Card, Tag, InlineAlert, PortalShell } from "@hemaya/ui";
+import { ROLE_LABEL, PORTALS } from "@hemaya/domain";
 import {
   updateItemLabel, saveItemOrder, setItemActive, addItem,
   submitChangeRequest, saveTemplate, setTemplateActive, saveSystemMessage, setSetting,
+  grantRole, revokeRole,
 } from "@/lib/admin-actions";
 import "./admin.css";
 
@@ -53,7 +55,7 @@ const TONE = {
 const vars = (s) => (s.match(/\{[^}]+\}/g) || []).filter((v, i, a) => a.indexOf(v) === i);
 const hit = (q, ...f) => !q.trim() || f.join(" ").toLowerCase().includes(q.trim().toLowerCase());
 
-export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health }) {
+export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health, staff }) {
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
@@ -85,12 +87,14 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
         <ContentScreen lists={lists} itemsByList={itemsByList} templates={templates}
           sysMessages={sysMessages} legalTexts={legalTexts} say={say} noPii={sysMsgOf("s_sysadmin")} />
       )}
+      {active === "users" && <UsersScreen staff={staff} me={me} say={say} />}
+      {active === "roles" && <RolesScreen staff={staff} />}
       {active === "settings" && <SettingsScreen settings={settings} say={say} />}
       {active === "flags" && <FlagsScreen settings={settings} say={say} />}
       {active === "audit" && <AuditScreen rows={techAudit} />}
       {active === "health" && <HealthScreen health={health} />}
       {active === "profile" && <Profile me={me} />}
-      {!["overview", "content", "settings", "flags", "audit", "health", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
+      {!["overview", "content", "users", "roles", "settings", "flags", "audit", "health", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
     </PortalShell>
   );
 }
@@ -529,6 +533,109 @@ function TextDetail({ m, kind, back, say }) {
         <button className="btn btn-primary" disabled={!dirty} onClick={save}>
           <I name={kind === "legals" ? "send" : "save"} size={18} /> {kind === "legals" ? "رفع النصّ للاعتماد" : "حفظ النصّ"}</button>
         <button className="btn btn-ghost" disabled={!dirty} onClick={() => { setText(m.body); setTone(m.tone); }}>تراجع</button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ المستخدمون والأدوار ═══════════ */
+const GRANTABLE_ROLES = Object.keys(ROLE_LABEL).filter((r) => r !== "subject");
+
+function UsersScreen({ staff, me, say }) {
+  const [rows, setRows] = useState(staff);
+  const [q, setQ] = useState("");
+  const [granting, setGranting] = useState(null); // {userId, role}
+  const list = rows.filter((u) => hit(q, u.name, u.email, (u.roles || []).map((r) => ROLE_LABEL[r.role] || r.role).join(" ")));
+
+  const doGrant = async () => {
+    const { userId, role } = granting;
+    if (!role) return;
+    const r = await grantRole(userId, role);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => xs.map((u) => u.user_id === userId
+      ? { ...u, roles: (u.roles || []).some((x) => x.role === role) ? u.roles : [...(u.roles || []), { role, attributes: {} }] } : u));
+    setGranting(null);
+    say("مُنح الدور «" + (ROLE_LABEL[role] || role) + "» — مُسجَّل في التدقيق");
+  };
+  const doRevoke = async (userId, role) => {
+    const r = await revokeRole(userId, role);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => xs.map((u) => u.user_id === userId ? { ...u, roles: (u.roles || []).filter((x) => x.role !== role) } : u));
+    say("سُحب الدور «" + (ROLE_LABEL[role] || role) + "» — مُسجَّل في التدقيق");
+  };
+
+  return (
+    <div>
+      <h2 className="h2">المستخدمون</h2>
+      <p className="lede">حسابات المنسوبين وأدوارهم. طالبو الحماية لا يظهرون هنا إطلاقاً (sysadmin_no_pii)، وأدوار حسابك أنت يديرها مدير نظامٍ آخر.</p>
+      <span className="ad-search" style={{ marginBottom: 14, display: "inline-flex" }}><I name="search" size={18} color="var(--text-secondary)" />
+        <input placeholder="بحث بالاسم أو البريد أو الدور…" value={q} onChange={(e) => setQ(e.target.value)} /></span>
+      <div className="ad-tblwrap"><table className="ad-tbl">
+        <thead><tr><th>المنسوب</th><th>الأدوار</th><th>أُنشئ</th><th>آخر دخول</th><th></th></tr></thead>
+        <tbody>
+          {list.map((u) => {
+            const self = u.user_id === me.uid;
+            return (
+              <tr key={u.user_id}>
+                <td><b style={{ color: "var(--text-strong)" }}>{u.name}</b>{self && <Tag tone="info" size="sm" style={{ marginInlineStart: 6 }}>أنت</Tag>}
+                  <div className="muted mono" style={{ fontSize: 11, direction: "ltr", textAlign: "end" }}>{u.email}</div></td>
+                <td><div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                  {(u.roles || []).map((r) => (
+                    <span className="achip" key={r.role}>{ROLE_LABEL[r.role] || r.role}
+                      {!self && <button className="ad-ibtn" style={{ padding: 0, marginInlineStart: 2 }} title="سحب الدور"
+                        onClick={() => doRevoke(u.user_id, r.role)}><I name="close" size={13} /></button>}
+                    </span>))}
+                </div></td>
+                <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.created_at ? new Date(u.created_at).toLocaleDateString("ar-SA") : "—"}</td>
+                <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("ar-SA") : "—"}</td>
+                <td>{!self && (granting?.userId === u.user_id ? (
+                  <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                    <select className="ad-input" style={{ width: "auto", padding: "5px 8px", fontSize: 12 }} value={granting.role}
+                      onChange={(e) => setGranting({ userId: u.user_id, role: e.target.value })}>
+                      <option value="">اختر دوراً…</option>
+                      {GRANTABLE_ROLES.filter((r) => !(u.roles || []).some((x) => x.role === r)).map((r) => (
+                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>))}
+                    </select>
+                    <button className="ad-ibtn" title="منح" onClick={doGrant}><I name="check" size={18} color="var(--color-primary)" /></button>
+                    <button className="ad-ibtn" title="إلغاء" onClick={() => setGranting(null)}><I name="close" size={18} /></button>
+                  </span>
+                ) : (
+                  <button className="ad-ibtn" title="منح دوراً" onClick={() => setGranting({ userId: u.user_id, role: "" })}><I name="person_add" size={18} /></button>
+                ))}</td>
+              </tr>
+            );
+          })}
+          {!list.length && <tr><td colSpan="5" className="muted" style={{ padding: 26, textAlign: "center" }}>لا حسابات مطابقة</td></tr>}
+        </tbody>
+      </table></div>
+    </div>
+  );
+}
+
+function RolesScreen({ staff }) {
+  const counts = {};
+  for (const u of staff) for (const r of u.roles || []) counts[r.role] = (counts[r.role] || 0) + 1;
+  const portalOf = (role) => PORTALS.find((p) => p.roles.includes(role));
+  return (
+    <div>
+      <h2 className="h2">الأدوار والصلاحيات</h2>
+      <p className="lede">الأدوار المعرّفة في القاعدة (app_role) وتوزيعها على المنسوبين وبواباتها — الصلاحيات نفسها تفرضها سياسات RLS لا الواجهات.</p>
+      <div className="ad-grid">
+        {GRANTABLE_ROLES.map((r) => {
+          const p = portalOf(r);
+          return (
+            <Card className="card pad" key={r}>
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <b style={{ color: "var(--text-strong)" }}>{ROLE_LABEL[r]}</b>
+                <Tag tone={counts[r] ? "success" : "neutral"} size="sm">{counts[r] || 0} منسوب</Tag>
+              </div>
+              <div className="muted mono" style={{ fontSize: 11, margin: "4px 0 8px", direction: "ltr", textAlign: "end" }}>{r}</div>
+              <div className="muted" style={{ fontSize: 12.5 }}>
+                <I name="door_open" size={14} /> {p ? p.title : "بلا بوابة مباشرة (صلاحية بيانات)"}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
