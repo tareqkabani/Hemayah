@@ -55,4 +55,5 @@ export const PORTALS: Portal[] = [
   { app: "studier", title: "بوابة الدارس", port: 3015, roles: ["studier"] },
   { app: "evaluator", title: "بوابة المقيّم", port: 3016, roles: ["evaluator"] },
   { app: "triage", title: "بوابة الفرز المبدئي", port: 3017, roles: ["case_officer", "deputy_chair", "board_chair"] },
+  { app: "admin", title: "بوابة مدير النظام (محتوى المنصّة)", port: 3018, roles: ["sysadmin"] },
 ];
