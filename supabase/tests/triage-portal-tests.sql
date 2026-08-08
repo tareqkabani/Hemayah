@@ -91,8 +91,10 @@ end $$;
 do $$
 declare _st case_status;
 begin
+  -- توقيع #62: الجهة بالاسم والمنطقة بالرمز — التوجيه بحسب النموذج التنظيمي
   select status into _st from public.triage_decide((select a from t_cases), 'refer', null,
-    '{"identity":true,"jurisdiction":true}'::jsonb, 'النيابة العامة — نيابة الرياض');
+    '{"identity":true,"jurisdiction":true}'::jsonb, 'النيابة العامة — نيابة الرياض',
+    'النيابة العامة', 'RUH');
   if _st <> 'referred' then raise exception 'TC-04 FAILED: الحالة % لا referred', _st; end if;
 end $$;
 do $$ begin

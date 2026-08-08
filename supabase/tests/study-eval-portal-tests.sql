@@ -39,9 +39,12 @@ end $$;
 -- أحمال المؤلّفين قبل الإسناد (لإثبات «الأقل عبئاً»)
 create temp table t_loads as
 select ur.user_id, ur.role::text as role,
+  -- معيار العبء نفسه المعتمد في assign_study_eval (مهاجرة المرونة): المُستبدَل لا يُحتسب
   case when ur.role = 'studier'
-    then (select count(*) from studies s where s.studier_id = ur.user_id and s.submitted_at is null)
-    else (select count(*) from assessments a where a.evaluator_id = ur.user_id and a.submitted_at is null)
+    then (select count(*) from studies s where s.studier_id = ur.user_id
+           and s.submitted_at is null and s.superseded_at is null)
+    else (select count(*) from assessments a where a.evaluator_id = ur.user_id
+           and a.submitted_at is null and a.superseded_at is null)
   end as load
 from user_roles ur where ur.role in ('studier','evaluator');
 
@@ -107,7 +110,7 @@ begin
     into _mine, _leak from my_study_tasks() t;
   select count(*) into _cross from my_assessment_tasks();
   execute 'reset role';
-  select count(*) into _real from studies where studier_id = i.s1;
+  select count(*) into _real from studies where studier_id = i.s1 and superseded_at is null;
   if _mine <> _real then raise exception 'اختبار 2أ فشل: مهام الدارس % <> صفوفه %', _mine, _real; end if;
   if _leak <> 0 then raise exception 'اختبار 2ب فشل: تسرّب مهام الغير'; end if;
   if _cross <> 0 then raise exception 'اختبار 2ج فشل: الدارس يرى مهام تقييم (%)', _cross; end if;
@@ -117,7 +120,8 @@ begin
   select count(*) into _mine from my_assessment_tasks();
   select count(*) into _cross from my_study_tasks();
   execute 'reset role';
-  select count(*) into _real from assessments where evaluator_id = i.e1;
+  -- my_assessment_tasks تستثني المُستبدَل (عقد مهاجرة المرونة) — فالمقارنة بمثله
+  select count(*) into _real from assessments where evaluator_id = i.e1 and superseded_at is null;
   if _mine <> _real then raise exception 'اختبار 2د فشل: مهام المقيّمة % <> صفوفها %', _mine, _real; end if;
   if _cross <> 0 then raise exception 'اختبار 2هـ فشل: المقيّمة ترى مهام دراسة'; end if;
   raise notice 'اختبار 2 ✓ جلب المهام معزول بالمؤلّف وبالدور';

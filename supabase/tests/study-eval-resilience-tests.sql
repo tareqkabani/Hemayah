@@ -110,45 +110,55 @@ begin
   raise notice 'اختبار 3 ✓ سحب الاطّلاع: الطابور والصلاحيات سُحبا من المُحال عنه فوراً';
 end $$;
 
--- ─── 4) نظافة النصاب: التقدّم للقرار يوسم صفوف الباقين «اكتُفي بالنصاب» ───
+-- ─── 4) النصاب الكامل (20260727000006): لا تقدُّم إلا بتسليم كل المُسنَدين ───
+-- عُدِّل هذا الاختبار مع مهاجرة النصاب الكامل التي ألغت «اكتُفي بالنصاب»
+-- (نصاب الواحد): الغاية تعدّد الآراء المستقلّة، فتُجمَّع كل المخرجات.
 do $$
-declare c record; _s uuid; _e uuid; _n int; _st case_status;
+declare c record; r record; _n int; _st case_status; _done int;
 begin
   select * into c from t_cases;
-  select studier_id into _s from studies where case_id = c.c2 and superseded_at is null limit 1;
-  select evaluator_id into _e from assessments where case_id = c.c2 and superseded_at is null limit 1;
 
-  perform pg_temp.impersonate(_s);
-  execute 'set local role authenticated';
+  -- تسليم أوّل دارس وأوّل مقيّم فقط: لا يكفي — القضية تبقى قيد الدراسة
+  select studier_id into r from studies where case_id=c.c2 and superseded_at is null order by studier_id limit 1;
+  perform pg_temp.impersonate(r.studier_id); execute 'set local role authenticated';
   perform submit_study(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
   execute 'reset role';
-  perform pg_temp.impersonate(_e);
-  execute 'set local role authenticated';
+  select evaluator_id into r from assessments where case_id=c.c2 and superseded_at is null order by evaluator_id limit 1;
+  perform pg_temp.impersonate(r.evaluator_id); execute 'set local role authenticated';
   perform submit_assessment(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
   execute 'reset role';
 
   select status into _st from protection_cases where id = c.c2;
-  if _st <> 'in_decision' then raise exception 'اختبار 4أ فشل: النصاب لم يقدّم القضية (%)', _st; end if;
+  if _st = 'in_decision' then raise exception 'اختبار 4أ فشل: تقدّمت القضية بنصاب الواحد (أُلغي)'; end if;
 
-  -- لا صفوف نشطة غير معتمدة بقيت — الباقون وُسموا
-  select count(*) into _n from (
-    select 1 from studies where case_id=c.c2 and submitted_at is null and superseded_at is null
-    union all
-    select 1 from assessments where case_id=c.c2 and submitted_at is null and superseded_at is null) x;
-  if _n <> 0 then raise exception 'اختبار 4ب فشل: بقيت صفوف معلّقة (%)', _n; end if;
+  -- لا وسم «اكتُفي بالنصاب» بعد اليوم — الباقون يبقون نشطين لا مُستبدَلين
   select count(*) into _n from (
     select 1 from studies where case_id=c.c2 and superseded_reason like '%اكتُفي بالنصاب%'
     union all
     select 1 from assessments where case_id=c.c2 and superseded_reason like '%اكتُفي بالنصاب%') x;
-  if _n < 1 then raise exception 'اختبار 4ج فشل: لا وسم نصاب'; end if;
+  if _n <> 0 then raise exception 'اختبار 4ب فشل: عاد وسم نصاب الواحد الملغى'; end if;
 
-  -- المعتمدان بقيا سليمين للحزمة
-  select count(*) into _n from (
+  -- تسليم بقية المُسنَدين → عندها فقط تتقدّم القضية للقرار
+  for r in select studier_id as uid from studies where case_id=c.c2 and submitted_at is null and superseded_at is null loop
+    perform pg_temp.impersonate(r.uid); execute 'set local role authenticated';
+    perform submit_study(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+    execute 'reset role';
+  end loop;
+  for r in select evaluator_id as uid from assessments where case_id=c.c2 and submitted_at is null and superseded_at is null loop
+    perform pg_temp.impersonate(r.uid); execute 'set local role authenticated';
+    perform submit_assessment(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+    execute 'reset role';
+  end loop;
+
+  select status into _st from protection_cases where id = c.c2;
+  if _st <> 'in_decision' then raise exception 'اختبار 4ج فشل: النصاب الكامل لم يقدّم القضية (%)', _st; end if;
+  -- كل المخرجات محفوظة (لا استبعاد) — تعدّد الآراء بلغ المجلس
+  select count(*) into _done from (
     select 1 from studies where case_id=c.c2 and submitted_at is not null and superseded_at is null
     union all
     select 1 from assessments where case_id=c.c2 and submitted_at is not null and superseded_at is null) x;
-  if _n <> 2 then raise exception 'اختبار 4د فشل: مخرجا النصاب تأثرا'; end if;
-  raise notice 'اختبار 4 ✓ نظافة النصاب: القضية تقدّمت والباقون وُسموا والطوابير نظيفة';
+  if _done < 4 then raise exception 'اختبار 4د فشل: لم تُجمَّع كل المخرجات (%)', _done; end if;
+  raise notice 'اختبار 4 ✓ النصاب الكامل: لا تقدُّم بنصاب الواحد، وكل المخرجات تُجمَّع للمجلس';
 end $$;
 
 -- ─── 5) عجز الطاقم: لا سحب بلا بديل — المهمة تبقى نشطة والإنذار مرة يومياً ───
@@ -197,13 +207,14 @@ do $$
 declare c record; _before int; _after int; _re int; _ex int;
 begin
   select * into c from t_cases;
-  perform set_config('app.settings.watchdog', 'off', true);
+  -- مفتاح الحارس انتقل إلى app_settings (20260727000007) — يُعطَّل بالجدول لا بالـGUC
+  update app_settings set value = 'off' where key = 'watchdog';
   update studies set created_at = now() - interval '7 days'
    where case_id = c.c1 and superseded_at is null;
   select count(*) into _before from studies where superseded_at is not null;
   select * into _re, _ex from study_eval_watchdog();
   select count(*) into _after from studies where superseded_at is not null;
-  perform set_config('app.settings.watchdog', 'on', true);
+  update app_settings set value = 'on' where key = 'watchdog';
   if _re <> 0 or _ex <> 0 or _before <> _after then
     raise exception 'اختبار 6 فشل: الحارس عمل وهو معطّل'; end if;
   raise notice 'اختبار 6 ✓ الحارس معطّل افتراضياً — التفعيل قرار بيئة صريح';
