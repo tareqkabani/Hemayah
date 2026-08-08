@@ -31,6 +31,7 @@ const FRONTEND = [
   portal("studier"),           // 3015
   portal("evaluator"),         // 3016
   portal("triage"),            // 3017
+  portal("admin"),             // 3018 — بوابة مدير النظام (محتوى المنصّة)
 ];
 const API = [portal("api")];   // 3020 (Hono REST)
 
