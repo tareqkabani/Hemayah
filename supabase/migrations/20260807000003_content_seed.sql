@@ -163,7 +163,8 @@ insert into reference_items (list_key, item_key, label, label_short, sort_order,
 ('council_vote','accept','قبول',null,1,'{}'),
 ('council_vote','reject','رفض',null,2,'{}'),
 
-('grievance_scope','rejection','على قرار الرفض',null,1,'{}'),
+-- «reject» هو المخزَّن فعلاً في قيد grievances_scope_check — لا «rejection» كما في التسليم
+('grievance_scope','reject','على قرار الرفض',null,1,'{}'),
 ('grievance_scope','types','على أنواع الحماية المقرّرة',null,2,'{}'),
 
 ('service_medium','onsite','حضوري في موقع آمن',null,1,'{}'),
