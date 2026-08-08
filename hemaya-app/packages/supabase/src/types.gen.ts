@@ -230,35 +230,54 @@ export type Database = {
       branches: {
         Row: {
           active: boolean | null
+          city: string | null
           created_at: string | null
           entity: Database["public"]["Enums"]["competent_entity"]
           id: string
           is_hq: boolean | null
+          is_intake_point: boolean
+          kind: string
           liaison_officer: string | null
           name: string
+          parent_id: string | null
           region: Database["public"]["Enums"]["region_code"]
         }
         Insert: {
           active?: boolean | null
+          city?: string | null
           created_at?: string | null
           entity: Database["public"]["Enums"]["competent_entity"]
           id?: string
           is_hq?: boolean | null
+          is_intake_point?: boolean
+          kind: string
           liaison_officer?: string | null
           name: string
+          parent_id?: string | null
           region: Database["public"]["Enums"]["region_code"]
         }
         Update: {
           active?: boolean | null
+          city?: string | null
           created_at?: string | null
           entity?: Database["public"]["Enums"]["competent_entity"]
           id?: string
           is_hq?: boolean | null
+          is_intake_point?: boolean
+          kind?: string
           liaison_officer?: string | null
           name?: string
+          parent_id?: string | null
           region?: Database["public"]["Enums"]["region_code"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "branches_parent_id_fkey"
+            columns: ["parent_id"]
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       challenges: {
         Row: {
@@ -681,6 +700,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      entity_structures: {
+        Row: {
+          approval_degrees: number
+          entity: Database["public"]["Enums"]["competent_entity"]
+          mode: string
+          note: string | null
+        }
+        Insert: {
+          approval_degrees?: number
+          entity: Database["public"]["Enums"]["competent_entity"]
+          mode: string
+          note?: string | null
+        }
+        Update: {
+          approval_degrees?: number
+          entity?: Database["public"]["Enums"]["competent_entity"]
+          mode?: string
+          note?: string | null
+        }
+        Relationships: []
       }
       execution_handoffs: {
         Row: {
@@ -1986,6 +2026,10 @@ export type Database = {
         Returns: undefined
       }
       _scope_ar: { Args: { _scope: string }; Returns: string }
+      admin_add_branch_unit: {
+        Args: { _city: string; _name?: string; _parent: string }
+        Returns: string
+      }
       admin_get_settings: {
         Args: never
         Returns: {
@@ -2001,6 +2045,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_list_org: { Args: never; Returns: Json }
       admin_list_staff: {
         Args: never
         Returns: {
@@ -2031,6 +2076,15 @@ export type Database = {
           target: string
         }[]
       }
+      admin_update_unit: {
+        Args: {
+          _active?: boolean
+          _id: string
+          _intake?: boolean
+          _name?: string
+        }
+        Returns: undefined
+      }
       advisor_decide_grievance: {
         Args: {
           _decision: string
@@ -2054,6 +2108,7 @@ export type Database = {
         Args: { _case_id: string; _per_role?: number }
         Returns: undefined
       }
+      branch_subtree: { Args: { _root: string }; Returns: string[] }
       business_days_between: {
         Args: { _from: string; _to: string }
         Returns: number

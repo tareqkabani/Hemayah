@@ -159,6 +159,28 @@ export async function revokeRole(userId: string, role: string): Promise<R> {
   return { ok: true };
 }
 
+/** إضافة فرع محافظة تحت وحدة منطقة — باب القائمة الرسمية للجهات المناطقية. */
+export async function addBranchUnit(parentId: string, city: string, name?: string): Promise<R & { id?: string }> {
+  const sb = createServerClient();
+  const { data, error } = await (sb.rpc as CallableFunction)("admin_add_branch_unit", {
+    _parent: parentId, _city: city, _name: name ?? null,
+  });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true, id: data as string };
+}
+
+/** تعديل وحدة: الاسم / نقطة الاستقبال / الإيقاف (لا حذف). */
+export async function updateUnit(id: string, patch: { name?: string; intake?: boolean; active?: boolean }): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("admin_update_unit", {
+    _id: id, _name: patch.name ?? null, _intake: patch.intake ?? null, _active: patch.active ?? null,
+  });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 /** ضبط مفتاح تشغيل (الإعدادات وأعلام الميزات) — عبر RPC محروسة ومؤثَّرة. */
 export async function setSetting(key: string, value: string): Promise<R> {
   const sb = createServerClient();
