@@ -10,6 +10,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, RiskLevel, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaChallenges } from "./challenges-store";
+import { ContentApprovals } from "./ContentApprovals";
 import { HemayaHandoff } from "./execution-handoff";
 import { HemayaMetrics } from "./center-metrics";
 import "./oversight.css";
@@ -616,6 +617,7 @@ const { App } = (function () {
     { id: 'approvals', t: 'اعتماد القرارات', icon: 'approval' },
     { id: 'voting', t: 'التصويت وإصدار القرار', icon: 'how_to_vote' },
     { id: 'challenges', t: 'مُحرّر التحديات', icon: 'edit_note' },
+    { id: 'content-approvals', t: 'اعتماد المحتوى', icon: 'fact_check', chairOnly: true },
     { id: 'handoff', t: 'التسليم للتنفيذ', icon: 'move_up' },
     { id: 'alerts', t: 'المواعيد والتنبيهات', icon: 'notification_important', badge: 2 },
     { id: 'staff', t: 'إنجازات الموظفين', icon: 'groups' },
@@ -633,12 +635,14 @@ const { App } = (function () {
     const [toastMsg, setToastMsg] = useState(null);
     const toast = (m) => { setToastMsg(m); clearTimeout(_ot); _ot = setTimeout(() => setToastMsg(null), 2600); };
     const go = (id) => { setActive(id); setOpen(false); window.scrollTo(0, 0); };
-    const cur = NAV.find((n) => n.id === active);
+    const nav = NAV.filter((n) => !n.chairOnly || role === 'chair');
+    const cur = nav.find((n) => n.id === active);
     let body;
     if (active === 'pipeline') body = <Pipeline role={role} acting={acting} toast={toast} />;
     else if (active === 'approvals') body = <DecisionHandoff role={role} kind="approvals" />;
     else if (active === 'voting') body = <DecisionHandoff role={role} kind="voting" />;
     else if (active === 'challenges') body = <Challenges role={role} acting={acting} toast={toast} />;
+    else if (active === 'content-approvals') body = <ContentApprovals initial={initialData && initialData.contentChanges} toast={toast} />;
     else if (active === 'handoff') body = <Handoff role={role} toast={toast} />;
     else if (active === 'alerts') body = <Alerts role={role} acting={acting} toast={toast} />;
     else if (active === 'staff') body = <Staff />;
@@ -652,7 +656,7 @@ const { App } = (function () {
         <aside className={'side' + (open ? ' open' : '')}>
           <div className="brand"><div className="brand-mark"><I name={r.icon} size={22} fill color="#fff" /></div>
             <div><div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-strong)', lineHeight: 1.2 }}>{r.title}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>قيادة المركز · إشراف</div></div></div>
-          <nav className="nav">{NAV.map((n) => (
+          <nav className="nav">{nav.map((n) => (
             <button key={n.id} className={'nav-item' + (active === n.id ? ' on' : '')} onClick={() => go(n.id)}>
               <I name={n.icon} size={20} /> <span>{n.t}</span>{n.badge && <span className="nav-badge">{n.badge}</span>}</button>))}</nav>
           <div className="side-foot">{r.perms}</div>
