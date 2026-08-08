@@ -36,15 +36,20 @@ export async function submitRequest(input: SubmitInput): Promise<SubmitResult> {
   if (!input.crime.trim() || !input.reason.trim()) {
     return { ok: false, error: "الجريمة والمسوّغات مطلوبة." };
   }
+  // الجهة المختصة إلزامية ⇔ سبق التقديم إليها؛ وعند «لا» لا تُمرَّر قيمة يتيمة
+  const priorSubmit = input.priorSubmit === "yes";
+  if (priorSubmit && !input.entity.trim()) {
+    return { ok: false, error: "اسم الجهة المختصة مطلوب عند سبق التقديم إليها." };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_protection_request", {
     _applicant_role: input.role,
     _category: category,
-    _entity: input.entity,
+    _entity: (priorSubmit ? input.entity.trim() : null) as unknown as string,
     _crime: input.crime,
     _reason: input.reason,
-    _prior_submit: input.priorSubmit === "yes",
+    _prior_submit: priorSubmit,
     _case_no: (input.caseNo || null) as string, // الدالة تقبل NULL فعلياً
     _details: (input.details ?? {}) as Json,
   });
