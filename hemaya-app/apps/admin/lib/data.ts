@@ -29,7 +29,10 @@ export async function getAdminData() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(GATEWAY_URL);
 
-  const [listsQ, itemsQ, notifsQ, sysQ, legalsQ, ccrQ] = await Promise.all([
+  // RPCs الدفعة الثانية أُنشئت بعد توليد الأنواع — يُعاد التوليد مع دمج السلسلة.
+  // (bind إلزامي: استخراج الدالة بلا ربطٍ يفقدها this فتنهار على rest)
+  const rpc = (supabase.rpc as CallableFunction).bind(supabase);
+  const [listsQ, itemsQ, notifsQ, sysQ, legalsQ, ccrQ, settingsQ, auditQ, healthQ] = await Promise.all([
     supabase.from("reference_lists").select("*").order("list_key"),
     supabase.from("reference_items").select("*").order("sort_order"),
     supabase.from("notification_templates").select("*").order("category"),
@@ -40,6 +43,9 @@ export async function getAdminData() {
       .select("id, target_kind, target_key, status, requested_at, note")
       .order("requested_at", { ascending: false })
       .limit(50),
+    rpc("admin_get_settings"),
+    rpc("admin_tech_audit", { _limit: 200 }),
+    rpc("admin_system_health"),
   ]);
 
   // بنود كل قائمة بمفتاحها — الموقوف يُعرض موقوفاً لا يُحذف
@@ -57,5 +63,8 @@ export async function getAdminData() {
     sysMessages: sysQ.data ?? [],
     legalTexts: legalsQ.data ?? [],
     changeRequests: ccrQ.data ?? [],
+    settings: (settingsQ as { data: { key: string; value: string }[] | null }).data ?? [],
+    techAudit: (auditQ as { data: unknown[] | null }).data ?? [],
+    health: (healthQ as { data: Record<string, unknown> | null }).data ?? {},
   };
 }

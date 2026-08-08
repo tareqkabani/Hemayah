@@ -141,6 +141,15 @@ export async function setTemplateActive(templateKey: string, active: boolean): P
   return done();
 }
 
+/** ضبط مفتاح تشغيل (الإعدادات وأعلام الميزات) — عبر RPC محروسة ومؤثَّرة. */
+export async function setSetting(key: string, value: string): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("admin_set_setting", { _key: key, _value: value });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}
+
 /** حفظ لافتة نظام (النصّ والدرجة) — شرط المنع نفسه يبقى في منطق التطبيق. */
 export async function saveSystemMessage(
   messageKey: string,

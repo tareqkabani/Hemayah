@@ -10,7 +10,7 @@ import React, { useMemo, useState } from "react";
 import { Card, Tag, InlineAlert, PortalShell } from "@hemaya/ui";
 import {
   updateItemLabel, saveItemOrder, setItemActive, addItem,
-  submitChangeRequest, saveTemplate, setTemplateActive, saveSystemMessage,
+  submitChangeRequest, saveTemplate, setTemplateActive, saveSystemMessage, setSetting,
 } from "@/lib/admin-actions";
 import "./admin.css";
 
@@ -53,7 +53,7 @@ const TONE = {
 const vars = (s) => (s.match(/\{[^}]+\}/g) || []).filter((v, i, a) => a.indexOf(v) === i);
 const hit = (q, ...f) => !q.trim() || f.join(" ").toLowerCase().includes(q.trim().toLowerCase());
 
-export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests }) {
+export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health }) {
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
@@ -85,8 +85,12 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
         <ContentScreen lists={lists} itemsByList={itemsByList} templates={templates}
           sysMessages={sysMessages} legalTexts={legalTexts} say={say} noPii={sysMsgOf("s_sysadmin")} />
       )}
+      {active === "settings" && <SettingsScreen settings={settings} say={say} />}
+      {active === "flags" && <FlagsScreen settings={settings} say={say} />}
+      {active === "audit" && <AuditScreen rows={techAudit} />}
+      {active === "health" && <HealthScreen health={health} />}
       {active === "profile" && <Profile me={me} />}
-      {!["overview", "content", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
+      {!["overview", "content", "settings", "flags", "audit", "health", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
     </PortalShell>
   );
 }
@@ -526,6 +530,165 @@ function TextDetail({ m, kind, back, say }) {
           <I name={kind === "legals" ? "send" : "save"} size={18} /> {kind === "legals" ? "رفع النصّ للاعتماد" : "حفظ النصّ"}</button>
         <button className="btn btn-ghost" disabled={!dirty} onClick={() => { setText(m.body); setTone(m.tone); }}>تراجع</button>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════ الإعدادات والمدد + أعلام الميزات ═══════════ */
+const KNOWN_FLAGS = {
+  watchdog: { t: "المراقبات الآلية (المهل والتصعيد)", d: "مراقبا الدراسة/التقييم ومهلة توصية الجهة — كل 30 دقيقة. الإيقاف يجمّد التذكير والتصعيد الآليين." },
+};
+
+function SettingsScreen({ settings, say }) {
+  const [rows, setRows] = useState(settings);
+  const [edit, setEdit] = useState(null); // {key, v}
+  const [addK, setAddK] = useState(""); const [addV, setAddV] = useState("");
+  const save = async (key, value) => {
+    const r = await setSetting(key, value);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => xs.some((x) => x.key === key) ? xs.map((x) => (x.key === key ? { ...x, value } : x)) : xs.concat({ key, value }));
+    setEdit(null);
+    say("حُفظ الإعداد «" + key + "» — مُسجَّل في التدقيق");
+  };
+  return (
+    <div>
+      <h2 className="h2">الإعدادات والمدد</h2>
+      <p className="lede">مفاتيح التشغيل العامة (app_settings) — تقرؤها دوال القاعدة المحروسة، وكل تغيير مُسجَّل في التدقيق باسمك.</p>
+      <InlineAlert kind="info" title="المدد النظامية ليست هنا" style={{ marginBottom: 14 }}>
+        مهل المواد (5 أيام توصية الجهة، 10 أيام التظلّم، 3 أيام الإشعار…) ثوابت نظامية في مصفوفة SLA — تغييرها قرار تشريعي لا إعداد تشغيلي.
+      </InlineAlert>
+      <Card className="card pad">
+        <div className="ad-sec-h"><I name="tune" size={18} color="var(--color-primary)" /> المفاتيح<span className="spacer" /><span className="muted mono" style={{ fontSize: 11.5 }}>key · value</span></div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {rows.map((s) => (
+            <div className="ad-item" key={s.key}>
+              <span className="mono ad-key">{s.key}</span>
+              {edit?.key === s.key
+                ? <input className="ad-input" style={{ flex: 1 }} value={edit.v} onChange={(e) => setEdit({ key: s.key, v: e.target.value })} autoFocus
+                    onKeyDown={(e) => { if (e.key === "Enter") save(s.key, edit.v); }} dir="auto" />
+                : <span style={{ flex: 1 }} className="mono">{s.value}</span>}
+              {edit?.key === s.key
+                ? <span style={{ display: "flex", gap: 6 }}>
+                    <button className="ad-ibtn" title="حفظ" onClick={() => save(s.key, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
+                    <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button></span>
+                : <button className="ad-ibtn" title="تحرير القيمة" onClick={() => setEdit({ key: s.key, v: s.value })}><I name="edit" size={17} /></button>}
+            </div>
+          ))}
+          {!rows.length && <div className="muted">لا مفاتيح بعد.</div>}
+        </div>
+        <div className="row" style={{ marginTop: 14, gap: 8 }}>
+          <input className="ad-input" style={{ maxWidth: 220, direction: "ltr" }} placeholder="key" value={addK} onChange={(e) => setAddK(e.target.value)} />
+          <input className="ad-input" style={{ flex: 1 }} placeholder="القيمة" value={addV} onChange={(e) => setAddV(e.target.value)} dir="auto" />
+          <button className="btn btn-ghost" disabled={!addK.trim()} onClick={() => { save(addK.trim(), addV); setAddK(""); setAddV(""); }}>إضافة</button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function FlagsScreen({ settings, say }) {
+  const [rows, setRows] = useState(settings);
+  const val = (k) => rows.find((x) => x.key === k)?.value ?? "off";
+  const toggle = async (k) => {
+    const next = val(k) === "on" ? "off" : "on";
+    const r = await setSetting(k, next);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => xs.some((x) => x.key === k) ? xs.map((x) => (x.key === k ? { ...x, value: next } : x)) : xs.concat({ key: k, value: next }));
+    say((next === "on" ? "فُعّل" : "أُوقف") + " علم «" + k + "» — مُسجَّل في التدقيق");
+  };
+  return (
+    <div>
+      <h2 className="h2">أعلام الميزات</h2>
+      <p className="lede">مفاتيح تشغيل/إيقاف لسلوكيات المنصّة الآلية — القيمة on/off في app_settings.</p>
+      <div style={{ display: "grid", gap: 12, maxWidth: 720 }}>
+        {Object.entries(KNOWN_FLAGS).map(([k, f]) => {
+          const on = val(k) === "on";
+          return (
+            <Card className="card pad" key={k}>
+              <div className="row" style={{ justifyContent: "space-between", rowGap: 10 }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <b style={{ color: "var(--text-strong)" }}>{f.t}</b>
+                  <div className="muted mono" style={{ fontSize: 11, margin: "2px 0 6px", direction: "ltr", textAlign: "end" }}>{k}</div>
+                  <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.7 }}>{f.d}</div>
+                </div>
+                <button className="ad-ibtn" onClick={() => toggle(k)} title={on ? "إيقاف" : "تفعيل"}>
+                  <I name={on ? "toggle_on" : "toggle_off"} size={40} color={on ? "var(--color-primary)" : "var(--text-disabled)"} /></button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ سجل التدقيق التقني + صحة النظام ═══════════ */
+function AuditScreen({ rows }) {
+  const [q, setQ] = useState("");
+  const list = rows.filter((r) => hit(q, r.action, r.target || ""));
+  return (
+    <div>
+      <h2 className="h2">سجل التدقيق التقني</h2>
+      <p className="lede">أفعال المحتوى والإشعارات والإعدادات فقط — تدقيق القضايا والامتثال خارج صلاحية مدير النظام (sysadmin_no_pii).</p>
+      <span className="ad-search" style={{ marginBottom: 14, display: "inline-flex" }}><I name="search" size={18} color="var(--text-secondary)" />
+        <input placeholder="بحث بالفعل أو الهدف…" value={q} onChange={(e) => setQ(e.target.value)} /></span>
+      <div className="ad-tblwrap"><table className="ad-tbl">
+        <thead><tr><th>#</th><th>الفعل</th><th>الهدف</th><th>الفاعل</th><th>الوقت</th></tr></thead>
+        <tbody>
+          {list.map((r) => (
+            <tr key={r.id}>
+              <td className="mono" style={{ fontSize: 11.5 }}>{r.id}</td>
+              <td className="mono" style={{ fontSize: 12, direction: "ltr", textAlign: "end" }}>{r.action}</td>
+              <td style={{ fontSize: 12.5, wordBreak: "break-word" }}>{r.target || "—"}</td>
+              <td className="mono" style={{ fontSize: 11 }}>{r.actor_id ? r.actor_id.slice(0, 8) + "…" : "النظام"}</td>
+              <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{new Date(r.created_at).toLocaleString("ar-SA")}</td>
+            </tr>
+          ))}
+          {!list.length && <tr><td colSpan="5" className="muted" style={{ padding: 26, textAlign: "center" }}>لا سجلات مطابقة</td></tr>}
+        </tbody>
+      </table></div>
+    </div>
+  );
+}
+
+function HealthScreen({ health }) {
+  const H = ({ icon, v, l }) => (
+    <Card className="card ad-stat">
+      <span className="ad-stat-ico" style={{ background: "var(--green-10)" }}><I name={icon} size={22} fill color="var(--color-primary)" /></span>
+      <span><b className="ad-stat-v">{v ?? "—"}</b><span className="ad-stat-l">{l}</span></span>
+    </Card>
+  );
+  const jobs = Array.isArray(health.cron_jobs) ? health.cron_jobs : [];
+  return (
+    <div>
+      <h2 className="h2">صحة النظام</h2>
+      <p className="lede">مؤشرات تشغيلية حيّة من القاعدة — بلا أي بيانات مشمولين.</p>
+      <div className="ad-stats">
+        <H icon="notifications" v={health.notifications_24h} l="إشعاراً آخر 24 ساعة" />
+        <H icon="receipt_long" v={health.audit_rows} l="صفوف سجل التدقيق" />
+        <H icon="group" v={health.staff_accounts} l="حساب منسوب فعّال" />
+        <H icon="approval" v={health.ccr_pending} l="طلب تعديل معلّق" />
+        <H icon="database" v={health.db_size} l="حجم قاعدة البيانات" />
+        <H icon="flag" v={health.watchdog === "on" ? "مفعّلة" : "موقوفة"} l="المراقبات الآلية" />
+      </div>
+      <Card className="card pad" style={{ marginTop: 16 }}>
+        <div className="ad-sec-h"><I name="schedule" size={18} color="var(--color-primary)" /> المهام المجدولة (pg_cron)</div>
+        <div className="ad-tblwrap"><table className="ad-tbl">
+          <thead><tr><th>المهمة</th><th>الجدولة</th><th>آخر تشغيل</th><th>آخر نتيجة</th><th>الحالة</th></tr></thead>
+          <tbody>
+            {jobs.map((j) => (
+              <tr key={j.name}>
+                <td className="mono" style={{ fontSize: 12, direction: "ltr", textAlign: "end" }}>{j.name}</td>
+                <td className="mono" style={{ fontSize: 12, direction: "ltr", textAlign: "end" }}>{j.schedule}</td>
+                <td className="mono" style={{ fontSize: 11.5 }}>{j.last_run || "—"}</td>
+                <td><Tag tone={j.last_status === "succeeded" ? "success" : j.last_status ? "error" : "neutral"} size="sm">{j.last_status || "لم تعمل بعد"}</Tag></td>
+                <td><Tag tone={j.active ? "success" : "neutral"} size="sm">{j.active ? "مجدولة" : "معطّلة"}</Tag></td>
+              </tr>
+            ))}
+            {!jobs.length && <tr><td colSpan="5" className="muted" style={{ padding: 20, textAlign: "center" }}>لا مهام مجدولة</td></tr>}
+          </tbody>
+        </table></div>
+      </Card>
     </div>
   );
 }

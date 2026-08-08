@@ -14,6 +14,9 @@ export default async function Page() {
       sysMessages={data.sysMessages}
       legalTexts={data.legalTexts}
       changeRequests={data.changeRequests}
+      settings={data.settings}
+      techAudit={data.techAudit}
+      health={data.health}
     />
   );
 }
