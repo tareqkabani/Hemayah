@@ -16,6 +16,7 @@ const ZONES = {
   "/studier": zone("ZONE_STUDIER_URL", "http://localhost:3015"),
   "/evaluator": zone("ZONE_EVALUATOR_URL", "http://localhost:3016"),
   "/triage": zone("ZONE_TRIAGE_URL", "http://localhost:3017"),
+  "/admin": zone("ZONE_ADMIN_URL", "http://localhost:3018"),
 };
 const API_URL = zone("ZONE_API_URL", "http://localhost:3020");
 

@@ -30,6 +30,7 @@ const ORIGIN = {
   hr: "/hr",
   interior: "/interior",
   security: "/security",
+  admin: "/admin",
 };
 
 type Spec = { role: string; portal: string; label: string; attrs?: Record<string, unknown> };
@@ -60,6 +61,7 @@ const DEMO: Record<string, Spec> = {
   "5000000002": { role: "tech_manager", portal: ORIGIN.technical, label: "مدير المكتب الفني" },
   "5000000003": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a2", spec: "أمني" } },
   "5000000004": { role: "advisor", portal: ORIGIN.technical, label: "المستشارون", attrs: { advisor: "a3", spec: "نفسي/اجتماعي" } },
+  "9000000001": { role: "sysadmin", portal: ORIGIN.admin, label: "مدير النظام" },
 };
 const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب الحماية" };
 
@@ -82,6 +84,7 @@ const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   prosecutor_general: { portal: ORIGIN.ag, label: "النائب العام" },
   advisor: { portal: ORIGIN.technical, label: "المستشارون" },
   tech_manager: { portal: ORIGIN.technical, label: "مدير المكتب الفني" },
+  sysadmin: { portal: ORIGIN.admin, label: "مدير النظام" },
 };
 
 // حساب الجهة المختصة بلا branch_id لا يرى شيئاً — كل سياسات RLS على
