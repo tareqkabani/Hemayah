@@ -8,7 +8,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL } from "@hemaya/domain";
+import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import { fetchRegister } from "@/lib/register";
@@ -48,8 +48,12 @@ const SRC = {
 };
 // ===== المناطق والفروع — توجيه المركز لفرع المنطقة بالاختصاص المكاني للقضية =====
 const CITY_REGION = { 'الرياض': 'RUH', 'جدة': 'MAK', 'مكة المكرمة': 'MAK', 'المدينة المنورة': 'MED', 'المدينة': 'MED', 'بريدة': 'QAS', 'الدمام': 'EAS', 'الخبر': 'EAS', 'أبها': 'ASR', 'تبوك': 'TAB', 'حائل': 'HAI', 'عرعر': 'NOR', 'جازان': 'JAZ', 'نجران': 'NAJ', 'الباحة': 'BAH', 'سكاكا': 'JOF' };
-const ENT_BR_PREFIX = { 'النيابة العامة': 'نيابة', 'رئاسة أمن الدولة': 'فرع', 'وزارة الداخلية': 'فرع', 'هيئة الرقابة ومكافحة الفساد': 'فرع', 'وزارة العدل': 'فرع' };
-const branchLabelT = (entity, code) => (ENT_BR_PREFIX[entity] || 'فرع') + ' ' + regionDisp(code);
+// الجهات ونماذجها التنظيمية من @hemaya/domain (مصدر واحد يحرسه اختبار التغطية):
+// المناطقية (النيابة) تُوجَّه لوحدة المنطقة؛ المركزية للمركز الرئيسي بلا اختيار منطقة.
+const branchLabelT = (entity, code) => (entityByLabel(entity)?.unitPrefix || 'فرع') + ' ' + regionDisp(code);
+const destLabelT = (entity, code) => isCentralEntity(entity)
+  ? (entity || 'الجهة المختصة') + ' — المركز الرئيسي'
+  : (entity || 'الجهة المختصة') + ' — ' + branchLabelT(entity, code);
 const SEED = []; // القضايا الحقيقيّة فقط من Supabase (initialRows) — لا حالات مُلفّقة
 
 function Pill({ status }) {
@@ -366,7 +370,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
   const saveReason = decision === 'closeNocase' ? 'closeNocase' : (RESPONSE_REASON[response] || '');
   const effDecision = decision === 'save' ? saveReason : decision;   // القرار الفعليّ — يُشتقّ سبب الحفظ من الرسالة
   const baseValid = decision === 'accept' || decision === 'closeNocase'
-    || (decision === 'save' && response) || (decision === 'refer' && entity && branch);
+    || (decision === 'save' && response) || (decision === 'refer' && entity && (isCentralEntity(entity) || branch));
   const noReplyGate = saveReason !== 'closeNoReply' || noReplyOk;
   // الفحص الشكليّ — إلزامي ومُلزِم إلا بمبرّر
   const needsChecks = rec.status === 'triage' && !recDriven;
@@ -468,17 +472,19 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
                 <span className="fld-label">الجهة المختصة <span style={{ color: 'var(--color-error)' }}>*</span></span>
                 <select value={entity} onChange={(e) => setEntity(e.target.value)}>
                   <option value="">اختر الجهة…</option>
-                  {['النيابة العامة', 'رئاسة أمن الدولة', 'وزارة الداخلية', 'هيئة الرقابة ومكافحة الفساد', 'وزارة العدل'].map((o) => <option key={o} value={o}>{o}</option>)}
+                  {COMPETENT_ENTITY_LABELS.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
-              <div className="fld" style={{ margin: 0 }}>
-                <span className="fld-label">الفرع المختص مكانياً <span style={{ color: 'var(--color-error)' }}>*</span></span>
-                <select value={branch} onChange={(e) => setBranch(e.target.value)}>
-                  {Object.keys(REGIONS).map((code) => <option key={code} value={code}>{branchLabelT(entity, code)}</option>)}
-                </select>
-                <p className="muted" style={{ margin: '6px 0 0' }}><I name="near_me" size={13} style={{ verticalAlign: 'middle', marginInlineEnd: 4 }} />مُشتقّ آلياً من الاختصاص المكاني للقضية (المدينة: {rec.city || 'غير محدّدة'}) — قابل للتعديل عند الحاجة.</p>
-              </div>
-              <InlineAlert kind="info" title="إحالة لطلب توصية (م5/4)">تُوجَّه الإحالة إلى <b>{branchLabelT(entity || 'الجهة المختصة', branch)}</b> — لضابط الاتصال المعتمد بالفرع، لا للجهة ككل. يدخل الطلب «بانتظار توصية الجهة» بمهلة 5 أيام عمل (م5/3 لائحة): فإن وردت بلا قضية قائمة يُحفظ، وإن وردت بالحماية يُقبل ويُسند آلياً للدراسة والتقييم.</InlineAlert>
+              {entity && (isCentralEntity(entity)
+                ? <p className="muted" style={{ margin: 0 }}><I name="account_balance" size={13} style={{ verticalAlign: 'middle', marginInlineEnd: 4 }} />جهةٌ مركزية — تُوجَّه الإحالة إلى المركز الرئيسي مباشرةً، والاختصاص المكاني للواقعة (المدينة: {rec.city || 'غير محدّدة'}) يبقى موثّقاً على الطلب.</p>
+                : <div className="fld" style={{ margin: 0 }}>
+                    <span className="fld-label">الوحدة المختصة مكانياً <span style={{ color: 'var(--color-error)' }}>*</span></span>
+                    <select value={branch} onChange={(e) => setBranch(e.target.value)}>
+                      {Object.keys(REGIONS).map((code) => <option key={code} value={code}>{branchLabelT(entity, code)}</option>)}
+                    </select>
+                    <p className="muted" style={{ margin: '6px 0 0' }}><I name="near_me" size={13} style={{ verticalAlign: 'middle', marginInlineEnd: 4 }} />مُشتقّة آلياً من الاختصاص المكاني للقضية (المدينة: {rec.city || 'غير محدّدة'}) — قابلة للتعديل عند الحاجة.</p>
+                  </div>)}
+              <InlineAlert kind="info" title="إحالة لطلب توصية (م5/4)">تُوجَّه الإحالة إلى <b>{destLabelT(entity, branch)}</b> — {isCentralEntity(entity) ? 'لضابط الاتصال المعتمد بالمركز الرئيسي للجهة.' : 'لضابط الاتصال المعتمد بالوحدة، لا للجهة ككل.'} يدخل الطلب «بانتظار توصية الجهة» بمهلة 5 أيام عمل (م5/3 لائحة): فإن وردت بلا قضية قائمة يُحفظ، وإن وردت بالحماية يُقبل ويُسند آلياً للدراسة والتقييم.</InlineAlert>
             </div>}
           {decision === 'accept' &&
             <InlineAlert kind="success" title="إسناد آلي للدراسة (المادة 9)" style={{ marginTop: 14 }}>يُحال الطلب آلياً إلى مرحلة الدراسة والتقييم ويُوزَّع على دارس/مقيّم.{urgent ? ' وبما أنه ' + rec.urgency + '، تُطبَّق تدابير حماية مؤقتة فور الاعتماد المزدوج.' : ''}</InlineAlert>}
@@ -514,7 +520,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
             <InlineAlert kind="warning" title="محاولات غير كافية" style={{ marginTop: 12 }}>يتطلّب هذا القرار 3 محاولات «لم يُرَد» موثّقة على أيام مختلفة (المسجّل حالياً: {noAnswerDays}).</InlineAlert>}
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16, gap: 10 }}>
             <button className="btn btn-ghost" onClick={back}>إلغاء</button>
-            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: entity + ' — ' + branchLabelT(entity, branch), entity, region: branch } : undefined, needsChecks ? checks : undefined)}>
+            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: destLabelT(entity, branch), entity, region: isCentralEntity(entity) ? null : branch } : undefined, needsChecks ? checks : undefined)}>
               اعتماد القرار <I name="arrow_back" size={18} />
             </button>
           </div>

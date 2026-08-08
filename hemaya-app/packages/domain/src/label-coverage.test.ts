@@ -10,6 +10,7 @@ import { CASE_STATUS, CATEGORY, RISK_LEVEL, CASE_SOURCE } from "./enums";
 import { ROLE_LABEL, PORTALS } from "./roles";
 import { REFERRAL_AUTHORITY_LABEL, REFERRAL_SERVICES } from "./materials";
 import { REGION_LABEL } from "./regions";
+import { COMPETENT_ENTITIES } from "./entities";
 import { CASE_TRANSITIONS } from "./case-state";
 
 const ENUMS = Constants.public.Enums;
@@ -54,5 +55,14 @@ describe("اتساق المراجع المشتقّة", () => {
   it("خدمات الإحالة تُسنَد لجهات معرّفة", () => {
     const authorities = new Set<string>(ENUMS.referral_authority);
     for (const svc of REFERRAL_SERVICES) expect(authorities).toContain(svc.authority);
+  });
+
+  it("الجهات المختصة تغطي قيم competent_entity واحدةً واحدة، بمسمّى ونموذج صحيحين", () => {
+    expect(sorted(Object.keys(COMPETENT_ENTITIES))).toEqual(sorted(ENUMS.competent_entity));
+    for (const spec of Object.values(COMPETENT_ENTITIES)) {
+      expect(spec.label.trim()).not.toBe("");
+      expect(["central", "regional"]).toContain(spec.orgModel);
+      if (spec.orgModel === "regional") expect(spec.unitPrefix?.trim()).toBeTruthy();
+    }
   });
 });
