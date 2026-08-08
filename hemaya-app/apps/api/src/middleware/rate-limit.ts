@@ -7,9 +7,15 @@ import type { Env } from "../types";
  * المفتاح: عنوان العميل من X-Forwarded-For (يضبطه الوسيط العكسيّ Nginx في
  * الإنتاج). ملاحظة: في الإنتاج متعدّد المثيلات، انقل هذا إلى مخزنٍ مشترك
  * (Redis) أو اعتمد تحديد المعدّل على حافة الشبكة.
+ *
+ * ⚠️ الحدّ يثق بـX-Forwarded-For: تأكّد أنّ الوسيط العكسيّ يعيد كتابته من
+ * اتّصال العميل ولا يمرّر رأس العميل الوارد — وإلّا أمكن انتحاله لتجاوز الحدّ.
  */
 const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 120;
+// قابلٌ للضبط دون إعادة بناء: عدّل RATE_LIMIT_PER_MIN في بيئة الـstack.
+// القيمة غير الصالحة (≤0 أو غير رقم) تعود للافتراضيّ 120 كي لا يُعطَّل الحاجز سهواً.
+const parsed = Number(process.env.RATE_LIMIT_PER_MIN);
+const MAX_PER_WINDOW = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 120;
 
 interface Bucket {
   count: number;
