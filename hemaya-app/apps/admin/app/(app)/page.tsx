@@ -18,6 +18,7 @@ export default async function Page() {
       techAudit={data.techAudit}
       health={data.health}
       staff={data.staff}
+      org={data.org}
     />
   );
 }

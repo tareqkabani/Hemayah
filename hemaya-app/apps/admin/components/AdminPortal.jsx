@@ -12,7 +12,7 @@ import { ROLE_LABEL, PORTALS } from "@hemaya/domain";
 import {
   updateItemLabel, saveItemOrder, setItemActive, addItem,
   submitChangeRequest, saveTemplate, setTemplateActive, saveSystemMessage, setSetting,
-  grantRole, revokeRole,
+  grantRole, revokeRole, addBranchUnit, updateUnit,
 } from "@/lib/admin-actions";
 import "./admin.css";
 
@@ -55,7 +55,7 @@ const TONE = {
 const vars = (s) => (s.match(/\{[^}]+\}/g) || []).filter((v, i, a) => a.indexOf(v) === i);
 const hit = (q, ...f) => !q.trim() || f.join(" ").toLowerCase().includes(q.trim().toLowerCase());
 
-export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health, staff }) {
+export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health, staff, org }) {
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
@@ -89,12 +89,13 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
       )}
       {active === "users" && <UsersScreen staff={staff} me={me} say={say} />}
       {active === "roles" && <RolesScreen staff={staff} />}
+      {active === "entities" && <EntitiesScreen org={org} say={say} />}
       {active === "settings" && <SettingsScreen settings={settings} say={say} />}
       {active === "flags" && <FlagsScreen settings={settings} say={say} />}
       {active === "audit" && <AuditScreen rows={techAudit} />}
       {active === "health" && <HealthScreen health={health} />}
       {active === "profile" && <Profile me={me} />}
-      {!["overview", "content", "users", "roles", "settings", "flags", "audit", "health", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
+      {!["overview", "content", "users", "roles", "entities", "settings", "flags", "audit", "health", "profile"].includes(active) && <ComingSoon meta={SCREEN_META[active]} />}
     </PortalShell>
   );
 }
@@ -632,6 +633,100 @@ function RolesScreen({ staff }) {
               <div className="muted mono" style={{ fontSize: 11, margin: "4px 0 8px", direction: "ltr", textAlign: "end" }}>{r}</div>
               <div className="muted" style={{ fontSize: 12.5 }}>
                 <I name="door_open" size={14} /> {p ? p.title : "بلا بوابة مباشرة (صلاحية بيانات)"}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ الجهات ووحداتها ═══════════ */
+const ENTITY_AR = { prosecution: "النيابة العامة", state_security: "رئاسة أمن الدولة", moi: "وزارة الداخلية", nazaha: "هيئة الرقابة ومكافحة الفساد", moj: "وزارة العدل" };
+
+function EntitiesScreen({ org, say }) {
+  const [data, setData] = useState(org);
+  const [adding, setAdding] = useState(null); // {parentId, city}
+  const patchUnit = (entity, id, changes) => setData((xs) => xs.map((e) => e.entity !== entity ? e
+    : { ...e, units: e.units.map((u) => (u.id === id ? { ...u, ...changes } : u)) }));
+
+  const doUpdate = async (entity, u, patch, okMsg) => {
+    patchUnit(entity, u.id, patch.intake !== undefined ? { is_intake_point: patch.intake } : patch.active !== undefined ? { active: patch.active } : {});
+    const r = await updateUnit(u.id, patch);
+    if (!r.ok) { patchUnit(entity, u.id, { is_intake_point: u.is_intake_point, active: u.active }); return say("⚠ " + r.error); }
+    say(okMsg + " — مُسجَّل في التدقيق");
+  };
+  const doAdd = async (entity, parent) => {
+    const city = adding.city.trim();
+    if (!city) return;
+    const r = await addBranchUnit(parent.id, city);
+    if (!r.ok) return say("⚠ " + r.error);
+    setData((xs) => xs.map((e) => e.entity !== entity ? e
+      : { ...e, units: [...e.units, { id: r.id, name: "نيابة " + city, kind: "branch", region: parent.region, city, parent_id: parent.id, is_intake_point: true, active: true, recommendations: 0 }] }));
+    setAdding(null);
+    say("أُضيف فرع «" + city + "» تحت " + parent.name + " — مُسجَّل في التدقيق");
+  };
+
+  const UnitRow = ({ entity, u, depth }) => (
+    <div className={"ad-item" + (u.active ? "" : " off")} style={{ marginInlineStart: depth * 22 }}>
+      <I name={u.kind === "hq" ? "account_balance" : u.kind === "region" ? "location_city" : "store"} size={17}
+        color={u.kind === "hq" ? "var(--color-primary)" : "var(--text-secondary)"} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        {u.name}
+        {u.city && <span className="muted" style={{ fontSize: 11.5 }}> · {u.city}</span>}
+        {!u.active && <Tag tone="neutral" size="sm" style={{ marginInlineStart: 6 }}>موقوفة</Tag>}
+      </span>
+      {u.recommendations > 0 && <span className="achip" title="توصيات مرتبطة">{u.recommendations} توصية</span>}
+      <button className={"achip" + (u.is_intake_point ? " on" : "")} title="نقطة استقبال الإحالات"
+        onClick={() => doUpdate(entity, u, { intake: !u.is_intake_point }, u.is_intake_point ? "أُلغيت نقطة الاستقبال" : "صارت نقطة استقبال")}>
+        <I name="inbox" size={12} /> استقبال</button>
+      {u.kind !== "hq" && (
+        <button className="ad-ibtn" title={u.active ? "إيقاف الوحدة (لا حذف)" : "إعادة تفعيل"}
+          onClick={() => doUpdate(entity, u, { active: !u.active }, u.active ? "أُوقفت الوحدة" : "أُعيد تفعيل الوحدة")}>
+          <I name={u.active ? "visibility_off" : "visibility"} size={17} /></button>)}
+      {u.kind === "region" && (
+        <button className="ad-ibtn" title="إضافة فرع محافظة" onClick={() => setAdding({ parentId: u.id, city: "" })}>
+          <I name="add_business" size={17} /></button>)}
+    </div>
+  );
+
+  return (
+    <div>
+      <h2 className="h2">الجهات ووحداتها</h2>
+      <p className="lede">هيكل كل جهة مختصة: نمطها التنظيمي، شجرة وحداتها، ونقاط الاستقبال. فروع المحافظات تُضاف من هنا عند ورود القائمة الرسمية — لا تُخترع بالإحالات.</p>
+      <div style={{ display: "grid", gap: 16 }}>
+        {data.map((e) => {
+          const regions = e.units.filter((u) => u.kind !== "branch");
+          const childrenOf = (id) => e.units.filter((u) => u.parent_id === id);
+          return (
+            <Card className="card pad" key={e.entity}>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 10, rowGap: 8 }}>
+                <div className="row" style={{ gap: 10 }}>
+                  <span className="ad-ico"><I name="account_balance" size={20} color="var(--color-primary)" fill /></span>
+                  <span><b style={{ color: "var(--text-strong)" }}>{ENTITY_AR[e.entity] || e.entity}</b>
+                    <div className="muted" style={{ fontSize: 11.5 }}>{e.note}</div></span>
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <Tag tone={e.mode === "central" ? "info" : "success"} size="sm">{e.mode === "central" ? "مركزية — المقرّ يستقبل" : "مناطقية — وحدات مناطق"}</Tag>
+                  <Tag tone="neutral" size="sm">اعتماد بدرجة {e.approval_degrees}</Tag>
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {regions.map((u) => (
+                  <React.Fragment key={u.id}>
+                    <UnitRow entity={e.entity} u={u} depth={0} />
+                    {childrenOf(u.id).map((c) => <UnitRow key={c.id} entity={e.entity} u={c} depth={1} />)}
+                    {adding?.parentId === u.id && (
+                      <div className="row" style={{ marginInlineStart: 22, gap: 8 }}>
+                        <input className="ad-input" style={{ maxWidth: 260 }} autoFocus placeholder="اسم المحافظة/المدينة…"
+                          value={adding.city} onChange={(ev) => setAdding({ parentId: u.id, city: ev.target.value })}
+                          onKeyDown={(ev) => { if (ev.key === "Enter") doAdd(e.entity, u); }} dir="auto" />
+                        <button className="btn btn-primary sm" disabled={!adding.city.trim()} onClick={() => doAdd(e.entity, u)}>إضافة الفرع</button>
+                        <button className="btn btn-ghost sm" onClick={() => setAdding(null)}>إلغاء</button>
+                      </div>)}
+                  </React.Fragment>
+                ))}
               </div>
             </Card>
           );
