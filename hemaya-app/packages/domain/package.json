@@ -5,6 +5,6 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": { "test": "vitest run" },
-  "dependencies": { "@hemaya/supabase": "workspace:*" },
+  "dependencies": { "@hemaya/supabase": "workspace:*", "@supabase/supabase-js": "^2.45.4" },
   "devDependencies": { "vitest": "^2.1.9" }
 }

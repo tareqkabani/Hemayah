@@ -614,6 +614,9 @@ importers:
       '@hemaya/supabase':
         specifier: workspace:*
         version: link:../supabase
+      '@supabase/supabase-js':
+        specifier: ^2.45.4
+        version: 2.110.0
     devDependencies:
       vitest:
         specifier: ^2.1.9
