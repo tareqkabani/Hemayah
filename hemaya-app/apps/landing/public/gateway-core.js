@@ -24,7 +24,8 @@
     interior:  '/interior',
     security:  '/security',
     ag:        '/ag',
-    technical: '/technical'    // المكتب الفني — المستشارون/المدير حسب الدور
+    technical: '/technical',   // المكتب الفني — المستشارون/المدير حسب الدور
+    admin:     '/admin'        // مدير النظام — إدارة كاملة لمحتوى المنصّة (sysadmin)
   };
 
   /* ---- المجموعات (الفاعل الأعلى) ---- */
@@ -33,10 +34,11 @@
     center:    { label: 'المركز',         icon: 'badge',             prefix: 'م', single: false },
     entity:    { label: 'الجهات',         icon: 'apartment',         prefix: 'ج', single: false },
     ag:        { label: 'النائب العام',   icon: 'balance',           prefix: 'ن', single: true  },
-    technical: { label: 'المكتب الفني',   icon: 'workspace_premium', prefix: 'ف', single: false }
+    technical: { label: 'المكتب الفني',   icon: 'workspace_premium', prefix: 'ف', single: false },
+    admin:     { label: 'مدير النظام',    icon: 'settings_account_box', prefix: 'د', single: true }
   };
-  var ROLE_ORDER = ['seeker', 'center', 'entity', 'ag', 'technical'];
-  var GROUP_PRIMARY = { seeker: 'seeker-main', center: 'center-triage', entity: 'entity-competent', ag: 'ag-main', technical: 'tech-consultants' };
+  var ROLE_ORDER = ['seeker', 'center', 'entity', 'ag', 'technical', 'admin'];
+  var GROUP_PRIMARY = { seeker: 'seeker-main', center: 'center-triage', entity: 'entity-competent', ag: 'ag-main', technical: 'tech-consultants', admin: 'admin-main' };
 
   /* ---- البوّابات الفرعية (كلٌّ بوّابة مستقلّة بصلاحيتها) ---- */
   var PORTALS = {
@@ -59,7 +61,8 @@
     'entity-interior':  { role: 'entity',    label: 'وزارة الداخلية',           href: APP.interior },
     'ag-main':          { role: 'ag',        label: 'بوّابة النائب العام',      href: APP.ag },
     'tech-consultants': { role: 'technical', label: 'المستشارون',              href: APP.technical },
-    'tech-manager':     { role: 'technical', label: 'مدير المكتب الفني',        href: APP.technical }
+    'tech-manager':     { role: 'technical', label: 'مدير المكتب الفني',        href: APP.technical },
+    'admin-main':       { role: 'admin',     label: 'بوّابة مدير النظام',       href: APP.admin }
   };
 
   /* ---- الهوية → البوّابة الفرعية (تُحاكي ربط نفاذ بالصلاحيات) ---- */
@@ -83,7 +86,8 @@
     '5000000001': 'tech-consultants',
     '5000000002': 'tech-manager',
     '5000000003': 'tech-consultants',
-    '5000000004': 'tech-consultants'
+    '5000000004': 'tech-consultants',
+    '9000000001': 'admin-main'
   };
   var PORTAL_DEMO = {};
   // أول هوية لكل بوابة تبقى هي المعبّأة مسبقاً (لا تطغى هويات الزملاء اللاحقة)
