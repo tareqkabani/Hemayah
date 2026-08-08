@@ -10,7 +10,7 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from '@hemaya/ui';
 import { createClient } from '@hemaya/supabase/src/browser';
-import { IdentityContext, RequestsContext, maskId, isOpenRequest } from './identity-context';
+import { IdentityContext, RequestsContext, ListsContext, maskId, isOpenRequest } from './identity-context';
 import {
   Profile as ProfileDetailed, NewRequest as NewRequestDetailed, RealRequests,
   STATUS_AR, CATEGORY_AR, STAGES, STAGE_INDEX, realNextAction,
@@ -335,12 +335,14 @@ function PortalApp() {
   );
 }
 
-function SeekerRoot({ identity, requests }) {
+function SeekerRoot({ identity, requests, lists }) {
   return (
     <IdentityContext.Provider value={identity}>
       <RequestsContext.Provider value={requests || []}>
-        <RealtimeRefresh />
-        <PortalApp />
+        <ListsContext.Provider value={lists || {}}>
+          <RealtimeRefresh />
+          <PortalApp />
+        </ListsContext.Provider>
       </RequestsContext.Provider>
     </IdentityContext.Provider>
   );

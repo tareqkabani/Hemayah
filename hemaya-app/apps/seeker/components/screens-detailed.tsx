@@ -11,7 +11,7 @@ import React, { useState, useContext, useTransition, useEffect } from "react";
 import { Card, Tag, InlineAlert } from "@hemaya/ui";
 import { SecretCode } from "@hemaya/ui";
 import { STAGE_DONE } from "@hemaya/domain";
-import { IdentityContext, RequestsContext, maskId, isOpenRequest } from "./identity-context";
+import { IdentityContext, RequestsContext, ListsContext, maskId, isOpenRequest } from "./identity-context";
 import { submitRequest } from "../lib/seeker-actions";
 
 export const CATEGORY_AR: Record<string, string> = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
@@ -204,6 +204,9 @@ export function Profile() {
 /* ────────────────────────── تقديم طلب جديد ────────────────────────── */
 export function NewRequest({ go }: { go?: (id: string) => void }) {
   const requests = useContext(RequestsContext);
+  // القوائم من طبقة المحتوى (reference_items) — لا مصفوفات مكتوبة يدوياً
+  const LISTS = useContext(ListsContext);
+  const labelsOf = (k: string) => (LISTS[k] || []).map((x) => x.label);
   const [f, setF] = useState<any>({ role: "", category: "", entity: "", crime: "", priorSubmit: "", reason: "", caseNo: "", files: [] as string[], repId: "", repName: "", repAge: "", ackTrue: false, ackTerms: false });
   const set = (k: string) => (e: any) => setF((s: any) => ({ ...s, [k]: e.target.value }));
   const [submitted, setSubmitted] = useState(false);
@@ -281,12 +284,12 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
         <div className="grid2">
           <div className="fld">
             <span className="fld-label">صفة مقدم الطلب <span className="req">*</span></span>
-            <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{["أصيل (عن شخصه)", "وليّ", "وصيّ", "وكيل", "محامٍ"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+            <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{labelsOf("applicant_role").map((o) => <option key={o} value={o}>{o}</option>)}</select>
             {onBehalf && <span className="hint">تقدّم نيابةً عن المشمول — أدخل بياناته الأساسية أدناه.</span>}
           </div>
           <div className="fld">
             <span className="fld-label">دور مقدم الطلب <span className="req">*</span></span>
-            <select value={f.category} onChange={set("category")}><option value="">الرجاء اختيار عنصر</option>{["شاهد", "مبلّغ", "خبير", "ضحية"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+            <select value={f.category} onChange={set("category")}><option value="">الرجاء اختيار عنصر</option>{(LISTS["app_category"] || []).filter((x) => x.key !== "related").map((x) => <option key={x.key} value={x.label}>{x.label}</option>)}</select>
           </div>
           <div className="fld">
             <span className="fld-label">هل سبق التقديم إلى الجهة المختصة؟ <span className="req">*</span></span>
@@ -307,7 +310,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
           {f.priorSubmit === "yes" &&
             <div className="fld">
               <span className="fld-label">اسم الجهة المختصة <span className="req">*</span></span>
-              <select value={f.entity} onChange={set("entity")}><option value="">الرجاء اختيار الجهة</option>{["النيابة العامة", "رئاسة أمن الدولة", "وزارة الداخلية", "هيئة الرقابة ومكافحة الفساد", "وزارة العدل"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+              <select value={f.entity} onChange={set("entity")}><option value="">الرجاء اختيار الجهة</option>{labelsOf("competent_entity").map((o) => <option key={o} value={o}>{o}</option>)}</select>
             </div>}
           <div className="fld full">
             <span className="fld-label">نوع الجريمة محل الحماية <span className="req">*</span></span>

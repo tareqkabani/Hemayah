@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createServerClient, GATEWAY_URL } from "@hemaya/supabase";
+import { getLists } from "@hemaya/domain";
 import { SeekerRoot } from "@/components/portal-app";
 import "@/components/portal.css";
 
@@ -15,6 +16,9 @@ export default async function SeekerPage() {
   if (!user) redirect(GATEWAY_URL);
 
   const meta = user.user_metadata ?? {};
+
+  // قوائم النموذج من طبقة المحتوى — رحلة واحدة، والنص للعرض والمخزَّن كما تتوقعه الدوال
+  const lists = await getLists(supabase, ["applicant_role", "app_category", "competent_entity"]);
 
   const { data: cases } = await supabase
     .from("protection_cases")
@@ -40,5 +44,5 @@ export default async function SeekerPage() {
     secretCode: requests[0]?.secret_code ?? null,
   };
 
-  return <SeekerRoot identity={identity} requests={requests} />;
+  return <SeekerRoot identity={identity} requests={requests} lists={lists} />;
 }
