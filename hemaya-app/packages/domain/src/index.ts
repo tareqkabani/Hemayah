@@ -9,3 +9,4 @@ export * from "./regions";
 export * from "./entities";
 export * from "./portal-config";
 export * from "./grievance";
+export * from "./content";

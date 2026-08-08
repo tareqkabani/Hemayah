@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       api_keys: {
@@ -171,7 +146,6 @@ export type Database = {
           {
             foreignKeyName: "assessments_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -248,7 +222,6 @@ export type Database = {
           {
             foreignKeyName: "board_decisions_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -343,7 +316,6 @@ export type Database = {
           {
             foreignKeyName: "consultation_sessions_referral_id_fkey"
             columns: ["referral_id"]
-            isOneToOne: false
             referencedRelation: "referrals"
             referencedColumns: ["id"]
           },
@@ -381,11 +353,49 @@ export type Database = {
           {
             foreignKeyName: "contact_logs_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
         ]
+      }
+      content_change_requests: {
+        Row: {
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          note: string | null
+          payload: Json
+          requested_at: string | null
+          requested_by: string
+          status: string
+          target_key: string
+          target_kind: string
+        }
+        Insert: {
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          payload: Json
+          requested_at?: string | null
+          requested_by: string
+          status?: string
+          target_key: string
+          target_kind: string
+        }
+        Update: {
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          note?: string | null
+          payload?: Json
+          requested_at?: string | null
+          requested_by?: string
+          status?: string
+          target_key?: string
+          target_kind?: string
+        }
+        Relationships: []
       }
       coord_messages: {
         Row: {
@@ -452,7 +462,6 @@ export type Database = {
           {
             foreignKeyName: "council_attachments_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -526,7 +535,6 @@ export type Database = {
           {
             foreignKeyName: "council_decisions_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: true
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -567,7 +575,6 @@ export type Database = {
           {
             foreignKeyName: "council_messages_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -602,7 +609,6 @@ export type Database = {
           {
             foreignKeyName: "council_votes_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -640,7 +646,6 @@ export type Database = {
           {
             foreignKeyName: "disclosure_events_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -672,7 +677,6 @@ export type Database = {
           {
             foreignKeyName: "emergency_reports_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -713,7 +717,6 @@ export type Database = {
           {
             foreignKeyName: "execution_handoffs_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -781,7 +784,6 @@ export type Database = {
           {
             foreignKeyName: "foreign_requests_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -849,7 +851,6 @@ export type Database = {
           {
             foreignKeyName: "grievances_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -884,7 +885,6 @@ export type Database = {
           {
             foreignKeyName: "imminent_protections_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -928,11 +928,43 @@ export type Database = {
           {
             foreignKeyName: "leadership_messages_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
         ]
+      }
+      legal_texts: {
+        Row: {
+          active: boolean
+          body: string
+          effective_at: string | null
+          legal_ref: string | null
+          screen: string
+          text_key: string
+          title: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          body: string
+          effective_at?: string | null
+          legal_ref?: string | null
+          screen: string
+          text_key: string
+          title: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          effective_at?: string | null
+          legal_ref?: string | null
+          screen?: string
+          text_key?: string
+          title?: string
+          version?: number
+        }
+        Relationships: []
       }
       lifecycle_reviews: {
         Row: {
@@ -972,7 +1004,6 @@ export type Database = {
           {
             foreignKeyName: "lifecycle_reviews_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1010,7 +1041,6 @@ export type Database = {
           {
             foreignKeyName: "measures_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1048,7 +1078,6 @@ export type Database = {
           {
             foreignKeyName: "messages_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1069,6 +1098,57 @@ export type Database = {
           notif_key?: string
           read_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      notification_templates: {
+        Row: {
+          active: boolean
+          body: string
+          category: string
+          channels: string[]
+          legal_ref: string | null
+          recipient: string
+          sla: string | null
+          subject: string
+          template_key: string
+          title: string
+          trigger_desc: string
+          updated_at: string | null
+          updated_by: string | null
+          variables: string[] | null
+        }
+        Insert: {
+          active?: boolean
+          body: string
+          category: string
+          channels?: string[]
+          legal_ref?: string | null
+          recipient: string
+          sla?: string | null
+          subject: string
+          template_key: string
+          title: string
+          trigger_desc: string
+          updated_at?: string | null
+          updated_by?: string | null
+          variables?: string[] | null
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          category?: string
+          channels?: string[]
+          legal_ref?: string | null
+          recipient?: string
+          sla?: string | null
+          subject?: string
+          template_key?: string
+          title?: string
+          trigger_desc?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          variables?: string[] | null
         }
         Relationships: []
       }
@@ -1125,7 +1205,6 @@ export type Database = {
           {
             foreignKeyName: "notifications_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1154,7 +1233,6 @@ export type Database = {
           {
             foreignKeyName: "obligations_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1192,7 +1270,6 @@ export type Database = {
           {
             foreignKeyName: "office_messages_grievance_id_fkey"
             columns: ["grievance_id"]
-            isOneToOne: false
             referencedRelation: "grievances"
             referencedColumns: ["id"]
           },
@@ -1221,7 +1298,6 @@ export type Database = {
           {
             foreignKeyName: "periodic_reviews_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1277,7 +1353,6 @@ export type Database = {
           {
             foreignKeyName: "protection_cases_branch_id_fkey"
             columns: ["branch_id"]
-            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
@@ -1312,7 +1387,6 @@ export type Database = {
           {
             foreignKeyName: "protection_documents_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1347,7 +1421,6 @@ export type Database = {
           {
             foreignKeyName: "protection_requests_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1397,14 +1470,12 @@ export type Database = {
           {
             foreignKeyName: "recommendation_approvals_branch_id_fkey"
             columns: ["branch_id"]
-            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recommendation_approvals_recommendation_id_fkey"
             columns: ["recommendation_id"]
-            isOneToOne: false
             referencedRelation: "recommendations"
             referencedColumns: ["id"]
           },
@@ -1475,18 +1546,92 @@ export type Database = {
           {
             foreignKeyName: "recommendations_branch_id_fkey"
             columns: ["branch_id"]
-            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recommendations_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
         ]
+      }
+      reference_items: {
+        Row: {
+          active: boolean
+          id: string
+          item_key: string
+          label: string
+          label_short: string | null
+          list_key: string
+          meta: Json | null
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          id?: string
+          item_key: string
+          label: string
+          label_short?: string | null
+          list_key: string
+          meta?: Json | null
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          item_key?: string
+          label?: string
+          label_short?: string | null
+          list_key?: string
+          meta?: Json | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_items_list_key_fkey"
+            columns: ["list_key"]
+            referencedRelation: "reference_lists"
+            referencedColumns: ["list_key"]
+          },
+        ]
+      }
+      reference_lists: {
+        Row: {
+          created_at: string | null
+          domain: string
+          icon: string | null
+          legal_ref: string | null
+          list_key: string
+          locked: boolean
+          scope: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          domain: string
+          icon?: string | null
+          legal_ref?: string | null
+          list_key: string
+          locked?: boolean
+          scope?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          domain?: string
+          icon?: string | null
+          legal_ref?: string | null
+          list_key?: string
+          locked?: boolean
+          scope?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       referrals: {
         Row: {
@@ -1538,7 +1683,6 @@ export type Database = {
           {
             foreignKeyName: "referrals_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1570,7 +1714,6 @@ export type Database = {
           {
             foreignKeyName: "related_persons_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1608,7 +1751,6 @@ export type Database = {
           {
             foreignKeyName: "risk_classifications_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1670,7 +1812,6 @@ export type Database = {
           {
             foreignKeyName: "studies_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1708,11 +1849,43 @@ export type Database = {
           {
             foreignKeyName: "subjects_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_messages: {
+        Row: {
+          active: boolean
+          body: string
+          legal_ref: string | null
+          message_key: string
+          screen: string
+          title: string
+          tone: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          body: string
+          legal_ref?: string | null
+          message_key: string
+          screen: string
+          title: string
+          tone: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          legal_ref?: string | null
+          message_key?: string
+          screen?: string
+          title?: string
+          tone?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       triage_reviews: {
         Row: {
@@ -1749,7 +1922,6 @@ export type Database = {
           {
             foreignKeyName: "triage_reviews_case_id_fkey"
             columns: ["case_id"]
-            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -2580,9 +2752,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_category: ["reporter", "witness", "expert", "victim", "related"],
@@ -2682,4 +2851,3 @@ export const Constants = {
     },
   },
 } as const
-
