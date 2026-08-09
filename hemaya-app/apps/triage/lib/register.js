@@ -98,6 +98,8 @@ export function mapCases(rows, now = new Date()) {
       reason: details.reason || "",
       entity: (rec && rec.source_body) || details.entity || "",
       caseNo: details.case_no || "",
+      // أسماء ملفات المرفقات كما خزّنها الإدخال اليدوي — تظهر في «المرفقات المقدّمة»
+      att: (Array.isArray(details.attachments) && details.attachments.length) ? details.attachments : undefined,
       sla,
       reply,
       closeReason: closeReview ? closeReview.reason : undefined,
