@@ -66,9 +66,21 @@ do $$
 declare i record; c record; _uid uuid; _d jsonb; _n int;
 begin
   select * into i from t_ids; select * into c from t_cases;
-  -- دارس مُسنَد فعلاً للقضية الورقية (الإسناد بالعبء لا يضمن خالداً بعينه)
-  select s.studier_id into _uid from studies s where s.case_id = c.c1 limit 1;
-  if _uid is null then raise exception 'تجهيز فشل: لا إسناد دراسة للقضية'; end if;
+  -- دارس مُسنَد للقضيتين معاً — الإسناد بالعبء (_per_role=2) قد يفرّق زوجَي
+  -- القضيتين متى زاد الدارسون على اثنين، فالتقاطع لا دارسٌ بعينه
+  select x.studier_id into _uid from (
+    select s.studier_id from studies s where s.case_id = c.c1
+    intersect
+    select s.studier_id from studies s where s.case_id = c.c2
+  ) x order by x.studier_id limit 1;
+  if _uid is null then
+    -- لا تقاطع — إسناد حتميّ في التجهيز يُدحرج مع المعاملة كسائر البيانات
+    select s.studier_id into _uid from studies s where s.case_id = c.c1
+    order by s.studier_id limit 1;
+    if _uid is null then raise exception 'تجهيز فشل: لا إسناد دراسة للقضية'; end if;
+    insert into studies (case_id, studier_id) values (c.c2, _uid)
+      on conflict (case_id, studier_id) do nothing;
+  end if;
 
   perform pg_temp.impersonate(_uid);
   execute 'set local role authenticated';
