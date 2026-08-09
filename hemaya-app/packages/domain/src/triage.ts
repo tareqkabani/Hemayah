@@ -9,8 +9,8 @@ export interface TriageCheckItem {
 
 export const TRIAGE_CHECK_ITEMS: TriageCheckItem[] = [
   { id: "complete", label: "اكتمال بيانات الطلب ومستنداته", ref: "م7/1، م5/1" },
-  { id: "juris", label: "وقوع الطلب ضمن اختصاص المركز وصفة مشمولة", ref: "المادة 1" },
-  { id: "case", label: "وجود قضية/بلاغ قائم أو صفة موجِبة للحماية", ref: "م1، م5" },
+  { id: "juris", label: "وقوع الطلب ضمن اختصاص المركز مبدئيا", ref: "المادة 1" },
+  { id: "case", label: "وجود قضية/بلاغ قائم", ref: "م1، م5" },
   { id: "noprior", label: "لا يوجد طلب سابق أو قرار سابق بشأن الشخص", ref: "إجرائي" },
-  { id: "verified", label: "تم التحقق من الطالب عبر محضر اتصال موثّق", ref: "م7" },
+  { id: "verified", label: "تم التحقق من مقدم الطلب عبر محضر اتصال موثّق", ref: "م7" },
 ];

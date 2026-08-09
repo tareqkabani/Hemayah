@@ -189,7 +189,6 @@ const CALL_CHANNELS = {
 const RESPONSE_OPTIONS = [
   'تم إغلاق الطلب لعدم الرد على التواصل الهاتفي والمراسلات.',
   'تم إغلاق الطلب لوجود طلب سابق.',
-  'بناءً على التواصل تم حفظ طلبكم.',
   'تم الحفظ بناءً على طلبكم.',
   'تم إغلاق الطلب لعدم الاختصاص.',
   'تم إغلاق طلب الحماية لوجود قرار رفض انضمام إلى برنامج حماية سابق.',
@@ -199,7 +198,6 @@ const RESPONSE_OPTIONS = [
 const RESPONSE_REASON = {
   'تم إغلاق الطلب لعدم الرد على التواصل الهاتفي والمراسلات.': 'closeNoReply',
   'تم إغلاق الطلب لوجود طلب سابق.': 'closePrior',
-  'بناءً على التواصل تم حفظ طلبكم.': 'closeReq',
   'تم الحفظ بناءً على طلبكم.': 'closeReq',
   'تم إغلاق الطلب لعدم الاختصاص.': 'closeJuris',
   'تم إغلاق طلب الحماية لوجود قرار رفض انضمام إلى برنامج حماية سابق.': 'closePrior',
@@ -325,8 +323,8 @@ function FormalCheck({ checks, setChecks }) {
         ))}
       </div>
       {sug &&
-        <InlineAlert kind={sug.id === 'accept' ? 'success' : sug.id === 'refer' ? 'info' : 'warning'} title="القرار المُرشَّح بناءً على الفحص" style={{ marginTop: 12 }}>
-          {sug.label} — يمكنك اعتماده أو اختيار غيره في «قرار الفرز» أدناه.
+        <InlineAlert kind={sug.id === 'accept' ? 'success' : sug.id === 'refer' ? 'info' : 'warning'} title="الاجراء المقترح بناءً على الفحص" style={{ marginTop: 12 }}>
+          {sug.label} — يمكنك اعتماده أو اختيار غيره في «اجراء الفرز» أدناه.
         </InlineAlert>}
     </Card>
   );
@@ -364,7 +362,6 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
     { id: 'save', label: 'حفظ وإغلاق الطلب', icon: 'inventory_2', danger: true },
   ];
 
-  const isSave = decision === 'save' || decision === 'closeNocase';
   const saveReason = decision === 'closeNocase' ? 'closeNocase' : (RESPONSE_REASON[response] || '');
   const effDecision = decision === 'save' ? saveReason : decision;   // القرار الفعليّ — يُشتقّ سبب الحفظ من الرسالة
   const baseValid = decision === 'accept' || decision === 'closeNocase'
@@ -440,10 +437,10 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
       {!viewOnly && rec.status === 'triage' && !recDriven &&
         <FormalCheck checks={checks} setChecks={setChecks} />}
 
-      {/* التوجيه — قرار الفرز */}
+      {/* التوجيه — اجراء الفرز */}
       {!viewOnly && (rec.status === 'triage' || isReplied) && (
         <Card className="card pad">
-          <b style={{ color: 'var(--text-strong)', display: 'block', marginBottom: 4 }}><I name="alt_route" size={18} color="var(--color-primary)" style={{ verticalAlign: 'middle', marginInlineEnd: 6 }} />التوجيه — قرار الفرز</b>
+          <b style={{ color: 'var(--text-strong)', display: 'block', marginBottom: 4 }}><I name="alt_route" size={18} color="var(--color-primary)" style={{ verticalAlign: 'middle', marginInlineEnd: 6 }} />التوجيه — اجراء الفرز</b>
           <p className="muted" style={{ margin: '0 0 12px' }}>
             {recDriven ? 'بناءً على توصية الجهة، اعتمد القرار المناسب.' : 'اعتمد على نتيجة الفحص الشكليّ أعلاه. الفرز شكليّ لا موضوعي؛ والقرار الموضوعي بالحماية يبقى للمجلس بعد الدراسة.'}
           </p>
@@ -480,18 +477,11 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
                     <select value={branch} onChange={(e) => setBranch(e.target.value)}>
                       {Object.keys(REGIONS).map((code) => <option key={code} value={code}>{branchLabelT(entity, code)}</option>)}
                     </select>
-                    <p className="muted" style={{ margin: '6px 0 0' }}><I name="near_me" size={13} style={{ verticalAlign: 'middle', marginInlineEnd: 4 }} />مُشتقّة آلياً من الاختصاص المكاني للقضية (المدينة: {rec.city || 'غير محدّدة'}) — قابلة للتعديل عند الحاجة.</p>
                   </div>)}
               <InlineAlert kind="info" title="إحالة لطلب توصية (م5/4)">تُوجَّه الإحالة إلى <b>{destLabelT(entity, branch)}</b> — {isCentralEntity(entity) ? 'لضابط الاتصال المعتمد بالمركز الرئيسي للجهة.' : 'لضابط الاتصال المعتمد بالوحدة، لا للجهة ككل.'} يدخل الطلب «بانتظار توصية الجهة» بمهلة 5 أيام عمل (م5/3 لائحة): فإن وردت بلا قضية قائمة يُحفظ، وإن وردت بالحماية يُقبل ويُسند آلياً للدراسة والتقييم.</InlineAlert>
             </div>}
           {decision === 'accept' &&
             <InlineAlert kind="success" title="إسناد آلي للدراسة (المادة 9)" style={{ marginTop: 14 }}>يُحال الطلب آلياً إلى مرحلة الدراسة والتقييم ويُوزَّع على دارس/مقيّم.{urgent ? ' وبما أنه ' + rec.urgency + '، تُطبَّق تدابير حماية مؤقتة فور الاعتماد المزدوج.' : ''}</InlineAlert>}
-          {isSave &&
-            <InlineAlert kind="warning" title="حفظ الطلب" style={{ marginTop: 14 }}>
-              {saveReason === 'closeReq' ? 'يُحفظ الطلب بناءً على طلب صاحبه. ' : saveReason === 'closeJuris' ? 'يُحفظ لعدم اختصاص المركز. ' : saveReason === 'closeNoReply' ? 'يُحفظ لتعذّر التواصل الهاتفي بعد 3 محاولات موثّقة على أيام مختلفة في محاضر الاتصال. ' : saveReason === 'closePrior' ? 'يُحفظ لوجود طلب سابق أو قرار سابق بشأن الشخص. ' : (saveReason === 'closeNocase' || decision === 'closeNocase') ? 'يُحفظ لعدم وجود قضية قائمة وفق توصية الجهة. ' : 'اختر رسالة «الرد على طالب الحماية» أدناه لتحديد سبب الحفظ. '}
-              يُوثَّق السبب كتابةً (المادة 10 — لا حفظ دون سبب)، ويطّلع عليه نائب الرئيس والرئيس، ويُشعَر به طالب الحماية فوراً (وبحدّ أقصى 3 أيام نظاماً، إ10). لا تظلّم في مرحلة الفرز — للطالب تقديم طلب جديد بمستجدّات، والتظلّم يكون بعد قرار المجلس.
-            </InlineAlert>}
-
           {decision === 'save' &&
             <div className="fld" style={{ marginTop: 14 }}>
               <span className="fld-label">الرد على طالب الحماية — سبب الحفظ <span style={{ color: 'var(--color-error)' }}>*</span></span>
@@ -503,11 +493,11 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
             </div>}
 
           {overriding &&
-            <InlineAlert kind="warning" title="مخالفة القرار المُرشَّح" style={{ marginTop: 12 }}>القرار المُرشَّح بناءً على الفحص الشكليّ هو «{sug.label}». اختيارك يخالفه — يلزم مبرّر موثّق لاعتماد قرار مختلف.</InlineAlert>}
+            <InlineAlert kind="warning" title="مخالفة الاجراء المقترح" style={{ marginTop: 12 }}>الاجراء المقترح بناءً على الفحص الشكليّ هو «{sug.label}». اختيارك يخالفه — يلزم مبرّر موثّق لاعتماد قرار مختلف.</InlineAlert>}
           {decision &&
             <div className="fld" style={{ marginTop: 12 }}>
-              <span className="fld-label">{overriding ? 'مبرّر مخالفة القرار المُرشَّح ' : 'ملاحظة الموظف '}{overriding ? <span style={{ color: 'var(--color-error)' }}>*</span> : <span className="muted" style={{ fontWeight: 400 }}>(اختياري)</span>}</span>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={overriding ? 'اذكر مبرّر مخالفة القرار المُرشَّح…' : 'توثيق موجز للقرار…'} dir="auto" />
+              <span className="fld-label">{overriding ? 'مبرّر مخالفة الاجراء المقترح ' : 'ملاحظة الموظف '}{overriding ? <span style={{ color: 'var(--color-error)' }}>*</span> : <span className="muted" style={{ fontWeight: 400 }}>(اختياري)</span>}</span>
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={overriding ? 'اذكر مبرّر مخالفة الاجراء المقترح…' : 'توثيق موجز للقرار…'} dir="auto" />
             </div>}
 
           {needsChecks && !checksComplete &&
