@@ -32,7 +32,7 @@ export async function getPortalData(role: "studier" | "evaluator") {
   const caseIds = tasks.map((t) => t.case_id);
   const details: Record<string, unknown> = {};
   if (caseIds.length) {
-    const [reqs, recs] = await Promise.all([
+    const [reqs, recs, dossiers] = await Promise.all([
       supabase
         .from("protection_requests")
         .select("case_id, applicant_role, channel, details, submitted_at")
@@ -41,11 +41,15 @@ export async function getPortalData(role: "studier" | "evaluator") {
         .from("recommendations")
         .select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details")
         .in("case_id", caseIds),
+      // الملف الكامل الوارد من الفرز — دالة عرض مقيّدة بالإسناد (لا نسخ بيانات)
+      Promise.all(caseIds.map((id) => supabase.rpc("study_dossier", { _case_id: id }))),
     ]);
-    for (const id of caseIds) {
+    for (let i = 0; i < caseIds.length; i++) {
+      const id = caseIds[i];
       details[id] = {
         request: reqs.data?.find((r) => r.case_id === id) ?? null,
         recommendation: recs.data?.find((r) => r.case_id === id) ?? null,
+        dossier: dossiers[i]?.data ?? null,
       };
     }
   }

@@ -610,7 +610,7 @@ function Intake({ applicantRoles }) {
     return (<div className="pi-wrap"><div className="card done-card">
       <div className="done-ico"><I name="task_alt" size={32} color="var(--color-primary)" fill /></div>
       <h1 style={{ marginBottom: 8 }}>{done.linked ? 'سُجلت التوصية ودُمجت في صفّ الطلب المُحال القائم' : 'سُجِّل الطلب وأُحيل للفرز المبدئي'}</h1>
-      <p className="sub" style={{ marginBottom: 0 }}>الرمز <span className="mono">{done.ref}</span>{done.linked ? <> — رُبطت التوصية بالطلب المُحال نفسه، فصار «وردت التوصية» في الفرز المبدئي — لا سجلّ مكرّر.</> : <> — ظهر الآن في «الطلبات الواردة» بالفرز المبدئي، ويسلك مساره كأيّ طلب.</>}</p>
+      <p className="sub" style={{ marginBottom: 0 }}>الرمز <span className="mono">{done.ref}</span>{done.linked ? <> — رُبطت التوصية بالطلب المُحال نفسه فلا سجلّ مكرّر بالرمز السري، وانتقل في سجلّ الفرز إلى «قيد الدراسة».</> : <> — ظهر الآن في «الطلبات الواردة» بالفرز المبدئي، ويسلك مساره كأيّ طلب.</>}</p>
       <div className="flags">
         <div className="flag"><I name="description" size={17} /> قناة الورود: <b>{done.channel === 'legacy' ? 'الموقع القديم (نفاذ) — طُبع وأُدخل يدوياً' : done.channel === 'inperson' ? 'ورقيّ حضوري — مُدخَل يدوياً' : 'بريد رسمي — مُدخَل يدوياً'}</b></div>
         <div className="flag"><I name="tag" size={17} /> {done.channel === 'legacy' ? 'مرجع الموقع القديم:' : 'قيد الورود:'} <b className="mono" style={{ marginInline: 4 }}>{done.regNo}</b> · {done.channel === 'legacy' ? 'قُدّم' : 'ورد'} <b style={{ marginInline: 4 }}>{done.when}</b> — منه تُحسب المُهل (م10)</div>
@@ -625,7 +625,7 @@ function Intake({ applicantRoles }) {
       <div className="man" style={{ maxWidth: 620, margin: '18px auto 0', textAlign: 'start', background: 'var(--green-10)', borderColor: 'var(--green-20)', color: 'var(--color-primary)' }}>
         <I name="conversion_path" size={16} />
         <span>{done.linked
-          ? <>يستأنف الطلب دورة حياته من حيث توقّف: <b>وردت التوصية ← قرار الفرز ← الدراسة والتقييم ← قرار المجلس ← الإشعار</b>.</>
+          ? <>سُجّلت التوصية وأُحيل الملف كاملاً إلى <b>الدراسة والتقييم</b> — يظهر حيّاً في بوابتي الدارس والمقيّم، ثمّ <b>قرار المجلس ← الإشعار</b>.</>
           : <>بعد التفريغ يسلك الطلب دورة الحياة كاملةً كأيّ طلب رقمي: <b>الفرز المبدئي ← الدراسة والتقييم ← قرار المجلس ← الإشعار والاتفاقية ← التنفيذ والتجديد</b> — وتُستكمل كل الإجراءات داخل المنصة.</>}</span>
       </div>
       <div style={{ marginTop: 22 }}><button className="btn btn-primary" onClick={resetAll}><I name="add" size={19} /> إدخال طلب آخر</button></div>

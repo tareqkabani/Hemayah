@@ -10,3 +10,4 @@ export * from "./entities";
 export * from "./portal-config";
 export * from "./grievance";
 export * from "./content";
+export * from "./triage";

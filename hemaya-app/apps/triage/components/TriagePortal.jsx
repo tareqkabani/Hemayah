@@ -8,7 +8,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity } from "@hemaya/domain";
+import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import { fetchRegister } from "@/lib/register";
@@ -290,13 +290,9 @@ function CallLogs({ rec, actor, viewOnly, isDone, logs, setLogs, onAdd }) {
 }
 
 // ===== الفحص الشكليّ — قائمة تحقّق تُرشّح القرار =====
-const CHECK_ITEMS = [
-  { id: 'complete', label: 'اكتمال بيانات الطلب ومستنداته', ref: 'م7/1، م5/1' },
-  { id: 'juris', label: 'وقوع الطلب ضمن اختصاص المركز وصفة مشمولة', ref: 'المادة 1' },
-  { id: 'case', label: 'وجود قضية/بلاغ قائم أو صفة موجِبة للحماية', ref: 'م1، م5' },
-  { id: 'noprior', label: 'لا يوجد طلب سابق أو قرار سابق بشأن الشخص', ref: 'إجرائي' },
-  { id: 'verified', label: 'تم التحقق من الطالب عبر محضر اتصال موثّق', ref: 'م7' },
-];
+// البنود من المصدر الواحد في @hemaya/domain — تقرؤها أيضاً بوابتا الدارس
+// والمقيّم لعرض نتيجة الفحص في الملف الكامل الوارد من الفرز.
+const CHECK_ITEMS = TRIAGE_CHECK_ITEMS;
 // القبول في البرنامج ركنان نظاماً: طلبٌ مسبّبٌ من الشخص، وتوصيةٌ من الجهة
 // المختصة. فما دامت التوصية لم تَرِد، فأقصى ما يصحّ ترشيحه هو الإحالة لطلبها —
 // لا القبول. والقبول يُرشَّح في القرار الثاني بعد ورودها (المسار recDriven).
@@ -522,7 +518,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
             <InlineAlert kind="warning" title="محاولات غير كافية" style={{ marginTop: 12 }}>يتطلّب هذا القرار 3 محاولات «لم يُرَد» موثّقة على أيام مختلفة (المسجّل حالياً: {noAnswerDays}).</InlineAlert>}
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16, gap: 10 }}>
             <button className="btn btn-ghost" onClick={back}>إلغاء</button>
-            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: destLabelT(entity, branch), entity, region: isCentralEntity(entity) ? null : branch } : undefined, needsChecks ? checks : undefined)}>
+            <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: destLabelT(entity, branch), entity, region: isCentralEntity(entity) ? null : branch } : undefined, needsChecks ? checks : undefined, note.trim())}>
               اعتماد القرار <I name="arrow_back" size={18} />
             </button>
           </div>
@@ -803,7 +799,7 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
     );
   };
 
-  const onResolve = async (rec, decision, extra, checks) => {
+  const onResolve = async (rec, decision, extra, checks, note) => {
     const map = { reassign: 'أُعيد إسناد الطلب لموظف آخر', accept: 'قُبل الطلب وأُسند للدراسة والتقييم', refer: 'أُحيل لجهة مختصة لطلب توصية', closeReq: 'حُفظ الطلب بطلب من طالب الحماية', closeNoReply: 'حُفظ الطلب — لعدم الرد على التواصل', closePrior: 'حُفظ الطلب — لوجود طلب/قرار سابق', closeJuris: 'حُفظ الطلب — لعدم الاختصاص', closeNocase: 'حُفظ الطلب — لا قضية قائمة', reverse: 'أُلغي القرار وأُعيد الطلب للمعالجة' };
     const statusMap = { accept: 'study', refer: 'pending', closeReq: 'closed', closeNoReply: 'closed', closePrior: 'closed', closeJuris: 'closed', closeNocase: 'closed', reverse: 'triage' };
     // الإحالة تحمل {label, entity, region} لربط التوصية بالفرع في القاعدة؛ غيرها نصٌّ حر
@@ -815,7 +811,8 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
       const rpcDec = decision === 'accept' ? 'study' : decision === 'refer' ? 'refer'
         : (String(decision).startsWith('close') ? 'close' : null);
       if (rpcDec) {
-        const reason = rpcDec === 'close' ? (map[decision] || 'حُفظ الطلب') : (rpcDec === 'refer' ? (extraLabel || '') : '');
+        // القبول: ملاحظة الموظف تُحفظ في triage_reviews.reason فتصل الدارس والمقيّم ضمن الملف الكامل
+        const reason = rpcDec === 'close' ? (map[decision] || 'حُفظ الطلب') : (rpcDec === 'refer' ? (extraLabel || '') : (note || ''));
         const res = await triageDecide(rec.caseId, rpcDec, reason, checks || {},
           decision === 'refer' ? (extraLabel || null) : null,
           refInfo ? refInfo.entity : null, refInfo ? refInfo.region : null);

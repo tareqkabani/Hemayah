@@ -4,7 +4,7 @@
 // السرّي · طبقة هوية النيابة) وموصولة بالبيانات الحيّة تحت RLS.
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, DeadlineTimer, SecretCode, I, NotifItem, fmtWhen } from "@hemaya/ui";
-import { STAGE_FLOW } from "@hemaya/domain";
+import { STAGE_FLOW, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
 import { PROTECTION_TYPES, REJECT_REASONS, DURATIONS } from "./lookups";
 
 const TRACK = {
@@ -463,6 +463,79 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
   );
 }
 
+// ===== الملف الكامل الوارد من الفرز (حزمة 2026-08-09 — المحور ٥) =====
+// عقد عرضٍ لا نموذج تخزين: يُقرأ من الجداول الأصلية عبر study_dossier
+// (دالة مقيّدة بالإسناد تحجب الهوية وتكشف الرمز السري فقط) — فيصل الدارس
+// والمقيّم الفحصُ الشكليّ ومحاضر الاتصال ومسار الطلب لا ملخّصٌ من حقلين.
+const CALL_CH = { phone: "الهاتف", platform: "رسائل المنصة" };
+const CALL_RES = { answered: "تم الرد", noanswer: "لم يُرَد" };
+export function TriageDossier({ d, cat }) {
+  const [open, setOpen] = useState(true);
+  const req = d?.request || {};
+  const rev = d?.review || null;
+  const rec = d?.recommendation || null;
+  const calls = d?.calls || [];
+  const fmtD = (ts) => (ts ? fmtWhen(ts) : "—");
+  const paper = req.channel === "paper";
+  const checkVals = rev?.formal_check || {};
+  const hasChecks = TRIAGE_CHECK_ITEMS.some((it) => checkVals[it.id] !== undefined);
+  const okOf = (v) => v === "yes" || v === true;
+  const sourceLabel = req.paper_source === "entity" ? "جهة مختصّة — خطاب ورقيّ"
+    : paper ? "طالب الحماية — إدخال يدويّ" : "طلب ذاتي — نفاذ";
+  // مسار الطلب من الوقائع الفعلية بطوابعها — لا نصوص مُلفّقة
+  const timeline = [];
+  if (req.submitted_at) timeline.push({ ts: req.submitted_at, icon: "inbox", t: "ورود الطلب", m: paper ? "أُدخل ورقياً عبر وحدة الإدخال اليدوي" : "عبر نفاذ — قائمة الفرز المشتركة", who: "النظام" });
+  if (rec?.raised_at) timeline.push({ ts: rec.raised_at, icon: "send", t: "إحالة لجهة مختصة لطلب توصية", m: rec.source_body || "الجهة المختصة", who: "موظف الفرز" });
+  if (rec?.received_at) timeline.push({ ts: rec.received_at, icon: "mark_email_read", t: "ورود توصية الجهة", m: rec.decision === "توفير" ? "توجد قضية قائمة — توصية بالحماية" : "لا قضية قائمة", who: rec.source_body || "الجهة المختصة" });
+  if (rev?.decided_at && rev.decision === "study") timeline.push({ ts: rev.decided_at, icon: "check_circle", t: "قبول وإسناد للدراسة والتقييم", m: rev.note || "استوفى الشروط الشكلية والاختصاص", who: rev.officer || "موظف الفرز" });
+  timeline.sort((a, b) => (a.ts > b.ts ? 1 : -1));
+  const R = (l, v) => (v ? <div className="ro-field" style={{ marginBottom: 6 }}><span className="muted" style={{ fontSize: 12.5 }}>{l}</span><span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-strong)" }}>{v}</span></div> : null);
+  return (
+    <Card className="card pad" style={{ marginBottom: 16, borderColor: "var(--green-20)" }}>
+      <div className="row" style={{ justifyContent: "space-between", cursor: "pointer" }} onClick={() => setOpen((o) => !o)}>
+        <b style={{ color: "var(--text-strong)" }}><I name="move_down" size={18} color="var(--color-primary)" fill style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />الملف الكامل الوارد من الفرز</b>
+        <span className="row" style={{ gap: 8 }}><Tag tone="success" size="sm" iconLeft={<I name="check_circle" size={13} fill />}>{rev?.decision === "study" ? "قُبِل وأُسند للدراسة" : "أُحيل للدراسة"}</Tag><I name={open ? "expand_less" : "expand_more"} size={20} color="var(--text-secondary)" /></span>
+      </div>
+      {open && <div style={{ marginTop: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8 }}>
+          {R("موظف الفرز", rev?.officer)}
+          {R("تاريخ الإجراء", rev?.decided_at ? fmtD(rev.decided_at) : null)}
+          {R("مصدر الطلب", sourceLabel)}
+          {R("الورود", req.submitted_at ? fmtD(req.submitted_at) : null)}
+          {R("رقم القضية", req.case_no || "—")}
+          {R("الجريمة", req.crime)}
+          {R("المدينة", req.city)}
+          {R("الجهة المختصة", rec?.source_body || req.entity || "—")}
+          {R("قيد الورود الورقيّ", req.reg_no)}
+        </div>
+        {paper && <InlineAlert kind="warning" title="ورودٌ ورقيّ" style={{ marginTop: 10 }}>{req.unverified ? "الهوية غير موثّقة — تُفعّل عبر نفاذ لاحقاً (م11/م21)." : "أُدخِل يدوياً من مستند ورقيّ."}</InlineAlert>}
+        {req.reason && <div className="fld" style={{ marginTop: 10 }}><span className="fld-label">ملخّص الطلب</span><div className="ro-field" style={{ display: "block", lineHeight: 1.7 }}>{req.reason}</div></div>}
+        {rec?.received_at && <div className="fld"><span className="fld-label">توصية الجهة الواردة</span><div className="ro-field" style={{ display: "block", lineHeight: 1.7 }}>{rec.notes || (rec.decision === "توفير" ? "توجد قضية قائمة، ونوصي بشمول الشخص بالحماية." : "لا توجد قضية قائمة وفق سجلّات الجهة.")}</div></div>}
+        {hasChecks && <div style={{ marginTop: 12 }}>
+          <b style={{ fontSize: 13.5, color: "var(--text-strong)" }}>نتيجة الفحص الشكليّ</b>
+          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 6 }}>
+            {TRIAGE_CHECK_ITEMS.map((it, i) => <li key={i} className="row" style={{ gap: 8, fontSize: 13 }}><I name={okOf(checkVals[it.id]) ? "check_circle" : "cancel"} size={17} fill color={okOf(checkVals[it.id]) ? "var(--color-success)" : "var(--color-error)"} /><span>{it.label}</span><span className="pill" style={{ marginInlineStart: "auto" }}>{it.ref}</span></li>)}
+          </ul>
+        </div>}
+        {!!calls.length && <div style={{ marginTop: 14 }}>
+          <b style={{ fontSize: 13.5, color: "var(--text-strong)" }}>محاضر الاتصال ({calls.length})</b>
+          <div className="tbl-wrap" style={{ marginTop: 8 }}>
+            <table><thead><tr><th>التاريخ</th><th>القناة</th><th>النتيجة</th><th>الملاحظات</th><th>المُعد</th></tr></thead>
+              <tbody>{calls.map((c, i) => <tr key={i} style={{ cursor: "default" }}><td className="mono" style={{ fontSize: 12 }}>{fmtD(c.at)}</td><td>{CALL_CH[c.channel] || c.channel}</td><td>{CALL_RES[c.result] || c.result}</td><td className="muted">{c.note && c.note !== "—" ? c.note : "—"}</td><td style={{ fontSize: 12.5 }}>{c.by || "موظف الفرز"}</td></tr>)}</tbody></table>
+          </div>
+        </div>}
+        {rev?.note && <div className="fld" style={{ marginTop: 12 }}><span className="fld-label">ملاحظة موظف الفرز</span><div className="ro-field" style={{ display: "block", lineHeight: 1.7 }}>{rev.note}</div></div>}
+        {!!timeline.length && <div style={{ marginTop: 14 }}>
+          <b style={{ fontSize: 13.5, color: "var(--text-strong)" }}>مسار الطلب</b>
+          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 8 }}>
+            {timeline.map((a, i) => <li key={i} className="row" style={{ gap: 8, alignItems: "flex-start", fontSize: 13 }}><I name={a.icon} size={17} color="var(--color-primary)" /><span><b style={{ color: "var(--text-strong)" }}>{a.t}</b> — {a.m} <span className="muted">({fmtD(a.ts)} · {a.who})</span></span></li>)}
+          </ul>
+        </div>}
+      </div>}
+    </Card>
+  );
+}
+
 // ===== شاشة الطلب — النموذج (دراسة أو تقييم حسب الدور) =====
 export function UnifiedForm({ cfg, me, task, detail, back, onSubmit, onReveal, onOpenDoc, busy }) {
   const [f, setF] = useState({
@@ -579,6 +652,8 @@ export function UnifiedForm({ cfg, me, task, detail, back, onSubmit, onReveal, o
 
       {/* ② المستندان الكاملان — مطويّان افتراضاً (هوية محجوبة) */}
       {!task.foreign && <SeekerReq task={task} detail={detail} viewer={me.name} onOpenDoc={onOpenDoc} />}
+      {/* الملف الكامل الوارد من الفرز — فوق بطاقة التوصية (حزمة 2026-08-09 محور ٥) */}
+      {!task.foreign && detail?.dossier && <TriageDossier d={detail.dossier} cat={task.cat} />}
       {!task.foreign && <AuthRec task={task} detail={detail} viewer={me.name} onOpenDoc={onOpenDoc} />}
       {task.foreign && (
         <InlineAlert kind="info" title="لا طلب مباشر من الشخص" style={{ marginBottom: 16 }}>
