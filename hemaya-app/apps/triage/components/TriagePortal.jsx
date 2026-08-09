@@ -148,7 +148,9 @@ function SummaryCard({ rec }) {
           <div className="ro-field" style={{ marginTop: 12 }}>
             <span className="fld-label">المرفقات المقدّمة</span>
             <div className="row" style={{ gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              {(rec.att || ['صورة الهوية.pdf', 'صحيفة الدعوى.pdf']).map((f, i) => <span key={i} className="attf"><I name="description" size={15} /> {f}</span>)}
+              {rec.att && rec.att.length
+                ? rec.att.map((f, i) => <span key={i} className="attf"><I name="description" size={15} /> {f}</span>)
+                : <span className="muted" style={{ fontSize: 12.5 }}>لا مرفقات</span>}
             </div>
           </div>
         </div>}
