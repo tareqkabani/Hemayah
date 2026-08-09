@@ -115,29 +115,67 @@ do $$ begin
   raise notice 'TC-05 PASS — السجلّ: «بانتظار الجهة» مرئية بتوصيتها المستحقّة';
 end $$;
 
--- ═══ TC-06 إعادة المعالجة: ورود التوصية يعيد الحالة للفرز (replied) ═══
+-- ═══ TC-06 التوصية الورقية المربوطة → الدراسة والتقييم مباشرةً (حزمة 2026-08-09 محور ٥) ═══
+-- ركنا القبول مكتملان لحظة تسجيلها (طلب مسبّب + توصية واردة) فلا قرار فرزٍ ثانٍ.
 do $$
-declare _st case_status;
+declare _st case_status; _n int;
 begin
   select status into _st from public.record_recommendation(
     (select a from t_cases), 'توفير', 'paper', '{}'::jsonb, '[]'::jsonb, null,
     'توجد قضية قائمة — اختبار آلي');
-  if _st <> 'triage' then raise exception 'TC-06 FAILED: الحالة % لا triage', _st; end if;
+  if _st <> 'under_study' then raise exception 'TC-06 FAILED: الحالة % لا under_study', _st; end if;
   if not exists (select 1 from recommendations
       where case_id = (select a from t_cases) and received_at is not null and decision = 'توفير') then
     raise exception 'TC-06 FAILED: التوصية لم تُسجَّل مستلمة';
   end if;
-  raise notice 'TC-06 PASS — إعادة المعالجة: وردت التوصية والقضية عادت للفرز لقرارٍ ثانٍ';
+  select count(*) into _n from studies where case_id = (select a from t_cases) and superseded_at is null;
+  if _n < 1 then raise exception 'TC-06 FAILED: لم يُسنَد دارس آلياً'; end if;
+  select count(*) into _n from assessments where case_id = (select a from t_cases) and superseded_at is null;
+  if _n < 1 then raise exception 'TC-06 FAILED: لم يُسنَد مقيّم آلياً'; end if;
+  raise notice 'TC-06 PASS — التوصية الورقية أحالت الملف مباشرةً للدراسة والتقييم بإسنادٍ آليّ';
 end $$;
 
--- ═══ TC-07 القرار الثاني: قبول وإسناد للدراسة ═══
+-- ═══ TC-06ب الملف الكامل للدارس المُسنَد: مقيّد بالإسناد ومحجوب الهوية ═══
+select pg_temp.impersonate((select studier from t_ids));
 do $$
-declare _st case_status;
+declare _d jsonb;
 begin
-  select status into _st from public.triage_decide((select a from t_cases), 'study',
-    'استوفى الشروط وفق توصية الجهة', '{}'::jsonb, null);
-  if _st <> 'under_study' then raise exception 'TC-07 FAILED: الحالة % لا under_study', _st; end if;
-  raise notice 'TC-07 PASS — القرار الثاني: قُبل وأُسند للدراسة والتقييم';
+  if not exists (select 1 from studies where case_id = (select a from t_cases)
+      and studier_id = (select studier from t_ids) and superseded_at is null) then
+    raise notice 'TC-06ب SKIP — الدارس التجريبي لم يقع عليه الإسناد الآلي';
+    return;
+  end if;
+  select public.study_dossier((select a from t_cases)) into _d;
+  if _d->'case'->>'secret' <> 'TC-2026-9501' then
+    raise exception 'TC-06ب FAILED: الملف بلا الرمز السري';
+  end if;
+  if _d->'request' ? 'identity' or _d::text like '%"nid"%' then
+    raise exception 'TC-06ب FAILED: الملف يكشف هوية طالب الحماية';
+  end if;
+  if _d->'recommendation'->>'decision' <> 'توفير' then
+    raise exception 'TC-06ب FAILED: توصية الجهة غائبة عن الملف';
+  end if;
+  begin
+    perform public.study_dossier((select b from t_cases));
+    raise exception 'TC-06ب FAILED: ملف قضيةٍ غير مُسنَدة مكشوف';
+  exception when others then
+    if sqlerrm not like '%not assigned%' then raise; end if;
+  end;
+  raise notice 'TC-06ب PASS — الملف الكامل للمُسنَد إليه فقط، بالرمز السري دون الهوية';
+end $$;
+select pg_temp.impersonate((select officer from t_ids));
+
+-- ═══ TC-07 لا قرار فرزٍ على قضيةٍ قيد الدراسة — الإحالة المباشرة نهائية ═══
+do $$ begin
+  begin
+    perform public.triage_decide((select a from t_cases), 'study',
+      'قرار ثانٍ بعد الإحالة المباشرة', '{}'::jsonb, null);
+    raise exception 'TC-07 FAILED: قُبل قرار فرزٍ على قضية قيد الدراسة';
+  exception when others then
+    if sqlerrm like '%TC-07 FAILED%' then raise; end if;
+    if sqlerrm not like '%not in triage%' and sqlerrm not like '%triage%' then raise; end if;
+  end;
+  raise notice 'TC-07 PASS — آلة الحالة ترفض قرار فرزٍ بعد الإحالة المباشرة للدراسة';
 end $$;
 
 -- ═══ TC-08 الحفظ: مرفوض بلا سبب، مقبول بسببٍ موثّق ═══
@@ -244,7 +282,7 @@ do $$ begin
 end $$;
 
 -- ═══ TC-14 عزل الأدوار: الدارس لا يرى قضايا الفرز غير المُسنَدة إليه ولا رسائلها ═══
--- (القضية A أُسندت آلياً للدراسة بعد TC-07 فتُستثنى — الفحص على B المحفوظة وعلى الرسائل)
+-- (القضية A أُسندت آلياً للدراسة بعد TC-06 فتُستثنى — الفحص على B المحفوظة وعلى الرسائل)
 select pg_temp.impersonate((select studier from t_ids));
 do $$ begin
   if exists (select 1 from protection_cases where id = (select b from t_cases)) then

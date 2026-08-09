@@ -99,18 +99,21 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
     // مهمته لحظة وصول إشعار الإسناد ويجد المستندين كاملين لا فارغين
     const missing = data.map((t) => t.case_id).filter((id) => !details[id]);
     if (!missing.length) return;
-    const [reqs, recs] = await Promise.all([
+    const [reqs, recs, dossiers] = await Promise.all([
       supabase.from("protection_requests").select("case_id, applicant_role, channel, details, submitted_at").in("case_id", missing),
       supabase.from("recommendations").select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details").in("case_id", missing),
+      // الملف الكامل الوارد من الفرز — يصل مع الإسناد الحي فيفتح البديل مهمته كاملةً
+      Promise.all(missing.map((id) => supabase.rpc("study_dossier", { _case_id: id }))),
     ]);
     setDetails((d) => {
       const next = { ...d };
-      for (const id of missing) {
+      missing.forEach((id, i) => {
         next[id] = {
           request: reqs.data?.find((r) => r.case_id === id) ?? null,
           recommendation: recs.data?.find((r) => r.case_id === id) ?? null,
+          dossier: dossiers[i]?.data ?? null,
         };
-      }
+      });
       return next;
     });
   };
