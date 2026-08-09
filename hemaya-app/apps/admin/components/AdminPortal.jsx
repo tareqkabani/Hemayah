@@ -246,28 +246,36 @@ function ListDetail({ l, items, back, say }) {
   const [add, setAdd] = useState("");
   const [edit, setEdit] = useState(null); // {key, v}
   const [busy, setBusy] = useState(false);
-  const orderDirty = useMemo(
-    () => rows.map((r) => r.item_key).join("|") !== items.map((r) => r.item_key).join("|"),
-    [rows, items]
-  );
+  // الترتيب متسخٌ فقط إن تغيّر تسلسل المفاتيح نفسها (لا مجرّد إضافة بندٍ جديد
+  // فُرِغ للخادم فوراً) — نقارن بمجموعةٍ مرتّبة تُحيّد الإضافة عن إعادة الترتيب.
+  const orderDirty = useMemo(() => {
+    const cur = rows.map((r) => r.item_key);
+    const orig = items.map((r) => r.item_key);
+    if (cur.length !== orig.length) return false; // إضافة/تحميل جديد — لا تُحسب ترتيباً
+    return cur.join("|") !== orig.join("|");
+  }, [rows, items]);
 
   // القائمة المقفلة: تحرير محلّي ثم رفعٌ للاعتماد بحمولة كاملة
   const [draft, setDraft] = useState(null); // نسخة عمل للمقفل
   const work = l.locked ? (draft ?? rows) : rows;
   const lockedDirty = l.locked && draft && JSON.stringify(draft) !== JSON.stringify(rows);
 
+  // ترجع true عند النجاح كي يبني المتّصل عليها (تصفير المسودة، التراجع…)
   const run = async (fn, okMsg) => {
     setBusy(true);
     const r = await fn();
     setBusy(false);
-    if (!r.ok) return say("⚠ " + r.error);
+    if (!r.ok) { say("⚠ " + r.error); return false; }
     say(okMsg + " — مُسجَّل في التدقيق");
+    return true;
   };
 
-  const editLabel = (key, v) => {
+  const editLabel = async (key, v) => {
     if (l.locked) { setDraft(work.map((x) => (x.item_key === key ? { ...x, label: v } : x))); return; }
+    const prev = rows;
     setRows((rs) => rs.map((x) => (x.item_key === key ? { ...x, label: v } : x)));
-    run(() => updateItemLabel(l.list_key, key, v), "حُفظ نصّ البند");
+    const ok = await run(() => updateItemLabel(l.list_key, key, v), "حُفظ نصّ البند");
+    if (!ok) setRows(prev); // تراجع عن التفاؤل عند فشل الخادم
   };
   const moveUp = (i) => {
     const next = work.slice();
@@ -275,10 +283,12 @@ function ListDetail({ l, items, back, say }) {
     if (l.locked) { setDraft(next); return; }
     setRows(next);
   };
-  const toggle = (it) => {
+  const toggle = async (it) => {
     if (l.locked) { setDraft(work.map((x) => (x.item_key === it.item_key ? { ...x, active: !x.active } : x))); return; }
+    const prev = rows;
     setRows((rs) => rs.map((x) => (x.item_key === it.item_key ? { ...x, active: !it.active } : x)));
-    run(() => setItemActive(l.list_key, it.item_key, !it.active), it.active ? "أُوقف البند" : "أُعيد تفعيل البند");
+    const ok = await run(() => setItemActive(l.list_key, it.item_key, !it.active), it.active ? "أُوقف البند" : "أُعيد تفعيل البند");
+    if (!ok) setRows(prev);
   };
   const doAdd = async () => {
     const label = add.trim();
@@ -289,7 +299,7 @@ function ListDetail({ l, items, back, say }) {
     const r = await addItem(l.list_key, label);
     setBusy(false);
     if (!r.ok) return say("⚠ " + r.error);
-    setRows((rs) => rs.concat({ item_key: r.key, label, active: true, sort_order: rs.length + 1 }));
+    setRows((rs) => rs.concat({ item_key: r.key, label, active: true, sort_order: Math.max(0, ...rs.map((x) => x.sort_order || 0)) + 1 }));
     say(`أُضيف البند بالمفتاح ${r.key} — مُسجَّل في التدقيق`);
   };
 
@@ -335,8 +345,11 @@ function ListDetail({ l, items, back, say }) {
       <div className="row" style={{ marginTop: 16 }}>
         {l.locked ? (
           <button className="btn btn-primary" disabled={!lockedDirty || busy}
-            onClick={() => run(() => submitChangeRequest("reference_list", l.list_key, { items: draft }, "تعديل قائمة مقفلة من بوابة الأدمن"),
-              "رُفع التعديل لاعتماد رئيس المركز").then(() => setDraft(null))}>
+            onClick={async () => {
+              const ok = await run(() => submitChangeRequest("reference_list", l.list_key, { items: draft }, "تعديل قائمة مقفلة من بوابة الأدمن"),
+                "رُفع التعديل لاعتماد رئيس المركز");
+              if (ok) setDraft(null); // لا تُفرَّغ المسودة إلا بنجاح الرفع (وإلا ضاعت تعديلات الأدمن)
+            }}>
             <I name="send" size={18} /> رفع التعديل للاعتماد</button>
         ) : (
           <button className="btn btn-primary" disabled={!orderDirty || busy}
@@ -366,12 +379,22 @@ function ListDetail({ l, items, back, say }) {
 /* ——— تبويب الإشعارات ——— */
 function NotifsTab({ templates, q, open, say }) {
   const [cat, setCat] = useState("الكل");
+  // تجاوزٌ محلّي لحالة التفعيل — تغذيةٌ فوريّة مع تراجعٍ عند فشل الخادم
+  const [actOverride, setActOverride] = useState({}); // {template_key: bool}
+  const isActive = (n) => (n.template_key in actOverride ? actOverride[n.template_key] : n.active);
   const cats = Object.keys(NOTIF_CATS).filter((c) => templates.some((t) => t.category === c));
   const rows = templates.filter((n) => (cat === "الكل" || n.category === cat) &&
     hit(q, n.title, n.subject, n.body, n.recipient, n.legal_ref || "", n.trigger_desc));
+  const [busyKey, setBusyKey] = useState(null);
   const toggle = async (n) => {
-    const r = await setTemplateActive(n.template_key, !n.active);
-    say(r.ok ? (n.active ? "أُوقف الإشعار: " : "فُعّل الإشعار: ") + n.title : "⚠ " + r.error);
+    if (busyKey === n.template_key) return; // يمنع النقر المزدوج المتسارع
+    const next = !isActive(n);
+    setBusyKey(n.template_key);
+    setActOverride((o) => ({ ...o, [n.template_key]: next }));
+    const r = await setTemplateActive(n.template_key, next);
+    setBusyKey(null);
+    if (!r.ok) { setActOverride((o) => ({ ...o, [n.template_key]: !next })); return say("⚠ " + r.error); }
+    say((next ? "فُعّل الإشعار: " : "أُوقف الإشعار: ") + n.title + " — مُسجَّل في التدقيق");
   };
   return (
     <div>
@@ -382,19 +405,19 @@ function NotifsTab({ templates, q, open, say }) {
       <div className="ad-tblwrap"><table className="ad-tbl">
         <thead><tr><th>الإشعار</th><th>المُرسَل إليه</th><th>القنوات</th><th>السند</th><th>المهلة</th><th>الحالة</th><th></th></tr></thead>
         <tbody>
-          {rows.map((n) => (
-            <tr key={n.template_key} className={n.active ? "" : "off"}>
+          {rows.map((n) => { const act = isActive(n); return (
+            <tr key={n.template_key} className={act ? "" : "off"}>
               <td><button className="ad-link" onClick={() => open(n.template_key)}>{n.title}</button>
                 <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{n.trigger_desc}</div></td>
               <td style={{ fontSize: 12.5 }}>{n.recipient}</td>
               <td><div className="row" style={{ gap: 4, flexWrap: "wrap" }}>{(n.channels || []).map((c) => <span className="achip" key={c}>{CHANNEL_AR[c] || c}</span>)}</div></td>
               <td className="mono" style={{ fontSize: 12 }}>{n.legal_ref || "—"}</td>
               <td style={{ fontSize: 12.5 }}>{n.sla || "—"}</td>
-              <td><Tag tone={n.active ? "success" : "neutral"} size="sm">{n.active ? "مفعّل" : "موقوف"}</Tag></td>
-              <td><button className="ad-ibtn" title={n.active ? "إيقاف" : "تفعيل"} onClick={() => toggle(n)}>
-                <I name={n.active ? "toggle_on" : "toggle_off"} size={26} color={n.active ? "var(--color-primary)" : "var(--text-disabled)"} /></button></td>
+              <td><Tag tone={act ? "success" : "neutral"} size="sm">{act ? "مفعّل" : "موقوف"}</Tag></td>
+              <td><button className="ad-ibtn" title={act ? "إيقاف" : "تفعيل"} disabled={busyKey === n.template_key} onClick={() => toggle(n)}>
+                <I name={act ? "toggle_on" : "toggle_off"} size={26} color={act ? "var(--color-primary)" : "var(--text-disabled)"} /></button></td>
             </tr>
-          ))}
+          ); })}
           {!rows.length && <tr><td colSpan="7" className="muted" style={{ padding: 26, textAlign: "center" }}>لا نتائج مطابقة</td></tr>}
         </tbody>
       </table></div>
@@ -491,14 +514,27 @@ function TextDetail({ m, kind, back, say }) {
   const key = kind === "sys" ? m.message_key : m.text_key;
   const [text, setText] = useState(m.body);
   const [tone, setTone] = useState(m.tone);
-  const dirty = text !== m.body || (kind === "sys" && tone !== m.tone);
+  const [busy, setBusy] = useState(false);
+  // خطّ أساسٍ محلّي: للنظامي = آخر نصٍّ رُفع (يمنع رفعاً مكرّراً مطابقاً، ويعيد
+  // التفعيل عند أي تعديلٍ جديد)؛ وللنظام = ما حُفظ فعلاً (m ثابتة حتى التحديث).
+  const [baseBody, setBaseBody] = useState(m.body);
+  const [baseTone, setBaseTone] = useState(m.tone);
+  const dirty = text !== baseBody || (kind === "sys" && tone !== baseTone);
   const save = async () => {
+    if (busy) return;
+    setBusy(true);
     if (kind === "sys") {
       const r = await saveSystemMessage(key, { body: text, tone });
-      return say(r.ok ? "حُفظ النصّ وسرى على كل البوابات — مُسجَّل في التدقيق" : "⚠ " + r.error);
+      setBusy(false);
+      if (!r.ok) return say("⚠ " + r.error);
+      setBaseBody(text); setBaseTone(tone); // ما حُفظ صار الأساس
+      return say("حُفظ النصّ وسرى على كل البوابات — مُسجَّل في التدقيق");
     }
     const r = await submitChangeRequest("legal_text", key, { body: text }, "تعديل نصّ نظامي من بوابة الأدمن");
-    say(r.ok ? "رُفع النصّ لاعتماد رئيس المركز — مُسجَّل في التدقيق" : "⚠ " + r.error);
+    setBusy(false);
+    if (!r.ok) return say("⚠ " + r.error);
+    setBaseBody(text); // آخر نصٍّ رُفع — لا يُرفع ثانيةً إلا إن عُدِّل
+    say("رُفع النصّ لاعتماد رئيس المركز — مُسجَّل في التدقيق");
   };
   return (
     <div>
@@ -531,9 +567,9 @@ function TextDetail({ m, kind, back, say }) {
       </Card>
 
       <div className="row" style={{ marginTop: 16, gap: 8 }}>
-        <button className="btn btn-primary" disabled={!dirty} onClick={save}>
+        <button className="btn btn-primary" disabled={!dirty || busy} onClick={save}>
           <I name={kind === "legals" ? "send" : "save"} size={18} /> {kind === "legals" ? "رفع النصّ للاعتماد" : "حفظ النصّ"}</button>
-        <button className="btn btn-ghost" disabled={!dirty} onClick={() => { setText(m.body); setTone(m.tone); }}>تراجع</button>
+        <button className="btn btn-ghost" disabled={!dirty} onClick={() => { setText(baseBody); setTone(baseTone); }}>تراجع</button>
       </div>
     </div>
   );
@@ -645,6 +681,32 @@ function RolesScreen({ staff }) {
 /* ═══════════ الجهات ووحداتها ═══════════ */
 const ENTITY_AR = { prosecution: "النيابة العامة", state_security: "رئاسة أمن الدولة", moi: "وزارة الداخلية", nazaha: "هيئة الرقابة ومكافحة الفساد", moj: "وزارة العدل" };
 
+// صفّ الوحدة — في نطاق الوحدة (لا داخل جسم الرسم) كي لا يُعاد تركيبه على كل ضغطة مفتاح
+function UnitRow({ entity, u, depth, onUpdate, onAddChild }) {
+  return (
+    <div className={"ad-item" + (u.active ? "" : " off")} style={{ marginInlineStart: depth * 22 }}>
+      <I name={u.kind === "hq" ? "account_balance" : u.kind === "region" ? "location_city" : "store"} size={17}
+        color={u.kind === "hq" ? "var(--color-primary)" : "var(--text-secondary)"} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        {u.name}
+        {u.city && <span className="muted" style={{ fontSize: 11.5 }}> · {u.city}</span>}
+        {!u.active && <Tag tone="neutral" size="sm" style={{ marginInlineStart: 6 }}>موقوفة</Tag>}
+      </span>
+      {u.recommendations > 0 && <span className="achip" title="توصيات مرتبطة">{u.recommendations} توصية</span>}
+      <button className={"achip" + (u.is_intake_point ? " on" : "")} title="نقطة استقبال الإحالات"
+        onClick={() => onUpdate(entity, u, { intake: !u.is_intake_point }, u.is_intake_point ? "أُلغيت نقطة الاستقبال" : "صارت نقطة استقبال")}>
+        <I name="inbox" size={12} /> استقبال</button>
+      {u.kind !== "hq" && (
+        <button className="ad-ibtn" title={u.active ? "إيقاف الوحدة (لا حذف)" : "إعادة تفعيل"}
+          onClick={() => onUpdate(entity, u, { active: !u.active }, u.active ? "أُوقفت الوحدة" : "أُعيد تفعيل الوحدة")}>
+          <I name={u.active ? "visibility_off" : "visibility"} size={17} /></button>)}
+      {u.kind === "region" && (
+        <button className="ad-ibtn" title="إضافة فرع محافظة" onClick={() => onAddChild(u.id)}>
+          <I name="add_business" size={17} /></button>)}
+    </div>
+  );
+}
+
 function EntitiesScreen({ org, say }) {
   const [data, setData] = useState(org);
   const [adding, setAdding] = useState(null); // {parentId, city}
@@ -668,28 +730,7 @@ function EntitiesScreen({ org, say }) {
     say("أُضيف فرع «" + city + "» تحت " + parent.name + " — مُسجَّل في التدقيق");
   };
 
-  const UnitRow = ({ entity, u, depth }) => (
-    <div className={"ad-item" + (u.active ? "" : " off")} style={{ marginInlineStart: depth * 22 }}>
-      <I name={u.kind === "hq" ? "account_balance" : u.kind === "region" ? "location_city" : "store"} size={17}
-        color={u.kind === "hq" ? "var(--color-primary)" : "var(--text-secondary)"} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        {u.name}
-        {u.city && <span className="muted" style={{ fontSize: 11.5 }}> · {u.city}</span>}
-        {!u.active && <Tag tone="neutral" size="sm" style={{ marginInlineStart: 6 }}>موقوفة</Tag>}
-      </span>
-      {u.recommendations > 0 && <span className="achip" title="توصيات مرتبطة">{u.recommendations} توصية</span>}
-      <button className={"achip" + (u.is_intake_point ? " on" : "")} title="نقطة استقبال الإحالات"
-        onClick={() => doUpdate(entity, u, { intake: !u.is_intake_point }, u.is_intake_point ? "أُلغيت نقطة الاستقبال" : "صارت نقطة استقبال")}>
-        <I name="inbox" size={12} /> استقبال</button>
-      {u.kind !== "hq" && (
-        <button className="ad-ibtn" title={u.active ? "إيقاف الوحدة (لا حذف)" : "إعادة تفعيل"}
-          onClick={() => doUpdate(entity, u, { active: !u.active }, u.active ? "أُوقفت الوحدة" : "أُعيد تفعيل الوحدة")}>
-          <I name={u.active ? "visibility_off" : "visibility"} size={17} /></button>)}
-      {u.kind === "region" && (
-        <button className="ad-ibtn" title="إضافة فرع محافظة" onClick={() => setAdding({ parentId: u.id, city: "" })}>
-          <I name="add_business" size={17} /></button>)}
-    </div>
-  );
+  const openAdd = (id) => setAdding({ parentId: id, city: "" });
 
   return (
     <div>
@@ -715,8 +756,8 @@ function EntitiesScreen({ org, say }) {
               <div style={{ display: "grid", gap: 6 }}>
                 {regions.map((u) => (
                   <React.Fragment key={u.id}>
-                    <UnitRow entity={e.entity} u={u} depth={0} />
-                    {childrenOf(u.id).map((c) => <UnitRow key={c.id} entity={e.entity} u={c} depth={1} />)}
+                    <UnitRow entity={e.entity} u={u} depth={0} onUpdate={doUpdate} onAddChild={openAdd} />
+                    {childrenOf(u.id).map((c) => <UnitRow key={c.id} entity={e.entity} u={c} depth={1} onUpdate={doUpdate} onAddChild={openAdd} />)}
                     {adding?.parentId === u.id && (
                       <div className="row" style={{ marginInlineStart: 22, gap: 8 }}>
                         <input className="ad-input" style={{ maxWidth: 260 }} autoFocus placeholder="اسم المحافظة/المدينة…"
