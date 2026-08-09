@@ -86,7 +86,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
   const ent = ENTITIES[rec.entity] || ENTITIES.prosecution; // الجهة المختصة ومسمّياتها
   const [f, setF] = useState({
     // قسم ١ — في الطلب المرتبط تُورث الهوية؛ وإلا تُدخَل يدوياً من الخطاب الورقيّ
-    psychHistory: '', health: '', healthNote: '', criminal: 'لا يوجد', criminalNote: '',
+    psych: 'لا يوجد', psychHistory: '', health: '', healthNote: '', criminal: 'لا يوجد', criminalNote: '',
     reveal: '', role: rec.cat || '',
     obName: '', obNid: '', obPhone: '', obGender: '', obNationality: '', obMarital: '', obResidence: '', obEmployer: '', obEducation: '',
     // قسم ٢ و ٣
@@ -96,7 +96,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
     hidden2: '', threatExists: '', threatType: '', riskLevel: '', harmExists: '', harmType: '',
     extends: '', extendsWho: '', adapt: '', provide: '', why1: '', why2: '', why3: '',
     // قسم ٥ و ٦
-    types: [], alternatives: '', duration: '', durationNote: '', attachMap: {},
+    types: [], alternatives: '', duration: '', durationNote: '', attachFiles: [],
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const [ack, setAck] = useState(false);
@@ -189,7 +189,12 @@ function RecommendationForm({ rec, onApprove, onBack }) {
           </Field>
           {f.criminal === 'يوجد' && <Field label="تفاصيل التاريخ الجنائي" hint="(يُرفق إن وجد)"><input value={f.criminalNote} onChange={(e) => set('criminalNote', e.target.value)} dir="auto" /></Field>}
         </div>
-        <Field label="التاريخ النفسي (للتقييم)" hint="(يُرفق إن وجد)"><textarea value={f.psychHistory} onChange={(e) => set('psychHistory', e.target.value)} dir="auto" /></Field>
+        <div className="rf-grid2">
+          <Field label="التاريخ النفسي (للتقييم)" req>
+            <Choice value={f.psych} set={(v) => set('psych', v)} options={['لا يوجد', 'يوجد']} />
+          </Field>
+          {f.psych === 'يوجد' && <Field label="تفاصيل التاريخ النفسي" hint="(يُرفق إن وجد)"><input value={f.psychHistory} onChange={(e) => set('psychHistory', e.target.value)} dir="auto" /></Field>}
+        </div>
         <Field label="رغبة مقدم الطلب في الكشف عن هويته" req>
           <Choice value={f.reveal} set={(v) => set('reveal', v)} options={['يرغب', 'لا يرغب']} />
         </Field>
@@ -268,35 +273,33 @@ function RecommendationForm({ rec, onApprove, onBack }) {
         )}
       </Sec>
 
-      {/* ⑤ أنواع الحماية المقترحة */}
-      <Sec n="٥" title="أنواع الحماية المقترحة" fed>
+      {/* ⑤ و⑥ يظهران مع «توفير» فقط — «عدم توفير» يخفيهما ولا يمنع الرفع (حزمة 2026-08-09 محور ٢) */}
+      {f.provide !== 'عدم توفير' && <Sec n="٥" title="أنواع الحماية المقترحة" fed>
         <Multi value={(f.types || []).filter((t) => PROTECTION_TYPES.includes(t))} set={(v) => set('types', v)} options={PROTECTION_TYPES} />
-        <p className="rf-sec-sub" style={{ marginTop: 8 }}>تُختار من بنود الحماية المعتمدة (المادة 14)؛ والقرار النهائي بأنواعها للمجلس.</p>
+        <p className="rf-sec-sub" style={{ marginTop: 8 }}>تُختار من بنود الحماية المعتمدة (المادة 14 واللائحة)؛ والقرار النهائي بأنواعها للمجلس.</p>
         <Field label="الحلول البديلة المقترحة (إن وجدت)"><textarea value={f.alternatives} onChange={(e) => set('alternatives', e.target.value)} dir="auto" /></Field>
-      </Sec>
+      </Sec>}
 
-      {/* ⑥ مدة الحماية */}
-      <Sec n="٦" title="مدة الحماية المقترحة" fed>
+      {f.provide !== 'عدم توفير' && <Sec n="٦" title="مدة الحماية المقترحة" fed>
         <Choice value={f.duration} set={(v) => set('duration', v)} options={['ثلاثون يوماً', 'إلى حين انتهاء القضية', 'مدة محدّدة']} />
         {f.duration === 'مدة محدّدة' && <Field label="حدّد المدة" hint=""><input value={f.durationNote} onChange={(e) => set('durationNote', e.target.value)} dir="auto" style={{ maxWidth: 320 }} /></Field>}
-      </Sec>
+      </Sec>}
 
-      {/* المرفقات — مستندات مسمّاة، لكل مستند حقل إرفاق (PDF) يُرفع عند وجوده */}
-      <Sec n="" title="المستندات المطلوبة (مرفقات)" sub={linked ? 'PDF — صورة خطاب الجهة الوارد إلزامية سنداً للتدقيق؛ وأرفق ما ورد معه.' : 'PDF — لكل مستند حقل إرفاق مستقلّ؛ أرفق ما ينطبق (بعضها اختياري: التاريخ الجنائي/النفسي إن وُجد).'}>
+      {/* المرفقات — رفع متعدد الملفات؛ يُخزَّن اسم الملف وتُحذف الملفات فرادى */}
+      <Sec n="" title="المستندات المطلوبة (مرفقات)" sub={linked ? 'PDF — أرفق صورة خطاب الجهة الوارد وما ورد معه دفعةً واحدة.' : 'PDF — أرفق المستندات الداعمة دفعةً واحدة (الهوية · بيانات القضية · تقييم المخاطر · التقارير والمسوّغات).'}>
         <div className="rf-attach-grid">
-          {(linked
-            ? ['صورة خطاب الجهة الوارد (التوصية)', 'بيانات القضية والإجراءات النظامية', 'تقرير تقييم المخاطر', 'معلومات أخرى للتهديد (وسائط، أوراق)', 'أي مسوّغات تدعم التوصية']
-            : ['الهوية الوطنية لطالب الحماية والتابعين', 'بيانات القضية والإجراءات النظامية', 'تقرير تقييم المخاطر', 'تقرير طبي للحالة الصحية', 'التاريخ الجنائي (إن وجد)', 'التاريخ النفسي (إن وجد)', 'معلومات أخرى للتهديد (وسائط، أوراق)', 'أي مسوّغات تدعم الطلب', 'طلب الحماية المسبّب']
-          ).map((d) => {
-            const fn = (f.attachMap || {})[d];
-            return (
-              <label key={d} className="rf-attach" style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
-                <input type="file" accept="application/pdf" style={{ display: 'none' }}
-                  onChange={(e) => { const x = e.target.files && e.target.files[0]; if (x) set('attachMap', { ...(f.attachMap || {}), [d]: x.name }); e.target.value = ''; }} />
-                <I name={fn ? 'check_circle' : 'upload_file'} size={16} color={fn ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!fn} />
-                <span>{d}{fn && <b style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--color-primary)', marginTop: 2 }}>{fn} ✓</b>}</span>
-              </label>);
-          })}
+          <label className="rf-attach" style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+            <input type="file" accept="application/pdf,image/*" multiple style={{ display: 'none' }}
+              onChange={(e) => { const xs = Array.from(e.target.files || []); if (xs.length) set('attachFiles', [...(f.attachFiles || []), ...xs.map((x) => x.name)]); e.target.value = ''; }} />
+            <I name={(f.attachFiles || []).length ? 'check_circle' : 'upload_file'} size={16} color={(f.attachFiles || []).length ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!(f.attachFiles || []).length} />
+            <span>إرفاق المستندات (يمكن اختيار أكثر من ملف)</span>
+          </label>
+          {(f.attachFiles || []).map((fn, i) => (
+            <label key={fn + i} className="rf-attach" style={{ alignItems: 'flex-start' }}>
+              <I name="check_circle" size={16} color="var(--color-primary)" fill />
+              <span>{fn}</span>
+              <button className="link" style={{ marginInlineStart: 'auto', fontSize: 12 }} onClick={(e) => { e.preventDefault(); set('attachFiles', (f.attachFiles || []).filter((_, j) => j !== i)); }}><I name="close" size={15} /></button>
+            </label>))}
         </div>
       </Sec>
 
@@ -309,7 +312,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
         </div>
         <label className="rf-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>أقرّ بأنّ محتوى التوصية أُدخل مطابقاً للخطاب الرسمي الوارد وصورته مُرفقة، ويُسجل إدخالي في التدقيق باسمي ووقته.</span></label>
         <div className="row" style={{ marginTop: 16, gap: 10 }}>
-          <button className="btn btn-primary" disabled={!ack || (linked && !f.provide) || (!linked && !(f.attachMap || {})['الهوية الوطنية لطالب الحماية والتابعين'])} onClick={() => onApprove(f)}><I name="send" size={18} /> تسجيل وإحالة</button>
+          <button className="btn btn-primary" disabled={!ack || (linked && !f.provide) || (!linked && !(f.attachFiles || []).length)} onClick={() => onApprove(f)}><I name="send" size={18} /> تسجيل وإحالة</button>
         </div>
         {linked && !f.provide && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>حدّد توصية الجهة (توفير / عدم توفير) كما وردت في الخطاب.</p>}
       </Card>
@@ -503,11 +506,12 @@ function Intake({ applicantRoles }) {
           factors9: {
             health: d.health || '', healthNote: d.healthNote || '',
             criminal: d.criminal || '', criminalNote: d.criminalNote || '',
-            psychHistory: d.psychHistory || '', reveal: d.reveal || '',
+            psych: d.psych || '', psychHistory: d.psychHistory || '', reveal: d.reveal || '',
             crimeType: d.crimeType || '', waqia: d.waqia || [], crimeDesc: d.crimeDesc || '', hidden2: d.hidden2 || '',
             threatExists: d.threatExists || '', threatType: d.threatType || '', riskLevel: d.riskLevel || '',
             harmExists: d.harmExists || '', harmType: d.harmType || '',
             extends: d.extends || '', extendsWho: d.extendsWho || '', adapt: d.adapt || '',
+            attachFiles: (d.attachFiles || []).filter(Boolean),
             caseSummary: d.caseSummary || '', caseStage: d.caseStage || '', applicantRoleDesc: d.applicantRole || '',
             contacted: d.contacted || '', contactKind: d.contactKind || '',
             reasons: [d.why1, d.why2, d.why3].filter(Boolean),
@@ -557,10 +561,11 @@ function Intake({ applicantRoles }) {
       } else {
         details.letter = { no: letter.no, date: letter.date, by: letter.by };
         details.recommendation = d.provide || null; // توفير | عدم توفير (توصية الجهة الفعليّة)
+        details.attachments = (d.attachFiles || []).filter(Boolean); // أسماء المرفقات — تظهر في سجل الفرز
         details.assess = {
           health: d.health || '', healthNote: d.healthNote || '',
           criminal: d.criminal || '', criminalNote: d.criminalNote || '',
-          psychHistory: d.psychHistory || '', reveal: d.reveal || '',
+          psych: d.psych || '', psychHistory: d.psychHistory || '', reveal: d.reveal || '',
           crimeType: d.crimeType || '', waqia: d.waqia || [], crimeDesc: d.crimeDesc || '', hidden2: d.hidden2 || '',
           threatExists: d.threatExists || '', threatType: d.threatType || '', riskLevel: d.riskLevel || '',
           harmExists: d.harmExists || '', harmType: d.harmType || '',

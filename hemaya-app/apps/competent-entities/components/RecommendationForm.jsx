@@ -69,13 +69,13 @@ export function RecommendationForm({ rec, onApprove, onBack }) {
   const linked = rec.linked !== false;
   const ent = ENTITIES[rec.entity] || ENTITIES.prosecution;
   const [f, setF] = useState({
-    psychHistory: '', health: '', healthNote: '', criminal: 'لا يوجد', criminalNote: '',
+    psych: 'لا يوجد', psychHistory: '', health: '', healthNote: '', criminal: 'لا يوجد', criminalNote: '',
     reveal: '', role: rec.cat || '', obName: '', obNid: '', obPhone: '',
     reasons: '', caseNo: rec.caseNo || '', caseSummary: '', caseStage: '', applicantRole: '',
     contacted: '', contactKind: '', crimeType: '', waqia: [], crimeDesc: '',
     hidden2: '', threatExists: '', threatType: '', riskLevel: '', harmExists: '', harmType: '',
     extends: '', extendsWho: '', adapt: '', provide: '', why1: '', why2: '', why3: '',
-    types: [], alternatives: '', duration: '', durationNote: '', attachMap: {},
+    types: [], alternatives: '', duration: '', durationNote: '', attachFiles: [],
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const [ack, setAck] = useState(false);
@@ -163,7 +163,12 @@ export function RecommendationForm({ rec, onApprove, onBack }) {
           </Field>
           {f.criminal === 'يوجد' && <Field label="تفاصيل التاريخ الجنائي" hint="(يُرفق إن وجد)"><input value={f.criminalNote} onChange={(e) => set('criminalNote', e.target.value)} dir="auto" /></Field>}
         </div>
-        <Field label="التاريخ النفسي (للتقييم)" hint="(يُرفق إن وجد)"><textarea value={f.psychHistory} onChange={(e) => set('psychHistory', e.target.value)} dir="auto" /></Field>
+        <div className="rf-grid2">
+          <Field label="التاريخ النفسي (للتقييم)" req>
+            <Choice value={f.psych} set={(v) => set('psych', v)} options={['لا يوجد', 'يوجد']} />
+          </Field>
+          {f.psych === 'يوجد' && <Field label="تفاصيل التاريخ النفسي" hint="(يُرفق إن وجد)"><input value={f.psychHistory} onChange={(e) => set('psychHistory', e.target.value)} dir="auto" /></Field>}
+        </div>
         <Field label="رغبة مقدم الطلب في الكشف عن هويته" req>
           <Choice value={f.reveal} set={(v) => set('reveal', v)} options={['يرغب', 'لا يرغب']} />
         </Field>
@@ -239,29 +244,32 @@ export function RecommendationForm({ rec, onApprove, onBack }) {
         )}
       </Sec>
 
-      <Sec n="٥" title="أنواع الحماية المقترحة" fed>
+      {/* ⑤ و⑥ يظهران مع «توفير» فقط — «عدم توفير» يخفيهما ولا يمنع الرفع (حزمة 2026-08-09 محور ٢) */}
+      {f.provide !== 'عدم توفير' && <Sec n="٥" title="أنواع الحماية المقترحة" fed>
         <Multi value={(f.types || []).filter((t) => PROTECTION_TYPES.includes(t))} set={(v) => set('types', v)} options={PROTECTION_TYPES} />
-        <p className="rf-sec-sub" style={{ marginTop: 8 }}>تُختار من بنود الحماية المعتمدة (المادة 14)؛ والقرار النهائي بأنواعها للمجلس.</p>
+        <p className="rf-sec-sub" style={{ marginTop: 8 }}>تُختار من بنود الحماية المعتمدة (المادة 14 واللائحة)؛ والقرار النهائي بأنواعها للمجلس.</p>
         <Field label="الحلول البديلة المقترحة (إن وجدت)"><textarea value={f.alternatives} onChange={(e) => set('alternatives', e.target.value)} dir="auto" /></Field>
-      </Sec>
+      </Sec>}
 
-      <Sec n="٦" title="مدة الحماية المقترحة" fed>
+      {f.provide !== 'عدم توفير' && <Sec n="٦" title="مدة الحماية المقترحة" fed>
         <Choice value={f.duration} set={(v) => set('duration', v)} options={DURATIONS} />
         {isCustomDuration(f.duration) && <Field label="حدّد المدة" hint=""><input value={f.durationNote} onChange={(e) => set('durationNote', e.target.value)} dir="auto" style={{ maxWidth: 320 }} /></Field>}
-      </Sec>
+      </Sec>}
 
-      <Sec n="" title="المستندات المطلوبة (مرفقات)" sub="PDF — لكل مستند حقل إرفاق مستقلّ؛ أرفق ما ينطبق (بعضها اختياري: التاريخ الجنائي/النفسي إن وُجد).">
+      <Sec n="" title="المستندات المطلوبة (مرفقات)" sub="PDF — أرفق المستندات الداعمة دفعةً واحدة (الهوية · بيانات القضية · تقييم المخاطر · التقارير والمسوّغات).">
         <div className="rf-attach-grid">
-          {['الهوية الوطنية لطالب الحماية والتابعين', 'بيانات القضية والإجراءات النظامية', 'تقرير تقييم المخاطر', 'تقرير طبي للحالة الصحية', 'التاريخ الجنائي (إن وجد)', 'التاريخ النفسي (إن وجد)', 'معلومات أخرى للتهديد (وسائط، أوراق)', 'أي مسوّغات تدعم الطلب', 'طلب الحماية المسبّب'].map((d) => {
-            const fn = (f.attachMap || {})[d];
-            return (
-              <label key={d} className="rf-attach" style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
-                <input type="file" accept="application/pdf" style={{ display: 'none' }}
-                  onChange={(e) => { const x = e.target.files && e.target.files[0]; if (x) set('attachMap', { ...(f.attachMap || {}), [d]: x.name }); e.target.value = ''; }} />
-                <I name={fn ? 'check_circle' : 'upload_file'} size={16} color={fn ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!fn} />
-                <span>{d}{fn && <b style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--color-primary)', marginTop: 2 }}>{fn} ✓</b>}</span>
-              </label>);
-          })}
+          <label className="rf-attach" style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+            <input type="file" accept="application/pdf,image/*" multiple style={{ display: 'none' }}
+              onChange={(e) => { const xs = Array.from(e.target.files || []); if (xs.length) set('attachFiles', [...(f.attachFiles || []), ...xs.map((x) => x.name)]); e.target.value = ''; }} />
+            <I name={(f.attachFiles || []).length ? 'check_circle' : 'upload_file'} size={16} color={(f.attachFiles || []).length ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!(f.attachFiles || []).length} />
+            <span>إرفاق المستندات (يمكن اختيار أكثر من ملف)</span>
+          </label>
+          {(f.attachFiles || []).map((fn, i) => (
+            <label key={fn + i} className="rf-attach" style={{ alignItems: 'flex-start' }}>
+              <I name="check_circle" size={16} color="var(--color-primary)" fill />
+              <span>{fn}</span>
+              <button className="link" style={{ marginInlineStart: 'auto', fontSize: 12 }} onClick={(e) => { e.preventDefault(); set('attachFiles', (f.attachFiles || []).filter((_, j) => j !== i)); }}><I name="close" size={15} /></button>
+            </label>))}
         </div>
       </Sec>
 
@@ -274,7 +282,7 @@ export function RecommendationForm({ rec, onApprove, onBack }) {
         <label className="rf-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>{linked ? 'أقرّ بصحة البيانات واكتمال المسوّغات، وأرفع التوصية لاعتماد الرئيس المباشر تمهيداً لإرسالها للمركز خلال المهلة النظامية.' : 'أقرّ بصحة البيانات واكتمال المسوّغات، وأرفع الطلب لاعتماد الرئيس المباشر تمهيداً لإرساله للمركز.'}</span></label>
         <div className="row" style={{ marginTop: 16, gap: 10 }}>
           <button className="btn btn-ghost"><I name="save" size={18} /> حفظ كمسوّدة</button>
-          <button className="btn btn-primary" disabled={!ack || (!linked && !(f.attachMap || {})['الهوية الوطنية لطالب الحماية والتابعين'])} onClick={() => onApprove && onApprove(f)}><I name="send" size={18} /> {linked ? 'رفع للاعتماد' : 'رفع الطلب'}</button>
+          <button className="btn btn-primary" disabled={!ack || (!linked && !(f.attachFiles || []).length)} onClick={() => onApprove && onApprove(f)}><I name="send" size={18} /> {linked ? 'رفع للاعتماد' : 'رفع الطلب'}</button>
         </div>
       </Card>
     </div>
@@ -357,7 +365,7 @@ export function UrgentForm({ rec, onSubmit, onBack }) {
         {u.extends === 'نعم' && <Field label="من يمتدّ إليهم الخطر" req><input value={u.extendsWho} onChange={(e) => set('extendsWho', e.target.value)} dir="auto" placeholder="مثال: الزوجة وابنان قاصران" /></Field>}
       </Sec>
 
-      <Sec n="٤" title="التدابير المؤقّتة المطلوبة" sub="تُختار من الأنواع الـ(13) المنصوص عليها في المادة الرابعة عشرة؛ والنائب العام يبتّ بالتدابير النهائية." fed>
+      <Sec n="٤" title="التدابير المؤقّتة المطلوبة" sub="تُختار من بنود المادة الرابعة عشرة واللائحة؛ والنائب العام يبتّ بالتدابير النهائية." fed>
         <Field label="التدابير المطلوبة (يمكن اختيار أكثر من واحد)" req>
           <Multi value={u.requestedTypes} set={(v) => set('requestedTypes', v)} options={PROTECTION_TYPES} />
         </Field>

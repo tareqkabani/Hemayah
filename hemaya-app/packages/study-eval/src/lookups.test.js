@@ -2,10 +2,16 @@
 import { describe, it, expect } from "vitest";
 import { PROTECTION_TYPES, REJECT_REASONS, DURATIONS } from "./lookups";
 
-describe("أنواع الحماية — المادة 14", () => {
-  it("ثلاثة عشر نوعاً بلا بند «أخرى» (له خانة مستقلة في النموذج)", () => {
-    expect(PROTECTION_TYPES).toHaveLength(13);
+describe("أنواع الحماية — المادة 14 واللائحة", () => {
+  it("ثمانية عشر بنداً (13 من م14 + 5 من اللائحة — حزمة 2026-08-09) بلا بند «أخرى» (له خانة مستقلة في النموذج)", () => {
+    expect(PROTECTION_TYPES).toHaveLength(18);
     expect(PROTECTION_TYPES.some((p) => p.t.includes("أخرى"))).toBe(false);
+  });
+
+  it("بنود اللائحة الخمسة حاضرة بعد بنود م14 الثلاثة عشر", () => {
+    const tail = PROTECTION_TYPES.slice(13).map((p) => p.t);
+    expect(tail[0]).toContain("إخضاع وسائل اتصال المشمول بالحماية للرقابة");
+    expect(tail[4]).toContain("وضع عنوان إقامة آخر للمشمول بالحماية");
   });
 
   it("النقل من مكان العمل وتغيير محل الإقامة وحدهما يتطلبان نطاقاً زمنياً", () => {
