@@ -100,7 +100,8 @@ export function StudyEvalPortal({ role, me, initial, basePath }) {
     const missing = data.map((t) => t.case_id).filter((id) => !details[id]);
     if (!missing.length) return;
     const [reqs, recs, dossiers] = await Promise.all([
-      supabase.from("protection_requests").select("case_id, applicant_role, channel, details, submitted_at").in("case_id", missing),
+      // النموذج عبر الدالة المقيّدة الباترة للهوية — لا قراءة مباشرة من protection_requests
+      supabase.rpc("study_eval_requests", { _case_ids: missing }),
       supabase.from("recommendations").select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details").in("case_id", missing),
       // الملف الكامل الوارد من الفرز — يصل مع الإسناد الحي فيفتح البديل مهمته كاملةً
       Promise.all(missing.map((id) => supabase.rpc("study_dossier", { _case_id: id }))),

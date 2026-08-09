@@ -28,15 +28,14 @@ export async function getPortalData(role: "studier" | "evaluator") {
 
   const tasks = tasksQ.data ?? [];
 
-  // تفاصيل النموذج (الطلب + توصية الجهة) للحالات المُسنَدة — سياسات «المُسنَد إليه» تحكمها
+  // تفاصيل النموذج (الطلب + توصية الجهة) للحالات المُسنَدة — الطلب عبر
+  // study_eval_requests المقيّدة بالإسناد والباترة لهوية طالب الحماية
+  // (identity/emergency_contact/on_behalf/onBehalf لا تغادر الخادم)
   const caseIds = tasks.map((t) => t.case_id);
   const details: Record<string, unknown> = {};
   if (caseIds.length) {
     const [reqs, recs, dossiers] = await Promise.all([
-      supabase
-        .from("protection_requests")
-        .select("case_id, applicant_role, channel, details, submitted_at")
-        .in("case_id", caseIds),
+      supabase.rpc("study_eval_requests", { _case_ids: caseIds }),
       supabase
         .from("recommendations")
         .select("case_id, source_body, decision, proposed_type, proposed_duration, factors9, notes, received_at, details")
