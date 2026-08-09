@@ -75,7 +75,11 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
       roleTag="بلا بيانات مشمولين"
       collapsed={collapsed}
       onToggleCollapsed={() => setCollapsed((c) => !c)}
-      onLogout={() => { window.location.href = "/admin/auth/signout"; }}
+      onLogout={() => {
+        // مسار الخروج POST يمسح الجلسة ويرجع JSON — ثم ينتقل العميل للبوابة الموحّدة.
+        // (كان window.location.href=GET إلى مسارٍ لا يقبل إلا POST ⇒ 405 فلا يخرج.)
+        fetch("/admin/auth/signout", { method: "POST" }).finally(() => { window.location.href = "/"; });
+      }}
       toast={toast}
     >
       {active === "overview" && (
