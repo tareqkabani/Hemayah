@@ -318,7 +318,7 @@ function RecommendationForm({ rec, onApprove, onBack }) {
 }
 
 // ── نموذج طالب الحماية الورقيّ (يطابق حقول بوابة الطالب) ──
-function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
+function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy, applicantRoles }) {
   const [s, setS] = useState({
     name: '', nid: '', phone: '', ecName: '', ecRel: '', ecPhone: '',
     role: '', category: '', priorSubmit: '', entity: '', repId: '', repName: '', repAge: '',
@@ -334,7 +334,9 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
   const ivOk = ch !== 'inperson' || (s.ivDate && s.ivNote.trim());
   const legacyOk = ch !== 'legacy' || (s.nat.trim() && s.cityIn.trim());
   const legacy = ch === 'legacy';
-  const ready = ch && metaOk && ivOk && legacyOk && s.name.trim() && s.nid.trim().length === 10 && s.phone.trim() && s.role && s.category && s.priorSubmit && s.entity && s.crime.trim() && s.reason.trim() && repOk && s.ackTrue && !busy;
+  // الجهة المختصة شرطية بسبق التقديم — مطابق لسلوك بوابة طالب الحماية
+  const ready = ch && metaOk && ivOk && legacyOk && s.name.trim() && s.nid.trim().length === 10 && s.phone.trim() && s.role && s.category && s.priorSubmit && (s.priorSubmit !== 'نعم' || s.entity) && s.crime.trim() && s.reason.trim() && repOk && s.ackTrue && !busy;
+  const roleOptions = (applicantRoles && applicantRoles.length) ? applicantRoles : ['أصيل (عن شخصه)', 'وليّ', 'وصيّ', 'وكيل', 'محامٍ'];
 
   return (
     <div className="rf">
@@ -364,7 +366,7 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
           <Field label="الاسم الكامل" req><input value={s.name} onChange={set('name')} dir="auto" placeholder="كما في الطلب الورقيّ" /></Field>
           <Field label="رقم الهوية / الإقامة" req><input value={s.nid} onChange={(e) => setS((x) => ({ ...x, nid: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="mono" inputMode="numeric" placeholder="١٠ أرقام" /></Field>
           <Field label="رقم الجوال" req><input value={s.phone} onChange={(e) => setS((x) => ({ ...x, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="mono" inputMode="tel" placeholder="05XXXXXXXX" /></Field>
-          <Field label="صفة مقدّم الطلب" hint="(م7/1 · م5/1)" req><Choice value={s.role} set={set('role')} options={['أصيل (عن شخصه)', 'وليّ', 'وصيّ', 'وكيل', 'محامٍ']} /></Field>
+          <Field label="صفة مقدّم الطلب" hint="(م7/1 · م5/1)" req><select value={s.role} onChange={set('role')}><option value="">— اختر —</option>{roleOptions.map((o) => <option key={o}>{o}</option>)}</select></Field>
           {onBehalfRole && <div style={{ gridColumn: '1 / -1' }}><div className="rf-divider"><I name="supervisor_account" size={16} color="var(--text-secondary)" /> بيانات طالب الحماية (المُقدَّم نيابةً عنه) — لائحة م5/1</div>
           <div className="rf-grid2">
             <Field label="رقم هوية الشخص" req><input value={s.repId} onChange={(e) => setS((x) => ({ ...x, repId: e.target.value.replace(/\D/g, '').slice(0, 10) }))} className="mono" inputMode="numeric" placeholder="١٠ أرقام" /></Field>
@@ -396,8 +398,8 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
         <Field label="نوع الجريمة محل الحماية" hint="(م1 — الجرائم الكبيرة)" req><textarea value={s.crime} onChange={set('crime')} dir="auto" placeholder="وصف موجز لطبيعة الجريمة المشمولة بالنظام…" /></Field>
         <Field label="سبب طلب الحماية ومسوّغاته" hint="(طلب مسبّب — م7/1)" req><textarea value={s.reason} onChange={set('reason')} dir="auto" placeholder="اذكر طبيعة الخطر والمسوّغات التي تستدعي توفير الحماية…" style={{ minHeight: 100 }} /></Field>
         <div className="rf-grid2">
-          <Field label="هل سبق التقديم إلى الجهة المختصة؟" req><select value={s.priorSubmit} onChange={set('priorSubmit')}><option value="">— اختر —</option><option value="نعم">نعم</option><option value="لا">لا</option></select></Field>
-          <Field label="اسم الجهة المختصة" hint="(م1/5 · جهة التحقيق أو المحاكمة)" req><select value={s.entity} onChange={set('entity')}><option value="">— اختر —</option>{ENTS.map(([, n]) => <option key={n}>{n}</option>)}</select></Field>
+          <Field label="هل سبق التقديم إلى الجهة المختصة؟" req><select value={s.priorSubmit} onChange={(e) => { const v = e.target.value; setS((x) => ({ ...x, priorSubmit: v, ...(v !== 'نعم' ? { entity: '' } : {}) })); }}><option value="">— اختر —</option><option value="نعم">نعم</option><option value="لا">لا</option></select></Field>
+          {s.priorSubmit === 'نعم' && <Field label="اسم الجهة المختصة" hint="(م1/5 · جهة التحقيق أو المحاكمة)" req><select value={s.entity} onChange={set('entity')}><option value="">— اختر —</option>{ENTS.map(([, n]) => <option key={n}>{n}</option>)}</select></Field>}
         </div>
         <Field label="رقم القضية" hint="(إن وجد)"><input value={s.caseNo} onChange={set('caseNo')} dir="auto" placeholder="مثال: 1447/…" /></Field>
         {legacy && <div className="rf-grid2" style={{ marginTop: 4 }}>
@@ -408,17 +410,19 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
 
       <Sec n="٤" title="المرفقات" sub="المرفقات اختيارية — أضفها إن توفّرت تعزيزاً لسند التدقيق.">
         <div className="rf-attach-grid">
-          <label className="rf-attach" style={{ cursor: 'pointer' }} onClick={() => setS((x) => ({ ...x, scanReq: !x.scanReq }))}>
-            <I name={s.scanReq ? 'check_circle' : 'upload_file'} size={18} color={s.scanReq ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={s.scanReq} />
-            <span>{legacy ? (s.scanReq ? 'نسخة الطلب المطبوعة من الموقع القديم ✓' : 'نسخة الطلب المطبوعة من الموقع القديم (اختياري)') : (s.scanReq ? 'صورة الطلب الورقيّ ✓' : 'صورة الطلب الورقيّ (اختياري)')}</span>
+          <label className="rf-attach" style={{ cursor: 'pointer' }}>
+            <input type="file" style={{ display: 'none' }} accept="image/*,application/pdf" onChange={(e) => { const fl = e.target.files && e.target.files[0]; if (fl) setS((x) => ({ ...x, scanReq: fl.name })); e.target.value = ''; }} />
+            <I name={s.scanReq ? 'check_circle' : 'upload_file'} size={18} color={s.scanReq ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!s.scanReq} />
+            <span>{(legacy ? 'نسخة الطلب المطبوعة من الموقع القديم' : 'صورة الطلب الورقيّ') + (s.scanReq ? ' — ' + s.scanReq : ' (اختياري) — اختر ملفاً')}</span>
           </label>
-          {!legacy && <label className="rf-attach" style={{ cursor: 'pointer' }} onClick={() => setS((x) => ({ ...x, scanId: !x.scanId }))}>
-            <I name={s.scanId ? 'check_circle' : 'badge'} size={18} color={s.scanId ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={s.scanId} />
-            <span>{s.scanId ? 'صورة الهوية / الإقامة ✓' : 'صورة الهوية / الإقامة (اختياري)'}</span>
+          {!legacy && <label className="rf-attach" style={{ cursor: 'pointer' }}>
+            <input type="file" style={{ display: 'none' }} accept="image/*,application/pdf" onChange={(e) => { const fl = e.target.files && e.target.files[0]; if (fl) setS((x) => ({ ...x, scanId: fl.name })); e.target.value = ''; }} />
+            <I name={s.scanId ? 'check_circle' : 'badge'} size={18} color={s.scanId ? 'var(--color-primary)' : 'var(--text-secondary)'} fill={!!s.scanId} />
+            <span>{s.scanId ? 'صورة الهوية / الإقامة — ' + s.scanId : 'صورة الهوية / الإقامة (اختياري) — اختر ملفاً'}</span>
           </label>}
           {s.extras.map((x, i) => <label key={i} className="rf-attach"><I name="check_circle" size={18} color="var(--color-primary)" fill /><span>{x} ✓</span><button className="link" style={{ marginInlineStart: 'auto', fontSize: 12 }} onClick={(e) => { e.preventDefault(); setS((st) => ({ ...st, extras: st.extras.filter((_, j) => j !== i) })); }}><I name="close" size={15} /></button></label>)}
         </div>
-        <button className="link" style={{ marginTop: 10 }} onClick={() => { const n = window.prompt('اسم المرفق الإضافي (مثال: تقرير طبي · محضر بلاغ)'); if (n && n.trim()) setS((x) => ({ ...x, extras: [...x.extras, n.trim()] })); }}><I name="add" size={16} /> إضافة مرفق آخر</button>
+        <label className="link" style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}><input type="file" multiple style={{ display: 'none' }} accept="image/*,application/pdf" onChange={(e) => { const fs = Array.from(e.target.files || []).map((fl) => fl.name); if (fs.length) setS((x) => ({ ...x, extras: [...x.extras, ...fs] })); e.target.value = ''; }} /><I name="add" size={16} /> إضافة مرفق آخر</label>
       </Sec>
 
       {ch === 'inperson' && (
@@ -447,7 +451,7 @@ function SeekerPaperForm({ onDone, onBack, meta, setMeta, metaOk, busy }) {
   );
 }
 
-function Intake() {
+function Intake({ applicantRoles }) {
   const [stage, setStage] = useState('select'); // select | seeker | entity | done
   const [entity, setEntity] = useState('prosecution');
   const [entMode, setEntMode] = useState('onbehalf');
@@ -540,9 +544,10 @@ function Intake() {
         details.city = d.cityIn || '';
         details.emergency_contact = { name: d.ecName || '', rel: d.ecRel || '', phone: d.ecPhone || '' };
         details.on_behalf = d.onBehalf === 'نعم' ? { nid: d.repId || '', name: d.repName || '', age: d.repAge || '' } : null;
+        // يُخزَّن اسم الملف (لا علامة true/false) — يظهر في شاشة النجاح وسجل الفرز
         details.attachments = [
-          ...(d.scanReq ? [d.channel === 'legacy' ? 'نسخة الطلب المطبوعة' : 'صورة الطلب الورقيّ'] : []),
-          ...((d.channel !== 'legacy' && d.scanId) ? ['صورة الهوية / الإقامة'] : []),
+          ...(d.scanReq ? [(d.channel === 'legacy' ? 'نسخة الطلب المطبوعة' : 'صورة الطلب الورقيّ') + ' — ' + d.scanReq] : []),
+          ...((d.channel !== 'legacy' && d.scanId) ? ['صورة الهوية / الإقامة — ' + d.scanId] : []),
           ...(d.extras || []),
         ];
         if (d.channel === 'inperson') details.interview = { date: d.ivDate, note: d.ivNote };
@@ -588,6 +593,7 @@ function Intake() {
         ref: res.secret, src, linked: false,
         channel: src === 'seeker' ? d.channel : 'mail',
         atts: src === 'seeker' ? ((details.attachments || []).length) : 0,
+        attNames: src === 'seeker' ? (details.attachments || []) : [],
         regNo: meta.regNo, when: fmtD(meta.receivedDate),
         letter: src === 'entity' ? { no: letter.no, date: fmtD(letter.date) } : null,
       });
@@ -611,7 +617,7 @@ function Intake() {
         {done.letter && <div className="flag"><I name="mail" size={17} /> الخطاب الرسمي: <b className="mono" style={{ marginInline: 4 }}>{done.letter.no}</b> · بتاريخ <b style={{ marginInline: 4 }}>{done.letter.date}</b> — وارد بالبريد</div>}
         {(done.linked || done.channel === 'legacy') && <div className="flag"><I name="verified_user" size={17} /> الهوية: <b>{done.linked ? 'موثّقة — موروثة من الطلب المُحال القائم' : 'موثّقة — دخول عبر نفاذ في الموقع القديم'}</b></div>}
         {!(done.linked || done.channel === 'legacy') && <div className="flag"><I name="gpp_maybe" size={17} color="var(--pp-bronze-ink)" /> الهوية: <b style={{ color: 'var(--pp-bronze-ink)' }}>غير موثّقة — تُفعَّل عبر نفاذ لاحقاً</b></div>}
-        <div className="flag"><I name="attach_file" size={17} /> المرفقات: <b>{done.src === 'entity' ? 'صورة الخطاب ومرفقاته' : (done.atts ? done.atts + ' مرفق (اختياري)' : 'بلا مرفقات — اختيارية')}</b></div>
+        <div className="flag"><I name="attach_file" size={17} /> المرفقات: <b>{done.src === 'entity' ? 'صورة الخطاب ومرفقاته' : ((done.attNames || []).length ? done.attNames.join(' · ') : 'بلا مرفقات — اختيارية')}</b></div>
         <div className="flag"><I name="history" size={17} /> مُسجَّل في التدقيق: <b>موظف الاستقبال · الآن</b></div>
         {done.channel === 'inperson' && <div className="flag"><I name="record_voice_over" size={17} /> مقابلة طالب الحماية: <b>موثّقة بمحضر — يوجبها النظام</b></div>}
         <div className="flag"><I name={done.src === 'entity' ? 'gavel' : 'person'} size={17} /> المصدر: <b>{done.src === 'entity' ? (done.linked ? 'جهة مختصّة — توصية على طلبٍ مُحال' : 'جهة مختصّة — طلب نيابةً عن الشخص') : (done.channel === 'legacy' ? 'طالب الحماية — عبر الموقع القديم' : 'طالب الحماية — ورقيّ حضوري')}</b></div>
@@ -627,7 +633,7 @@ function Intake() {
   }
 
   if (stage === 'seeker') {
-    return (<div className="pi-wrap">{err && <InlineAlert kind="error" title="تعذّر التسجيل" style={{ marginBottom: 14 }}>{err}</InlineAlert>}<SeekerPaperForm onDone={finish} onBack={() => setStage('select')} meta={meta} setMeta={setMeta} metaOk={metaOk} busy={busy} /></div>);
+    return (<div className="pi-wrap">{err && <InlineAlert kind="error" title="تعذّر التسجيل" style={{ marginBottom: 14 }}>{err}</InlineAlert>}<SeekerPaperForm onDone={finish} onBack={() => setStage('select')} meta={meta} setMeta={setMeta} metaOk={metaOk} busy={busy} applicantRoles={applicantRoles} /></div>);
   }
 
   if (stage === 'entity') {
@@ -722,6 +728,6 @@ function Intake() {
   </div>);
 }
 
-export function PaperIntakePortal() {
-  return <Intake />;
+export function PaperIntakePortal({ applicantRoles }) {
+  return <Intake applicantRoles={applicantRoles} />;
 }
