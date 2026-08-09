@@ -2609,6 +2609,16 @@ export type Database = {
         Returns: string
       }
       study_dossier: { Args: { _case_id: string }; Returns: Json }
+      study_eval_requests: {
+        Args: { _case_ids: string[] }
+        Returns: {
+          applicant_role: string
+          case_id: string
+          channel: string
+          details: Json
+          submitted_at: string
+        }[]
+      }
       study_eval_watchdog: {
         Args: never
         Returns: {
