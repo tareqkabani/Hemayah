@@ -31,19 +31,11 @@ export async function updateItemLabel(listKey: string, itemKey: string, label: s
   return done();
 }
 
-/** إعادة ترتيب بنود قائمة غير مقفلة — sort_order من موضعها في المصفوفة. */
+/** إعادة ترتيب بنود قائمة غير مقفلة — عبر RPC ذرّية (لا حلقة UPDATE قابلة للانقطاع). */
 export async function saveItemOrder(listKey: string, orderedKeys: string[]): Promise<R> {
   const sb = createServerClient();
-  for (let i = 0; i < orderedKeys.length; i++) {
-    const { data, error } = await sb
-      .from("reference_items")
-      .update({ sort_order: i + 1 })
-      .eq("list_key", listKey)
-      .eq("item_key", orderedKeys[i])
-      .select("id");
-    if (error) return fail(error.message);
-    if (!data?.length) return fail("تعذّر الترتيب — القائمة مقفلة.");
-  }
+  const { error } = await (sb.rpc as CallableFunction)("admin_reorder_items", { _list_key: listKey, _keys: orderedKeys });
+  if (error) return fail((error as { message: string }).message);
   return done();
 }
 
