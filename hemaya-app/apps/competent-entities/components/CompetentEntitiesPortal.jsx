@@ -407,6 +407,8 @@ function App() {
           waqia: (fd.waqia || []).filter(Boolean), hidden_m2: fd.hidden2, threat: fd.threatExists,
           risk_level: fd.riskLevel, harm: fd.harmExists, harm_type: fd.harmType,
           extends_others: fd.extends, extends_who: fd.extendsWho, adapt: fd.adapt,
+          psych: fd.psych, psych_history: fd.psychHistory,
+          attach_files: (fd.attachFiles || []).filter(Boolean),
         },
         types: (fd.types || []).filter(Boolean),
         durationDays: durationDays(fd.duration),
@@ -427,7 +429,11 @@ function App() {
       reason: fd.reasons || [fd.why1, fd.why2, fd.why3].filter(Boolean).join(' · ') || 'مسوّغات التوصية المرفوعة للمركز',
       caseNo: fd.caseNo || r?.caseNo || '',
       provide: fd.provide ? fd.provide === 'توفير' : true,
-      details: { types: (fd.types || []).filter(Boolean), branch: currentBranch },
+      details: {
+        types: (fd.types || []).filter(Boolean), branch: currentBranch,
+        psych: fd.psych || '', psychHistory: fd.psychHistory || '',
+        attachments: (fd.attachFiles || []).filter(Boolean),
+      },
     });
     if (!res.ok) { showToast('تعذّر رفع التوصية: ' + res.error); return; }
     if (r && r.secret && r.secret.charAt(0) === 'C') {

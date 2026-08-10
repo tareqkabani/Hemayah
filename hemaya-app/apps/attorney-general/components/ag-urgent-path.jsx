@@ -157,7 +157,7 @@ function UrgentDetail({ u, back }) {
 
       {outcome === 'approve' && (<>
         <div style={{ marginBottom: 18 }}>
-          <div className="fld-label">التدابير المؤقّتة المقرّرة (من الـ13 — المادة الرابعة عشرة)</div>
+          <div className="fld-label">التدابير المؤقّتة المقرّرة (بنود المادة الرابعة عشرة واللائحة)</div>
           <div className="chips">{PROTECTION_TYPES.map((t) => <button key={t} className={'chip' + (types.includes(t) ? ' on' : '')} onClick={() => toggle(t)}>{t}</button>)}</div>
         </div>
         <div style={{ marginBottom: 18 }}>
