@@ -100,6 +100,11 @@ begin
   select count(*) into _n from emergency_contacts where case_id = _cid
     and name_enc is not null and phone_enc is not null and relationship = 'زوجة';
   if _n <> 1 then raise exception 'FAIL 2ب: لا صفّ مشفّر للمسار الإلكتروني (مفتاح relationship البديل)'; end if;
+  -- حارس انحدار: إعادة كتابة الدالة يجب أن تحفظ محرّك الإشعارات (نسخة 20260808000006
+  -- لا 20260807000001) — الإشعار من قالب n_received وأثره في التدقيق
+  if not exists (select 1 from audit_log where action = 'notify_n_received' and target = _cid::text) then
+    raise exception 'FAIL 2ج: إعادة كتابة submit_protection_request أسقطت إشعار القالب n_received';
+  end if;
 end $$;
 
 -- ══ 3) الحمولة الفارغة (نموذج الإدخال يرسل حقولاً خاوية) لا تُنشئ صفاً ══

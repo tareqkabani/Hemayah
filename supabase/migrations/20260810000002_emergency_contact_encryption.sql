@@ -74,8 +74,11 @@ begin
 end $$;
 revoke all on function public._store_emergency_contact(uuid, jsonb) from public, anon, authenticated;
 
--- ── 3) التقديم الإلكتروني — إعادة كتابة نسخة 20260807000001 كاملةً
---  مع اعتراض emergency_contact: تُشفَّر في الجدول وتُحذف من details.
+-- ── 3) التقديم الإلكتروني — إعادة كتابة النسخة الأخيرة كاملةً مع اعتراض
+--  emergency_contact: تُشفَّر في الجدول وتُحذف من details.
+--  ⚠️ النسخة الأخيرة هي 20260808000006 (إشعار n_received من القالب عبر
+--  notify_from_template) لا 20260807000001 — إعادة كتابة الأقدم تُسقط
+--  محرّك الإشعارات (اصطاده e2e-full-journey: «لا أثر تدقيق للإشعار»).
 create or replace function public.submit_protection_request(
   _applicant_role text, _category app_category, _entity text, _crime text, _reason text,
   _prior_submit boolean, _case_no text, _details jsonb default '{}'::jsonb)
@@ -145,10 +148,11 @@ begin
           'مرحباً، تسلّمنا طلبك ونراجع بياناته في مرحلة الفرز المبدئي. سنتواصل معك إن لزم استيفاء.',
           'منسّق الحماية');
 
-  insert into notifications (case_id, type, title, body, target_tab, sent_at)
-  values (_cid, 'submission', 'تم استلام طلبك',
-          'سُجِّل طلبك ' || _ref || ' وأُسند له رمز سري (' || _sec || '). سيُحال إلى الجهة المختصة لرفع التوصية خلال 5 أيام.',
-          'requests', now());
+  -- إشعار الاستلام من القالب (كان نصاً حرفياً)
+  perform notify_from_template('n_received',
+    jsonb_build_object('رقم_الطلب', _ref, 'الرمز_السري', _sec,
+      'تاريخ_التقديم', to_char(now(), 'YYYY-MM-DD'), 'مهلة_الفرز', '5 أيام عمل'),
+    _cid, 'submission', 'requests');
 
   insert into audit_log (actor_id, action, target)
   values (_uid, 'submit_protection_request', _ref);
