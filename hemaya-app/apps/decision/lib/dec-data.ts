@@ -122,6 +122,7 @@ export async function getDecisionData() {
       risk: (RISK_LEVEL as any)[c.classification] || c.classification || "—",
       foreign: c.source === "foreign",
       preparerUid: cd.preparer_id || null,
+      createdAt: fmt(c.created_at),
     });
 
     decisions[secret] = {

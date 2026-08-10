@@ -190,6 +190,9 @@ export const DScreens = (function () {
     "هل سبق التقديم للجهة المختصة؟": "protection_requests.details→prior_submit", "رقم القضية (إن وجد)": "protection_requests.details→case_no",
     "مستوى التهديد — بحسب الطالب": "protection_requests.details→threat", "امتداد الخطر إلى الغير (م5/4)": "protection_requests.details→extends",
     "مسوّغات طلب الحماية": "protection_requests.details→reason", "مرفقات الطلب": "protection_requests.details→files",
+    "رقم الوارد": "protection_requests.details→incoming_no", "تاريخ الوارد": "protection_cases.created_at",
+    "طلب نيابةً عن شخص": "protection_requests.details→onBehalf (العمر فقط — الاسم والهوية محجوبان)",
+    "تصنيف الخطر المبدئي (من الفرز)": "protection_cases.classification",
     "الجهة المختصة": "recommendations.source_body", "ضابط الاتصال المعتمد": "recommendations.details→officer",
     "مرجع التوصية": "recommendations.details→rec_ref", "تاريخ الرفع": "recommendations.received_at", "اعتمدها": "recommendations.details→approved_by",
     "الحالة الصحية": "recommendations.details→health", "التاريخ الجنائي": "recommendations.details→criminal",
@@ -321,16 +324,21 @@ export const DScreens = (function () {
     const dd = typeof req.details === "string" ? { reason: req.details } : req.details || {};
     const files = Array.isArray(dd.files) ? dd.files : [];
     const channel = req.channel === "seeker" ? "بوابة طالب الحماية" : req.channel === "body" ? "الجهة المختصة" : req.channel || "—";
+    // طلب نيابةً عن شخص: تُعرض الواقعة والعمر فقط — الاسم والهوية محجوبان (م15/16)
+    const ob = dd.onBehalf || dd.on_behalf || null;
     return (
       <DocCard icon="assignment_ind" title="طلب الحماية — كما ورد من مقدّمه"
         badges={<Tag tone="success" size="sm" iconLeft={<I name="verified" size={12} fill />}>موثّق عبر نفاذ</Tag>}
         meta={(q.ref || "—") + (req.submitted_at ? " · " + fmtWhen(req.submitted_at) : "")}>
         <FormSections sections={[
+          (dd.incoming_no || q.createdAt) && { title: "بيانات الورود والإحالة", icon: "folder_shared", note: "مجلوبة آلياً · للقراءة",
+            rows: [["رقم الوارد", dd.incoming_no], ["تاريخ الوارد", q.createdAt], ["تصنيف الخطر المبدئي (من الفرز)", q.risk !== "—" ? q.risk : null]] },
           { title: "تفاصيل الطلب — كما أدخلها مقدّمه", icon: "how_to_reg",
             rows: [
               ["قناة الورود", channel],
               ["صفة مقدم الطلب", dd.role],
               ["دور طالب الحماية في القضية", q.cat],
+              ["طلب نيابةً عن شخص", ob ? "نعم" + (ob.age ? " — العمر: " + ob.age : "") + " (اسم الشخص وهويته محجوبان)" : null],
               ["نوع الجريمة محل القضية", dd.crime || dd.waqia],
               ["الجهة المختصة (بحسب الطلب)", dd.entity],
               ["هل سبق التقديم للجهة المختصة؟", dd.prior_submit === true ? "نعم — " + (dd.prior_entity || dd.entity || "الجهة المختصة") : dd.prior_submit === false ? "لا" : null],
@@ -368,7 +376,7 @@ export const DScreens = (function () {
         meta={(rd.rec_ref || "") + (rec.received_at ? (rd.rec_ref ? " · " : "") + fmtWhen(rec.received_at) : "")}>
         <FormSections sections={[
           { title: "الجهة صاحبة التوصية", icon: "account_balance",
-            rows: [["الجهة المختصة", rec.source_body], ["ضابط الاتصال المعتمد", rd.officer], ["مرجع التوصية", rd.rec_ref], ["تاريخ الرفع", rec.received_at ? fmtWhen(rec.received_at) : null], ["اعتمدها", rd.approved_by]] },
+            rows: [["الجهة المختصة", rec.source_body], ["ضابط الاتصال المعتمد", rd.officer], ["مرجع التوصية", rd.rec_ref], ["تاريخ الرفع", rec.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : null], ["اعتمدها", rd.approved_by]] },
           { title: "بيانات مقدّم الطلب (محجوبة الهوية)", icon: "badge", note: "يُشار إليه بالرمز السري " + q.secret,
             rows: [["صفة مقدّم الطلب", q.cat], ["الحالة الصحية", rd.health], ["التاريخ الجنائي", rd.criminal], ["التاريخ النفسي", rd.psych], ["رغبة الكشف عن الهوية", rd.reveal]] },
           (rd.req_details || dd.reason) && { title: "تفاصيل وأسباب طلب الحماية", icon: "notes", text: rd.req_details || dd.reason },
@@ -385,13 +393,14 @@ export const DScreens = (function () {
               ["نوع الخطر", rd.threat_type],
               ["مستوى الخطر", dd.threat],
               ["نوع الضرر", rd.harm_type],
-              ["امتداد الخطر إلى الغير (م5/4)", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "نعم — " + rd.extends_who : rd.extends_who],
+              ["امتداد الخطر إلى الغير (م5/4)", rd.extends_who ? (rd.extends_who === "لا يمتدّ" ? "لا" : "نعم") : null],
+              ["إلى من يمتدّ", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? rd.extends_who : null],
               ...factors.map(([k, v]) => [k, String(v)]),
               ["توصية الجهة", rec.decision === "توفير" ? "توفير الحماية" : rec.decision],
             ],
-            blocks: [["الوصف الإجرامي", rd.crime_desc], ["أسباب التوصية", rec.notes]] },
+            blocks: [["الوصف الإجرامي", rd.crime_desc || dd.crime], ["أسباب التوصية", rec.notes]] },
           { title: "أنواع الحماية المقترحة من الجهة (م14) — اقتراحٌ لا يُقيّد المجلس", icon: "shield",
-            chips: types, rows: [["الحلول البديلة", rd.alt_solutions]] },
+            chips: types, rows: [["الحلول البديلة", rd.alt_solutions || "لا توجد"]] },
           { title: "مدة الحماية المقترحة", icon: "schedule", rows: [["المدة", fmtInterval(rec.proposed_duration)]] },
         ]} />
         {atts.length > 0 && <div className="fsec">
