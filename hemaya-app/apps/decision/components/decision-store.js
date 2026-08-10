@@ -31,8 +31,11 @@ export const HemayaDecision = (function () {
   var PROTECTION_TYPES = PROTECTION_TYPE_LABELS_14;
   var REASON_SKELETON = "استناداً إلى الدراسات والتقييمات المُجمَّعة (عوامل المادة 9) وما اقتُرح من تدابير المادة 14، أُعِدّ هذا القرار لعرضه — إعدادٌ محايد بلا توصية بالقبول أو الرفض؛ والقرار خالصٌ للمجلس.";
 
+  // نطاق القرار المُعَدّ (حزمة 11) — المعدّ يُعِدّ والقرار النهائي للمجلس
+  var SCOPES = ["قبول كلي", "قبول جزئي", "رفض الحماية"];
+
   // الحالة في الذاكرة — تُغذَّى من الخادم (hydrate) ثم تُحدَّث تفاؤليّاً
-  var store = { requests: [], decisions: {}, packages: {}, attachments: {}, votes: {}, messages: [], me: null };
+  var store = { requests: [], decisions: {}, packages: {}, attachments: {}, votes: {}, messages: [], me: null, lookups: null };
   var listeners = [];
   var actions = null; // تُحقَن من البوابة (أفعال الخادم)
 
@@ -50,6 +53,7 @@ export const HemayaDecision = (function () {
     store.votes       = data.votes       || {};
     store.messages    = data.messages    || [];
     store.me          = data.me          || null;
+    store.lookups     = data.lookups     || store.lookups || null;
     // silent: للترطيب الأول داخل الرسم — البثّ أثناء render يحذّر React
     if (!(opts && opts.silent)) emit();
   }
@@ -59,7 +63,7 @@ export const HemayaDecision = (function () {
   function allCases() { return store.requests.slice(); }
   function getDecision(secret) { return store.decisions[secret] || null; }
   function dOf(secret) {
-    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", approvals: { deputy: null, chair: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
+    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", scope: "", scopeNote: "", approvals: { deputy: null, chair: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
   }
 
   // حصيلة التصويت (للقيادة — العضو لا يرى أصوات غيره فتُحسب له من voteOpen فقط)
@@ -134,10 +138,18 @@ export const HemayaDecision = (function () {
 
   var API = {
     SEATS: SEATS, MEMBER_SEATS: MEMBER_SEATS, VOTING_SEATS: VOTING_SEATS, MAJORITY: MAJORITY,
-    PREPARERS: PREPARERS, PROTECTION_TYPES: PROTECTION_TYPES, REASON_SKELETON: REASON_SKELETON,
+    PREPARERS: PREPARERS, PROTECTION_TYPES: PROTECTION_TYPES, SCOPES: SCOPES, REASON_SKELETON: REASON_SKELETON,
     DECISION_STAGES: DECISION_STAGES,
     setActions: setActions, hydrate: hydrate,
     getMe: function () { return store.me; },
+    // القوائم المرجعية (طبقة المحتوى): أنواع م14 والمدد — والثوابت المجالية احتياط
+    getLookups: function () {
+      var lk = store.lookups || {};
+      return {
+        types: (lk.types && lk.types.length ? lk.types : PROTECTION_TYPES),
+        durations: (lk.durations && lk.durations.length ? lk.durations : null),
+      };
+    },
     allCases: allCases, queueBySecret: reqBySecret, caseIdOf: caseIdOf,
     subscribe: function (fn) { listeners.push(fn); return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
     getDecision: getDecision, dOf: dOf,
@@ -148,23 +160,26 @@ export const HemayaDecision = (function () {
     nextActionOf: nextActionOf, stageOf: stageOf,
     getThreads: getThreads, findThread: findThread, startThread: startThread, sendMessage: sendMessage,
 
-    // المعدّ: حفظ مسوّدة القرار (أنواع م14 + مدة + حيثيات)
+    // المعدّ: حفظ مسوّدة القرار (النطاق + أنواع م14 + مدة + حيثيات)
     saveDecision: function (secret, patch) {
       var d = dOf(secret); var cid = caseIdOf(secret);
       if (patch.types) d.types = patch.types;
       if (patch.duration !== undefined) d.duration = patch.duration;
       if (patch.reasoning !== undefined) d.reasoning = patch.reasoning;
+      if (patch.scope !== undefined) d.scope = patch.scope;
+      if (patch.scopeNote !== undefined) d.scopeNote = patch.scopeNote;
       store.decisions[secret] = d; emit();
-      if (cid && actions && actions.saveDecision) return actions.saveDecision(cid, d.types, d.duration, d.reasoning).then(logErr("save"));
+      if (cid && actions && actions.saveDecision) return actions.saveDecision(cid, d.types, d.duration, d.reasoning, d.scope || null, d.scopeNote || null).then(logErr("save"));
       return Promise.resolve(null);
     },
-    // المعدّ: رفع القرار لاعتماد نائب الرئيس
+    // المعدّ: رفع القرار لاعتماد نائب الرئيس (النطاق إلزامي — يُفرَض في القاعدة أيضاً)
     submitForApproval: function (secret, patch) {
       var d = dOf(secret); var cid = caseIdOf(secret);
       d.types = patch.types; d.duration = patch.duration; d.reasoning = patch.reasoning;
+      d.scope = patch.scope || d.scope; d.scopeNote = patch.scopeNote !== undefined ? patch.scopeNote : d.scopeNote;
       d.approvals = { deputy: null, chair: null }; d.status = "pending_deputy"; d.submittedAt = nowLabel();
       store.decisions[secret] = d; emit();
-      if (cid && actions && actions.submitForApproval) return actions.submitForApproval(cid, d.types, d.duration, d.reasoning).then(logErr("submit"));
+      if (cid && actions && actions.submitForApproval) return actions.submitForApproval(cid, d.types, d.duration, d.reasoning, d.scope || null, d.scopeNote || null).then(logErr("submit"));
       return Promise.resolve(null);
     },
     // النائب: اعتماد — يمرّ لحلقة اعتماد الرئيس

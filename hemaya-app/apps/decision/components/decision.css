@@ -154,6 +154,23 @@
 }
 @media (prefers-reduced-motion: reduce){ *{transition:none!important;} }
 
+/* ————— حزمة الاطّلاع (حزمة 11): بطاقات قابلة للطي + شبكة الحقول الموحّدة ————— */
+details.sc > summary::-webkit-details-marker { display: none; }
+details.sc > summary:hover { background: var(--surface-hover); }
+details.sc > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
+.sc-chev { transition: transform 160ms cubic-bezier(0.2, 0, 0.38, 0.9); }
+details.sc[open] > summary .sc-chev { transform: rotate(180deg); }
+.fsec { margin-top: 16px; }
+.fsec:first-child { margin-top: 0; }
+.fsec-h { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--text-strong); flex-wrap: wrap; }
+.fsec-note { font-weight: 400; font-size: 11.5px; color: var(--text-secondary); border-inline-start: 1px solid var(--border-subtle); padding-inline-start: 8px; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: var(--border-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.frow { display: grid; grid-template-columns: minmax(120px, 40%) 1fr; align-items: baseline; column-gap: 12px; row-gap: 2px; padding: 9px 12px; background: var(--surface-card); }
+.frow .fk { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.frow .fv { font-size: 13px; font-weight: 600; color: var(--text-strong); line-height: 1.6; }
+.frow .fsrc { display: inline-flex; align-items: center; gap: 3px; margin-inline-start: 6px; font-size: 10.5px; font-weight: 600; color: var(--color-primary); background: var(--green-10); padding: 1px 6px; border-radius: var(--radius-full); vertical-align: middle; }
+.flist { margin: 8px 0 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.9; color: var(--text-body); }
+
 /* أرقام أقسام التوصية الكاملة (AuthRec المشترك) — طبقة هوية النيابة البرونزية */
 :root { --pp-cream-strong: #EEE7DF; --pp-bronze: #AC936D; --pp-bronze-deep: #8A6F49; }
 .grp-n {
