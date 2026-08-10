@@ -10,6 +10,7 @@ import { HemayaBus } from "./referral-bus";
 import { HemayaHandoff } from "./execution-handoff";
 import { execClient, refetchHandoffs } from "./execution-live";
 import { refetchCenterReferrals, referralCreate, referralClose, referralUpdate } from "@/lib/referral-actions";
+import { revealEmergencyContact } from "@/lib/execution-actions";
 import "./execution.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -143,6 +144,45 @@ function StepRow({ s, i, isDone, locked, onToggle }) {
 }
 
 // ═══════════════ تفاصيل المشمول — التنفيذ والمتابعة ═══════════════
+// جهة اتصال الطوارئ (م14/6): الاسم والهاتف مشفّران في القاعدة ولا يصلان الواجهة
+// إلا بكشفٍ صريحٍ عبر execution_emergency_contact — كلّ كشفٍ يُقيَّد في التدقيق (م15/16).
+function EmergencyContactCard({ caseId }) {
+  const [ec, setEc] = useState({ st: 'masked' }); // masked | busy | shown | empty | error
+  const reveal = async () => {
+    setEc({ st: 'busy' });
+    try {
+      const r = await revealEmergencyContact(caseId);
+      if (!r.ok) { setEc({ st: 'error', msg: r.error }); return; }
+      setEc(r.contact ? { st: 'shown', c: r.contact } : { st: 'empty' });
+    } catch { setEc({ st: 'error', msg: 'تعذّر الاتصال بالخادم' }); }
+  };
+  return (
+    <Card className="card pad" style={{ marginBottom: 16 }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+        <p className="sec-h" style={{ margin: 0 }}><I name="contact_emergency" size={18} color="var(--color-primary)" /> جهة اتصال الطوارئ (م14/6)</p>
+        {ec.st === 'shown' && <Tag tone="warning" size="sm" iconLeft={<I name="visibility" size={13} />}>مكشوفة — قُيّدت في التدقيق</Tag>}
+      </div>
+      {ec.st === 'shown' ? (<>
+        <div className="ro-field" style={{ marginBottom: 8 }}><span className="muted">الاسم</span><b style={{ fontSize: 13.5, color: 'var(--text-strong)' }}>{ec.c.name || '—'}</b></div>
+        <div className="ro-field" style={{ marginBottom: 8 }}><span className="muted">صلة القرابة</span><span style={{ fontSize: 13.5 }}>{ec.c.relationship || '—'}</span></div>
+        <div className="ro-field"><span className="muted">رقم الجوال</span><span className="mono" dir="ltr" style={{ fontSize: 13.5 }}>{ec.c.phone || '—'}</span></div>
+      </>) : ec.st === 'empty' ? (
+        <p className="muted" style={{ margin: 0 }}>لا جهة اتصال طوارئ مسجّلة لهذه الحالة.</p>
+      ) : (<>
+        <div className="ro-field" style={{ marginBottom: 8 }}><span className="muted">الاسم</span><span className="mono">●●●●●●</span></div>
+        <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">رقم الجوال</span><span className="mono">●●●●●●●●●●</span></div>
+        {ec.st === 'error' && <p className="note warn" style={{ marginBottom: 12 }}><I name="error" size={15} /> {ec.msg}</p>}
+        <div className="row" style={{ justifyContent: 'space-between', gap: 10 }}>
+          <span className="muted" style={{ fontSize: 12 }}>البيانات مشفّرة (م15) — كلّ كشفٍ يُقيَّد باسمك في سجلّ التدقيق.</span>
+          <button className="btn btn-ghost btn-sm" disabled={ec.st === 'busy'} onClick={reveal}>
+            <I name={ec.st === 'busy' ? 'hourglass_top' : 'visibility'} size={16} /> {ec.st === 'busy' ? 'جارٍ الكشف…' : 'كشف البيانات'}
+          </button>
+        </div>
+      </>)}
+    </Card>
+  );
+}
+
 function Detail({ b, back }) {
   const [done, setDone] = useState(b.done);
   const [outcome, setOutcome] = useState('');
@@ -217,6 +257,9 @@ function Detail({ b, back }) {
       <div className="ro-field"><span className="muted">قناة التواصل</span><span className="row" style={{ gap: 6 }}><I name="lock" size={14} color="var(--color-primary)" /><span style={{ fontSize: 13.5 }}>{b.sec.contact}</span></span></div>
     </Card>
 
+    {/* جهة اتصال الطوارئ (م14/6) — للقضايا الحقيقية؛ الكشف صريحٌ ومقيَّد بالتدقيق */}
+    {b.caseId && <EmergencyContactCard caseId={b.caseId} />}
+
     {/* ب) المتابعة الدورية */}
     <Card className="card pad" style={{ marginBottom: 16 }}>
       <p className="sec-h"><I name="monitoring" size={18} color="var(--color-primary)" /> المتابعة الدورية (لائحة م8)</p>
@@ -277,7 +320,7 @@ function Beneficiaries({ openB }) {
   React.useEffect(() => { const h = () => hb((n) => n + 1); window.addEventListener('hemaya-handoff', h); window.addEventListener('storage', h); return () => { window.removeEventListener('hemaya-handoff', h); window.removeEventListener('storage', h); }; }, []);
   const HH = HemayaHandoff;
   const TRACK_SRC = { council: 'مجلس', urgent: 'عاجل', grievance: 'تظلّم' };
-  const extra = HH ? HH.list().filter((h) => h.status === 'active' && !BENEF.some((b) => b.secret === h.secret)).map((h) => ({ secret: h.secret, cat: h.cat, name: '—', src: TRACK_SRC[h.track] || (HH.TRACKS[h.track] || {}).label || 'تسليم', status: 'نشط', temp: !!h.temp, types: h.types || [], duration: h.temp ? '30 يوماً' : 'سنة', start: h.decidedAt, end: '—', dayLeft: h.temp ? 30 : 365, dayTotal: h.temp ? 30 : 365, risk: 'عالٍ', done: ['doc', 'rec'],
+  const extra = HH ? HH.list().filter((h) => h.status === 'active' && !BENEF.some((b) => b.secret === h.secret)).map((h) => ({ secret: h.secret, caseId: h.caseId || null, cat: h.cat, name: '—', src: TRACK_SRC[h.track] || (HH.TRACKS[h.track] || {}).label || 'تسليم', status: 'نشط', temp: !!h.temp, types: h.types || [], duration: h.temp ? '30 يوماً' : 'سنة', start: h.decidedAt, end: '—', dayLeft: h.temp ? 30 : 365, dayTotal: h.temp ? 30 : 365, risk: 'عالٍ', done: ['doc', 'rec'],
     sec: { unit: 'الإدارة الأمنية المختصّة مكانياً', officer: '—', contact: 'قناة مؤمّنة مع المشمول' },
     assess: { when: '—', next: 'بعد التفعيل', level: 'عالٍ' },
     reports: [] })) : [];
