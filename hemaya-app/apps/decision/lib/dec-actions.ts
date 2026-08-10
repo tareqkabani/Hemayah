@@ -17,16 +17,16 @@ async function rpc(name: string, args: Record<string, unknown>) {
 
 const revalAll = () => { revalidatePath("/decision"); revalidatePath("/decision-vote"); revalidatePath("/decision-lead"); };
 
-/** المعدّ: حفظ مسوّدة القرار (أنواع م14 + المدة + الحيثيات). */
-export async function saveDecision(caseId: string, types: string[], duration: string, reasoning: string) {
-  const r = await rpc("council_save", { _case_id: caseId, _types: types, _duration: duration || null, _reasoning: reasoning || null });
+/** المعدّ: حفظ مسوّدة القرار (النطاق + أنواع م14 + المدة + الحيثيات). */
+export async function saveDecision(caseId: string, types: string[], duration: string, reasoning: string, scope?: string | null, scopeNote?: string | null) {
+  const r = await rpc("council_save", { _case_id: caseId, _types: types, _duration: duration || null, _reasoning: reasoning || null, _scope: scope || null, _scope_note: scopeNote || null });
   if (r.ok) revalidatePath("/decision");
   return r;
 }
 
-/** المعدّ: رفع القرار لاعتماد نائب رئيس المركز. */
-export async function submitForApproval(caseId: string, types: string[], duration: string, reasoning: string) {
-  const r = await rpc("council_submit", { _case_id: caseId, _types: types, _duration: duration || null, _reasoning: reasoning });
+/** المعدّ: رفع القرار لاعتماد نائب رئيس المركز — النطاق إلزامي والجزئي بنصّ الاستثناء. */
+export async function submitForApproval(caseId: string, types: string[], duration: string, reasoning: string, scope?: string | null, scopeNote?: string | null) {
+  const r = await rpc("council_submit", { _case_id: caseId, _types: types, _duration: duration || null, _reasoning: reasoning, _scope: scope || null, _scope_note: scopeNote || null });
   if (r.ok) revalAll();
   return r;
 }

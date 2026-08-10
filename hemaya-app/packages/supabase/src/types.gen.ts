@@ -194,6 +194,8 @@ export type Database = {
           duration: string | null
           id: string
           justification: string
+          scope: string | null
+          scope_note: string | null
           tie_break: boolean | null
           type: Database["public"]["Enums"]["decision_type"]
           votes: Json | null
@@ -204,6 +206,8 @@ export type Database = {
           duration?: string | null
           id?: string
           justification: string
+          scope?: string | null
+          scope_note?: string | null
           tie_break?: boolean | null
           type: Database["public"]["Enums"]["decision_type"]
           votes?: Json | null
@@ -214,6 +218,8 @@ export type Database = {
           duration?: string | null
           id?: string
           justification?: string
+          scope?: string | null
+          scope_note?: string | null
           tie_break?: boolean | null
           type?: Database["public"]["Enums"]["decision_type"]
           votes?: Json | null
@@ -502,6 +508,8 @@ export type Database = {
           reasoning: string | null
           ref: string | null
           rejections: Json
+          scope: string | null
+          scope_note: string | null
           status: string
           submitted_at: string | null
           types: Json
@@ -523,6 +531,8 @@ export type Database = {
           reasoning?: string | null
           ref?: string | null
           rejections?: Json
+          scope?: string | null
+          scope_note?: string | null
           status?: string
           submitted_at?: string | null
           types?: Json
@@ -544,6 +554,8 @@ export type Database = {
           reasoning?: string | null
           ref?: string | null
           rejections?: Json
+          scope?: string | null
+          scope_note?: string | null
           status?: string
           submitted_at?: string | null
           types?: Json
@@ -664,6 +676,40 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "disclosure_events_case_id_fkey"
+            columns: ["case_id"]
+            referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergency_contacts: {
+        Row: {
+          case_id: string
+          created_at: string | null
+          id: string
+          name_enc: string | null
+          phone_enc: string | null
+          relationship: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string | null
+          id?: string
+          name_enc?: string | null
+          phone_enc?: string | null
+          relationship?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string | null
+          id?: string
+          name_enc?: string | null
+          phone_enc?: string | null
+          relationship?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_contacts_case_id_fkey"
             columns: ["case_id"]
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
@@ -1859,30 +1905,57 @@ export type Database = {
       }
       subjects: {
         Row: {
+          birth_date: string | null
           case_id: string
           contact_enc: string | null
           created_at: string | null
+          education_level: string | null
+          employer: string | null
           full_name_enc: string | null
+          gender: string | null
           id: string
+          job_title: string | null
+          marital_status: string | null
+          national_address: Json | null
           national_id_enc: string | null
+          nationality: string | null
+          source_flags: Json | null
           subject_type: string | null
         }
         Insert: {
+          birth_date?: string | null
           case_id: string
           contact_enc?: string | null
           created_at?: string | null
+          education_level?: string | null
+          employer?: string | null
           full_name_enc?: string | null
+          gender?: string | null
           id?: string
+          job_title?: string | null
+          marital_status?: string | null
+          national_address?: Json | null
           national_id_enc?: string | null
+          nationality?: string | null
+          source_flags?: Json | null
           subject_type?: string | null
         }
         Update: {
+          birth_date?: string | null
           case_id?: string
           contact_enc?: string | null
           created_at?: string | null
+          education_level?: string | null
+          employer?: string | null
           full_name_enc?: string | null
+          gender?: string | null
           id?: string
+          job_title?: string | null
+          marital_status?: string | null
+          national_address?: Json | null
           national_id_enc?: string | null
+          nationality?: string | null
+          source_flags?: Json | null
           subject_type?: string | null
         }
         Relationships: [
@@ -2182,6 +2255,8 @@ export type Database = {
           _case_id: string
           _duration: string
           _reasoning: string
+          _scope?: string
+          _scope_note?: string
           _types: Json
         }
         Returns: undefined
@@ -2212,6 +2287,8 @@ export type Database = {
           _case_id: string
           _duration: string
           _reasoning: string
+          _scope?: string
+          _scope_note?: string
           _types: Json
         }
         Returns: {
@@ -2992,3 +3069,4 @@ export const Constants = {
     },
   },
 } as const
+

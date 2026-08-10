@@ -10,7 +10,6 @@ import { Card, Tag, InlineAlert, DeadlineTimer } from "@hemaya/ui";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaDecision } from "./decision-store";
 import { FoundLine } from "./FoundLine";
-import { SeekerReq, AuthRec } from "@hemaya/study-eval";
 
 const HD = HemayaDecision;
 
@@ -166,7 +165,7 @@ export const DScreens = (function () {
     </div>);
   }
 
-  // ————— حزمة الاطّلاع الحقيقية (من HD.getPackage) —————
+  // ————— حزمة الاطّلاع الحقيقية (من HD.getPackage) — حزمة 11: أربع مجموعات بطاقات قابلة للطي —————
   const recToneOf = (rec, partial) => {
     const r = String(rec || "");
     if (/رفض|deny|reject/i.test(r)) return "error";
@@ -175,18 +174,265 @@ export const DScreens = (function () {
     return "success";
   };
 
-  function StudyCard({ icon, title, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null, rejectReasons = null }) {
+  // خريطة الحقول المعروضة ← أعمدتها (مرجع تطويري — لا يُعرض في الواجهة إطلاقاً).
+  // حقول النموذجين تعيش في details jsonb وتكتبها RPCs حيّة، فمسارها details→key.
+  const FIELD_COL = {
+    "الجنس": "subjects.gender", "الجنسية": "subjects.nationality", "تاريخ الميلاد": "subjects.birth_date",
+    "الحالة الاجتماعية": "subjects.marital_status", "المستوى التعليمي": "subjects.education_level",
+    "العنوان المختصر": "subjects.national_address→short", "رقم المبنى": "subjects.national_address→building",
+    "الشارع": "subjects.national_address→street", "الرقم الفرعي": "subjects.national_address→secondary",
+    "الحي": "subjects.national_address→district", "الرمز البريدي": "subjects.national_address→postal", "المدينة": "subjects.national_address→city",
+    "جهة العمل": "subjects.employer", "المسمى الوظيفي": "subjects.job_title",
+    "صلة القرابة": "emergency_contacts.relationship", "الاسم (جهة الطوارئ)": "emergency_contacts.name_enc", "رقم الجوال (جهة الطوارئ)": "emergency_contacts.phone_enc",
+    "صفة مقدم الطلب": "protection_requests.details→role", "دور طالب الحماية في القضية": "protection_cases.category",
+    "قناة الورود": "protection_requests.channel", "نوع الجريمة محل القضية": "protection_requests.details→crime",
+    "الجهة المختصة (بحسب الطلب)": "protection_requests.details→entity",
+    "هل سبق التقديم للجهة المختصة؟": "protection_requests.details→prior_submit", "رقم القضية (إن وجد)": "protection_requests.details→case_no",
+    "مستوى التهديد — بحسب الطالب": "protection_requests.details→threat", "امتداد الخطر إلى الغير (م5/4)": "protection_requests.details→extends",
+    "مسوّغات طلب الحماية": "protection_requests.details→reason", "مرفقات الطلب": "protection_requests.details→files",
+    "رقم الوارد": "protection_requests.details→incoming_no", "تاريخ الوارد": "protection_cases.created_at",
+    "طلب نيابةً عن شخص": "protection_requests.details→onBehalf (العمر فقط — الاسم والهوية محجوبان)",
+    "تصنيف الخطر المبدئي (من الفرز)": "protection_cases.classification",
+    "الجهة المختصة": "recommendations.source_body", "ضابط الاتصال المعتمد": "recommendations.details→officer",
+    "مرجع التوصية": "recommendations.details→rec_ref", "تاريخ الرفع": "recommendations.received_at", "اعتمدها": "recommendations.details→approved_by",
+    "الحالة الصحية": "recommendations.details→health", "التاريخ الجنائي": "recommendations.details→criminal",
+    "التاريخ النفسي": "recommendations.details→psych", "رغبة الكشف عن الهوية": "recommendations.details→reveal",
+    "تفاصيل وأسباب الطلب": "recommendations.details→req_details", "رقم القضية": "recommendations.details→case_no ∪ protection_requests.details→case_no",
+    "المرحلة الحالية للقضية": "recommendations.details→stage", "ملخّص القضية": "recommendations.details→case_summary",
+    "دور مقدّم الطلب وأهمية معلوماته": "recommendations.details→role_desc",
+    "هل تم التواصل مع مقدّم الطلب؟": "recommendations.details→contacted", "نوع الجريمة": "recommendations.details→crime_class",
+    "الواقعة": "protection_requests.details→waqia", "الوصف الإجرامي": "recommendations.details→crime_desc",
+    "إخفاء البيانات (م2)": "recommendations.details→hide_identity", "وجود خطر يهدّد طالب الحماية": "recommendations.details→threat_exists",
+    "نوع الخطر": "recommendations.details→threat_type", "نوع الضرر": "recommendations.details→harm_type",
+    "إلى من يمتدّ الخطر": "recommendations.details→extends_who", "عوامل المادة (9)": "recommendations.factors9",
+    "توصية الجهة": "recommendations.decision", "أسباب التوصية": "recommendations.notes",
+    "الأنواع المقترحة من الجهة": "recommendations.proposed_type", "الحلول البديلة": "recommendations.details→alt_solutions",
+    "المدة المقترحة": "recommendations.proposed_duration", "مرفقات التوصية": "recommendations.details→attachments",
+    "بالاطّلاع تبيّن — التوصية": "studies.found_recommendation ∪ assessments.found_recommendation",
+    "بالاطّلاع تبيّن — الطلب": "studies.found_request ∪ assessments.found_request",
+    "توصية المُعِدّ": "studies.recommendation ∪ assessments.recommendation",
+    "سبب الجزئية": "studies.partial_reason ∪ assessments.partial_reason",
+    "أسباب رفض الحماية": "studies.reject_reasons", "ملاحظات المُعِدّ": "studies.notes ∪ assessments.notes",
+    "نطاق القرار المُعَدّ": "council_decisions.scope", "ما يُقبل وما يُستثنى": "council_decisions.scope_note",
+  };
+  void FIELD_COL;
+
+  const AR_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+  const arNum = (n) => String(n).replace(/\d/g, (d) => AR_DIGITS[+d]);
+
+  function fmtWhen(ts) {
+    if (!ts) return "";
+    try { return new Date(ts).toLocaleString("ar-SA-u-nu-latn", { dateStyle: "short", timeStyle: "short" }); }
+    catch { return String(ts); }
+  }
+
+  // مدة interval من القاعدة → صياغة م14 الموحّدة («ثلاثون يوماً» لا «30 يوماً»)
+  function fmtInterval(v) {
+    if (!v) return "إلى حين انتهاء القضية";
+    const s = String(v).trim();
+    if (s === "30 days") return "ثلاثون يوماً";
+    const m = s.match(/^(\d+)\s*days?$/);
+    if (m) return m[1] + " يوماً";
+    const mo = s.match(/^(\d+)\s*mons?$/);
+    if (mo) return mo[1] + (mo[1] === "1" ? " شهر" : " أشهر");
+    return s;
+  }
+
+  // ————— لبنات العرض المشتركة (نمط الحزمة: بطاقة <details> + شبكة حقول) —————
+  // البطاقة القابلة للطي — الأساس البصري الموحّد للمجموعات الأربع
+  function DocCard({ icon, title, subtitle, badges, meta, accent = "var(--color-primary)", defaultOpen = false, children }) {
+    return (
+      <details className="sc" open={defaultOpen || undefined} style={{ border: "1px solid var(--border-subtle)", borderInlineStart: "4px solid " + accent, borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--surface-card)" }}>
+        <summary style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "var(--surface-subtle)", flexWrap: "wrap", cursor: "pointer", listStyle: "none" }}>
+          <I name={icon} size={20} color="var(--color-primary)" />
+          <span><b style={{ color: "var(--text-strong)", fontSize: 14 }}>{title}</b>{subtitle && <span className="muted" style={{ display: "block", fontSize: 11.5 }}>{subtitle}</span>}</span>
+          {badges}
+          <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
+            {meta && <span className="mono muted" style={{ fontSize: 11.5 }} dir="ltr">{meta}</span>}
+            <span className="material-symbols-rounded sc-chev" style={{ fontSize: 20, color: "var(--text-secondary)" }}>expand_more</span>
+          </span>
+        </summary>
+        <div style={{ padding: 16, borderTop: "1px solid var(--border-subtle)" }}>{children}</div>
+      </details>
+    );
+  }
+
+  /* عرض أقسام النموذج: rows [تسمية، قيمة، مصدر?] بشبكة موحّدة + شارة المصدر
+     (نفاذ/سُبل/الموارد) + نصوص opin + قوائم مرقّمة + رقائق. لا اسم عمودٍ يُعرض. */
+  function FormSections({ sections }) {
+    if (!sections) return null;
+    return (<React.Fragment>{sections.filter(Boolean).map((s, i) => (
+      <div key={i} className="fsec">
+        <p className="fsec-h"><I name={s.icon || "article"} size={16} color="var(--color-primary)" /> <span>{s.title}</span>{s.note && <span className="fsec-note">{s.note}</span>}</p>
+        {s.rows && <div className="fgrid">{s.rows.filter((r) => r && r[1]).map(([k, v, src], j) => (
+          <div className="frow" key={j}>
+            <span className="fk">{k}</span>
+            <span className="fv">{v}{src && <span className="fsrc"><I name="link" size={11} /> {src}</span>}</span>
+          </div>))}</div>}
+        {(s.blocks || []).filter((b) => b && b[1]).map(([bk, bv], j) => (
+          <div key={"b" + j} style={{ marginTop: 10 }}>
+            {bk && <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>{bk}</span>}
+            <div className="opin" style={{ marginTop: 0 }}>{bv}</div>
+          </div>))}
+        {s.text && <div className="opin" style={{ marginTop: s.rows ? 10 : 0 }}>{s.text}</div>}
+        {s.list && <ol className="flist">{s.list.map((x, j) => <li key={j}>{x}</li>)}</ol>}
+        {s.chips && s.chips.length > 0 && <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: "wrap" }}>{s.chips.map((c) => <Tag key={c} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{c}</Tag>)}</div>}
+      </div>))}</React.Fragment>);
+  }
+
+  // مرفقات مسمّاة داخل البطاقات — فتحها مُسجَّل في التدقيق (م15/16)
+  const AttRow = ({ list, onOpen }) => (list && list.length) ? (
+    <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+      {list.map((a, j) => <button key={j} className="chip" style={{ margin: 0 }} onClick={() => onOpen && onOpen(a)}><I name="description" size={15} /> {a}</button>)}
+    </div>) : null;
+
+  const srcOf = (flags, k, label) => {
+    const v = flags && flags[k];
+    return v ? label + (v === "manual" ? " (يدوي)" : "") : label;
+  };
+
+  // ① بيانات طالب الحماية — بطاقة مستقلّة عن الطلب (الهوية محجوبة دوماً)
+  function SubjectCard({ q, subject, emergency }) {
+    const s = subject || {};
+    const na = s.national_address || {};
+    const flags = s.source_flags || {};
+    const nafath = srcOf(flags, "nafath", "نفاذ"), spl = srcOf(flags, "spl", "سُبل"), hrdf = srcOf(flags, "hrdf", "الموارد البشرية");
+    const empty = !subject;
+    return (
+      <DocCard icon="person" title="بيانات طالب الحماية" subtitle="الهوية محجوبة — لا كشف في هذه المرحلة (م15/16)"
+        badges={<Tag tone="success" size="sm" iconLeft={<I name="verified_user" size={12} fill />}>موثّق عبر نفاذ</Tag>}
+        meta={q.secret}>
+        {empty ? <InlineAlert kind="info" title="لا بيانات مجلوبة">لم تُجلب البيانات الإثرائية لطالب الحماية بعد — تُعرض هنا متى توافر جلبها من نفاذ/سُبل/الموارد لهذا الطلب.</InlineAlert> :
+          <FormSections sections={[
+            { title: "بيانات مقدم الطلب", icon: "badge", note: "الهوية محجوبة — تُعرض الصفات غير المعرِّفة فقط",
+              rows: [["الجنس", s.gender, nafath], ["الجنسية", s.nationality, nafath], ["تاريخ الميلاد", s.birth_date, nafath], ["الحالة الاجتماعية", s.marital_status, nafath], ["المستوى التعليمي", s.education_level, nafath]] },
+            (na.short || na.city) && { title: "العنوان الوطني", icon: "location_on", note: "مرتبط بتدبير تغيير محل الإقامة",
+              rows: [["العنوان المختصر", na.short, spl], ["رقم المبنى", na.building, spl], ["الشارع", na.street, spl], ["الرقم الفرعي", na.secondary, spl], ["الحي", na.district, spl], ["الرمز البريدي", na.postal, spl], ["المدينة", na.city, spl]] },
+            (s.employer || s.job_title) && { title: "بيانات العمل", icon: "work", note: "تُستخدم لرصد الإجراءات الوظيفية المحظورة",
+              rows: [["جهة العمل", s.employer, hrdf], ["المسمى الوظيفي", s.job_title, hrdf]] },
+            { title: "جهة الاتصال في الحالات الطارئة", icon: "contact_emergency", note: "الاسم والهاتف محجوبان — يُكشفان للتنفيذ فقط",
+              rows: emergency
+                ? [["صلة القرابة", emergency.relationship || "مُسجّلة (محجوبة)"], ["بيانات التواصل", "محجوبة — تُكشف للتنفيذ فقط"]]
+                : [["الحالة", "لا جهة اتصال مسجّلة لهذا الطلب"]] },
+          ]} />}
+      </DocCard>
+    );
+  }
+
+  // ② طلب الحماية — كما ورد من مقدّمه (منفصل عن بيانات طالبه)
+  function RequestCard({ q, request, onOpenDoc }) {
+    const req = request;
+    if (!req) return null;
+    const dd = typeof req.details === "string" ? { reason: req.details } : req.details || {};
+    const files = Array.isArray(dd.files) ? dd.files : [];
+    const channel = req.channel === "seeker" ? "بوابة طالب الحماية" : req.channel === "body" ? "الجهة المختصة" : req.channel || "—";
+    // طلب نيابةً عن شخص: تُعرض الواقعة والعمر فقط — الاسم والهوية محجوبان (م15/16)
+    const ob = dd.onBehalf || dd.on_behalf || null;
+    return (
+      <DocCard icon="assignment_ind" title="طلب الحماية — كما ورد من مقدّمه"
+        badges={<Tag tone="success" size="sm" iconLeft={<I name="verified" size={12} fill />}>موثّق عبر نفاذ</Tag>}
+        meta={(q.ref || "—") + (req.submitted_at ? " · " + fmtWhen(req.submitted_at) : "")}>
+        <FormSections sections={[
+          (dd.incoming_no || q.createdAt) && { title: "بيانات الورود والإحالة", icon: "folder_shared", note: "مجلوبة آلياً · للقراءة",
+            rows: [["رقم الوارد", dd.incoming_no], ["تاريخ الوارد", q.createdAt], ["تصنيف الخطر المبدئي (من الفرز)", q.risk !== "—" ? q.risk : null]] },
+          { title: "تفاصيل الطلب — كما أدخلها مقدّمه", icon: "how_to_reg",
+            rows: [
+              ["قناة الورود", channel],
+              ["صفة مقدم الطلب", dd.role],
+              ["دور طالب الحماية في القضية", q.cat],
+              ["طلب نيابةً عن شخص", ob ? "نعم" + (ob.age ? " — العمر: " + ob.age : "") + " (اسم الشخص وهويته محجوبان)" : null],
+              ["نوع الجريمة محل القضية", dd.crime || dd.waqia],
+              ["الجهة المختصة (بحسب الطلب)", dd.entity],
+              ["هل سبق التقديم للجهة المختصة؟", dd.prior_submit === true ? "نعم — " + (dd.prior_entity || dd.entity || "الجهة المختصة") : dd.prior_submit === false ? "لا" : null],
+              ["رقم القضية (إن وجد)", dd.case_no],
+              ["مستوى التهديد — بحسب الطالب", dd.threat],
+              ["امتداد الخطر إلى الغير (م5/4)", dd.extends],
+            ],
+            blocks: [["مسوّغات طلب الحماية — بنصّ مقدّمه", dd.reason]] },
+        ]} />
+        {files.length > 0 && <div className="fsec">
+          <p className="fsec-h"><I name="attach_file" size={16} color="var(--color-primary)" /> <span>مرفقات الطلب</span><span className="fsec-note">اطّلاع داخل الشاشة — كل فتح مُسجَّل</span></p>
+          <AttRow list={files} onOpen={onOpenDoc} />
+        </div>}
+        <div className="ro-field" style={{ marginTop: 12 }}>
+          <span className="row" style={{ gap: 8 }}><I name="fact_check" size={17} color="var(--color-success)" fill /><span style={{ fontSize: 12.5, color: "var(--text-body)" }}>الإقراران مستوفيان — صحّة البيانات والموافقة على المعالجة</span></span>
+          <Tag tone="neutral" size="sm" iconLeft={<I name="lock_clock" size={13} />}>ختم زمني موثّق</Tag>
+        </div>
+      </DocCard>
+    );
+  }
+
+  // ③ توصية الجهة المختصة — بنموذجها الموحّد (استشارية — القرار خالص للمركز م9)
+  function RecCard({ q, recommendation, request, onOpenDoc }) {
+    const rec = recommendation;
+    if (!rec) return null;
+    const rd = rec.details || {};
+    const dd = (request && request.details) || {};
+    const types = Array.isArray(rec.proposed_type) ? rec.proposed_type : [];
+    const atts = Array.isArray(rd.attachments) ? rd.attachments : [];
+    const factors = rec.factors9 && typeof rec.factors9 === "object" ? Object.entries(rec.factors9) : [];
+    const negative = String(rec.decision || "").indexOf("عدم") >= 0;
+    return (
+      <DocCard icon="recommend" title={q.foreign ? "خطاب اللجنة الدائمة — المسار الأجنبي (م6)" : "توصية الجهة المختصة — بنموذجها الموحّد"}
+        badges={<Tag tone={negative ? "warning" : "success"} size="sm" iconLeft={<I name="recommend" size={12} />}>{rec.decision === "توفير" ? "توفير الحماية" : rec.decision || "—"}</Tag>}
+        meta={(rd.rec_ref || "") + (rec.received_at ? (rd.rec_ref ? " · " : "") + fmtWhen(rec.received_at) : "")}>
+        <FormSections sections={[
+          { title: "الجهة صاحبة التوصية", icon: "account_balance",
+            rows: [["الجهة المختصة", rec.source_body], ["ضابط الاتصال المعتمد", rd.officer], ["مرجع التوصية", rd.rec_ref], ["تاريخ الرفع", rec.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : null], ["اعتمدها", rd.approved_by]] },
+          { title: "بيانات مقدّم الطلب (محجوبة الهوية)", icon: "badge", note: "يُشار إليه بالرمز السري " + q.secret,
+            rows: [["صفة مقدّم الطلب", q.cat], ["الحالة الصحية", rd.health], ["التاريخ الجنائي", rd.criminal], ["التاريخ النفسي", rd.psych], ["رغبة الكشف عن الهوية", rd.reveal]] },
+          (rd.req_details || dd.reason) && { title: "تفاصيل وأسباب طلب الحماية", icon: "notes", text: rd.req_details || dd.reason },
+          { title: "ملخّص القضية ودور مقدّم الطلب", icon: "cases",
+            rows: [["رقم القضية", rd.case_no || dd.case_no], ["المرحلة الحالية للقضية", rd.stage]],
+            blocks: [["ملخّص القضية", rd.case_summary], ["دور مقدّم الطلب وأهمية معلوماته", rd.role_desc]] },
+          { title: "مسوّغات توفير الحماية", icon: "rule",
+            rows: [
+              ["هل تم التواصل مع مقدّم الطلب؟", rd.contacted],
+              ["نوع الجريمة", rd.crime_class],
+              ["الواقعة", dd.waqia],
+              ["إخفاء البيانات (م2)", rd.hide_identity],
+              ["وجود خطر يهدّد طالب الحماية", rd.threat_exists || (rd.threat_type ? "يوجد" : null)],
+              ["نوع الخطر", rd.threat_type],
+              ["مستوى الخطر", dd.threat],
+              ["نوع الضرر", rd.harm_type],
+              ["امتداد الخطر إلى الغير (م5/4)", rd.extends_who ? (rd.extends_who === "لا يمتدّ" ? "لا" : "نعم") : null],
+              ["إلى من يمتدّ", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? rd.extends_who : null],
+              ...factors.map(([k, v]) => [k, String(v)]),
+              ["توصية الجهة", rec.decision === "توفير" ? "توفير الحماية" : rec.decision],
+            ],
+            blocks: [["الوصف الإجرامي", rd.crime_desc || dd.crime], ["أسباب التوصية", rec.notes]] },
+          { title: "أنواع الحماية المقترحة من الجهة (م14) — اقتراحٌ لا يُقيّد المجلس", icon: "shield",
+            chips: types, rows: [["الحلول البديلة", rd.alt_solutions || "لا توجد"]] },
+          { title: "مدة الحماية المقترحة", icon: "schedule", rows: [["المدة", fmtInterval(rec.proposed_duration)]] },
+        ]} />
+        {atts.length > 0 && <div className="fsec">
+          <p className="fsec-h"><I name="attach_file" size={16} color="var(--color-primary)" /> <span>مرفقات التوصية</span><span className="fsec-note">اطّلاع داخل الشاشة — كل فتح مُسجَّل</span></p>
+          <AttRow list={atts} onOpen={onOpenDoc} />
+        </div>}
+        {!q.foreign && <InlineAlert kind="info" title="توصية استشارية" style={{ marginTop: 12 }}>التوصية لا تُلزم المجلس ولا تُغلق الطلب آلياً — القرار خالصٌ للمركز (م9).</InlineAlert>}
+      </DocCard>
+    );
+  }
+
+  // ④ بطاقة دراسة/تقييم — التسمية بالدور والرقم فقط (لا تخصّصات؛ التوزيع بالعبء §6)
+  function StudyCard({ role, index, rec, partial, proposed, duration, notes, when, foundRec = null, foundReq = null, rejectReasons = null }) {
+    const isStudy = role === "studier";
+    const title = (isStudy ? "دراسة" : "تقييم") + " (" + arNum(index) + ")";
+    const by = (isStudy ? "دارس مستقل" : "مقيّم مستقل") + " (" + arNum(index) + ")";
     const tone = recToneOf(rec, partial);
     const tc = tone === "success" ? "var(--color-success)" : tone === "warning" ? "var(--color-warning)" : tone === "error" ? "var(--color-error)" : "var(--border-default)";
     return (
-      <div style={{ border: "1px solid var(--border-subtle)", borderInlineStart: "4px solid " + tc, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "var(--surface-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
-          <I name={icon} size={20} color="var(--color-primary)" />
-          <b style={{ color: "var(--text-strong)", fontSize: 14 }}>{title}</b>
+      <details className="sc" style={{ border: "1px solid var(--border-subtle)", borderInlineStart: "4px solid " + tc, borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--surface-card)" }}>
+        <summary style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "var(--surface-subtle)", flexWrap: "wrap", cursor: "pointer", listStyle: "none" }}>
+          <I name={isStudy ? "balance" : "psychology"} size={20} color="var(--color-primary)" />
+          <span><b style={{ color: "var(--text-strong)", fontSize: 14 }}>{title}</b><span className="muted" style={{ display: "block", fontSize: 11.5 }}>أعدّه: {by} — مستقلّ ومعزول</span></span>
           {rec && <Tag tone={tone} size="sm">{rec}</Tag>}
-          {when && <span className="muted" style={{ marginInlineStart: "auto", fontSize: 11.5 }}>{when}</span>}
-        </div>
-        <div style={{ padding: 16 }}>
+          <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
+            {when && <span className="mono muted" style={{ fontSize: 11 }} dir="ltr">{when}</span>}
+            <span className="material-symbols-rounded sc-chev" style={{ fontSize: 20, color: "var(--text-secondary)" }}>expand_more</span>
+          </span>
+        </summary>
+        <div style={{ padding: 16, borderTop: "1px solid var(--border-subtle)" }}>
           <FoundLine foundRec={foundRec} foundReq={foundReq} />
           {partial && <div className="fac" style={{ borderTop: "none", paddingTop: 0 }}><span className="fac-k">سبب الجزئية</span><span className="fac-v">{partial}</span></div>}
           {Array.isArray(rejectReasons) && rejectReasons.length > 0 && <div style={{ marginBottom: 10 }}>
@@ -197,30 +443,25 @@ export const DScreens = (function () {
                 {r.note && <span className="muted" style={{ display: "block", fontSize: 12.5, marginTop: 3 }}>{r.note}</span>}
               </div>))}</div>
           </div>}
-          {proposed && proposed.length > 0 && <div className="row" style={{ gap: 6, marginBottom: duration || notes ? 10 : 0 }}>{proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
-          {duration && <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{duration}</b></div>}
+          {proposed && proposed.length > 0 && <div className="row" style={{ gap: 6, marginBottom: 10 }}>{proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
+          {/* interval فارغ ملتبس عمداً (يرمز «إلى حين انتهاء القضية» أو «مدة محدّدة»
+              المدوّنة في الملاحظات — عقد packages/study-eval/submit-params) فلا يُعرض */}
+          {duration ? <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{fmtInterval(duration)}</b></div> : null}
           {notes && <div className="opin" style={{ marginTop: 0, borderInlineStart: "3px solid " + tc }}>{notes}</div>}
         </div>
-      </div>
+      </details>
     );
   }
 
-  /* حزمة الاطّلاع — المستندان الكاملان بكل حقولهما (SeekerReq/AuthRec
-     المشتركان مع بوابتي الدارس والمقيّم — لا تسطيح ولا اختصار) ثم
-     الدراسات والتقييمات كما وردت، فالمرفقات الداعمة.
-     كل فتح مرفقٍ داخل المستندين = صف تدقيق (record_attachment_open).
+  /* حزمة الاطّلاع — أربع مجموعات بطاقات قابلة للطي بالنمط الموحّد (حزمة 11):
+     بيانات طالب الحماية · طلب الحماية · توصية الجهة · بطاقة لكل دراسة وكل تقييم،
+     ثم المرفقات الداعمة (اختيارية). كل فتح مرفق = صف تدقيق (record_attachment_open).
      attachEditable: المعدّ في «preparing» يرفع/يزيل المرفقات الداعمة. */
   function ReviewPackage({ q, attachEditable, onView, viewed }) {
     const pkg = HD.getPackage(q.secret) || {};
     const docs = pkg.docs || {};
     const studies = pkg.studies || [], assessments = pkg.assessments || [];
-    // هوية المُطّلع للعلامة المائية — من مقعد الجلسة الحقيقي
-    const meSeat = (HD.getMe() || {}).seat;
-    const viewer = ((PREPARERS[meSeat] || SEATS[meSeat] || {}).name) || "المُطّلع";
-    // صيغة المستندين المشتركة: task {secret, refNo, cat} + detail {request, recommendation}
-    const docTask = { secret: q.secret, refNo: q.ref || "—", cat: q.cat };
-    const docDetail = { request: docs.request, recommendation: docs.recommendation };
-    const auditOpen = (t, doc) => {
+    const auditOpen = (doc) => {
       // باني supabase كسول — لا يُرسل إلا عند then/await
       const supa = createClient();
       supa.rpc("record_attachment_open", { _case_id: HD.caseIdOf(q.secret), _doc: doc })
@@ -228,24 +469,23 @@ export const DScreens = (function () {
     };
     return (<div>
       <p className="sec-h" style={{ marginBottom: 10 }}><I name="folder_open" size={18} color="var(--color-primary)" /> حزمة الاطّلاع — مُجمَّعة آلياً</p>
-      <div className="pkg-bar"><I name="smart_toy" size={16} /><span>يجمع النظام المستندَين الكاملَين ومخرجات الدراسة والتقييم كما وردت بلا اختصار أو توصية. يطّلع المعدّ والمجلس على المحتوى الكامل، وكل فتح يُسجَّل في التدقيق (م15/16).</span></div>
+      <div className="pkg-bar"><I name="smart_toy" size={16} /><span>يجمع النظام بيانات طالب الحماية وطلبه وتوصية الجهة ومخرجات الدراسة والتقييم كما وردت — بلا اختصار أو انتقاء أو توصية. كل فتح مُسجَّل في التدقيق (م15/16).</span></div>
       {q.foreign && <InlineAlert kind="warning" title="مسار أجنبي (المادة 6)" style={{ margin: "12px 0" }}>طلب وارد عبر اللجنة الدائمة للمساعدة القانونية. عند قبول المجلس تُرفع النتيجة توصيةً إلى النائب العام للبتّ النهائي (المعاملة بالمثل).</InlineAlert>}
 
-      {docs.request && <div style={{ marginTop: 14 }}>
-        <SeekerReq task={docTask} detail={docDetail} viewer={viewer} onOpenDoc={auditOpen} />
-      </div>}
-      {docs.recommendation && <div style={{ marginTop: 4 }}>
-        <AuthRec task={docTask} detail={docDetail} viewer={viewer} onOpenDoc={auditOpen} />
-      </div>}
+      <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+        <SubjectCard q={q} subject={pkg.subject} emergency={pkg.emergency} />
+        <RequestCard q={q} request={docs.request} onOpenDoc={auditOpen} />
+        <RecCard q={q} recommendation={docs.recommendation} request={docs.request} onOpenDoc={auditOpen} />
+      </div>
 
       {studies.length > 0 && <div style={{ marginTop: 18 }}>
-        <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="balance" size={18} color="var(--color-primary)" /> الدراسات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({studies.length} — كلّ مُعدّ مستقلّ ومعزول)</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} icon="balance" title={"الدراسة القانونية " + (studies.length > 1 ? (i + 1) : "")} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} foundRec={s.foundRec} foundReq={s.foundReq} rejectReasons={s.rejectReasons} />)}</div>
+        <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="balance" size={18} color="var(--color-primary)" /> الدراسات المُعدّة <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({studies.length} — كل دارس مستقلّ ومعزول)</span></p>
+        <div style={{ display: "grid", gap: 12 }}>{studies.map((s, i) => <StudyCard key={i} role="studier" index={i + 1} rec={s.rec} partial={s.partial} proposed={s.proposed} duration={s.duration} notes={s.notes} when={s.when} foundRec={s.foundRec} foundReq={s.foundReq} rejectReasons={s.rejectReasons} />)}</div>
       </div>}
 
       {assessments.length > 0 && <div style={{ marginTop: 18 }}>
-        <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="psychology" size={18} color="var(--color-primary)" /> التقييمات <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({assessments.length})</span></p>
-        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} icon="psychology" title={"التقييم النفسي/الاجتماعي " + (assessments.length > 1 ? (i + 1) : "")} rec={a.rec} partial={a.partial} proposed={a.proposed} duration={a.duration} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} rejectReasons={a.rejectReasons} />)}</div>
+        <p className="sec-h" style={{ margin: "0 0 12px" }}><I name="psychology" size={18} color="var(--color-primary)" /> التقييمات المُعدّة <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>({assessments.length} — كل مقيّم مستقلّ ومعزول)</span></p>
+        <div style={{ display: "grid", gap: 12 }}>{assessments.map((a, i) => <StudyCard key={i} role="evaluator" index={i + 1} rec={a.rec} partial={a.partial} proposed={a.proposed} duration={a.duration} notes={a.notes} when={a.when} foundRec={a.foundRec} foundReq={a.foundReq} rejectReasons={a.rejectReasons} />)}</div>
       </div>}
 
       <AttachmentsPanel secret={q.secret} editable={!!attachEditable} onView={onView} viewed={viewed} />
@@ -288,6 +528,8 @@ export const DScreens = (function () {
       <Card className="card pad" style={{ marginTop: 16 }}>
         <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> قرار المركز المُعَدّ</p>
         <div className="pkg-bar"><I name="verified_user" size={16} /><span>أعدّه <b>{PREPARERS.prep1.name}</b> (مستشار قانوني) إعداداً محايداً من الدراسات والتقييمات — بلا توصية بالقبول أو الرفض.{approved ? <React.Fragment> اعتمده <b>النائب والرئيس</b> ({d.approvals.chair.when}).</React.Fragment> : null}</span></div>
+        {d.scope && <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">نطاق القرار المُعَدّ</span><Tag tone={d.scope === "رفض الحماية" ? "error" : d.scope === "قبول جزئي" ? "warning" : "success"} size="sm" iconLeft={<I name="gavel" size={12} />}>{d.scope}</Tag></div>}
+        {d.scope === "قبول جزئي" && d.scopeNote && <div className="fld" style={{ marginBottom: 12 }}><span className="fld-label">ما يُقبل وما يُستثنى</span><div className="opin" style={{ marginTop: 0 }}>{d.scopeNote}</div></div>}
         <div className="fld" style={{ marginBottom: 12 }}><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
           <div className="row" style={{ gap: 6 }}>{(d.types || []).map((t) => <Tag key={t} tone="success" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}{(d.types || []).length === 0 && <span className="muted">—</span>}</div></div>
         <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">مدّة الحماية</span><b style={{ color: "var(--text-strong)" }}>{d.duration || "—"}</b></div>
@@ -367,5 +609,5 @@ export const DScreens = (function () {
     </React.Fragment>);
   }
 
-  return { I, STATUS, identOf, seatsOf, useStore, SecretChip, Timer, AttachmentsPanel, StudyCard, ReviewPackage, DecisionView, VoteBox, CouncilTally, dayGroup, bizDaysSince };
+  return { I, STATUS, identOf, seatsOf, useStore, SecretChip, Timer, AttachmentsPanel, DocCard, FormSections, SubjectCard, RequestCard, RecCard, StudyCard, ReviewPackage, DecisionView, VoteBox, CouncilTally, dayGroup, bizDaysSince };
 })();

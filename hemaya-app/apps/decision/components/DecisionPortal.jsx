@@ -24,7 +24,6 @@ const App = (function () {
   const S = DScreens;
   const { ReviewPackage, DecisionView, VoteBox, CouncilTally, Timer, I, STATUS, identOf, seatsOf, useStore, SecretChip, dayGroup, bizDaysSince } = S;
   const SEATS = HD.SEATS, PREPARERS = HD.PREPARERS, VOTING_SEATS = HD.VOTING_SEATS;
-  const PROTECTION_TYPES = HD.PROTECTION_TYPES;
   const DECISION_STAGES = HD.DECISION_STAGES;
   const dOf = HD.dOf, stageOf = HD.stageOf;
   const allCases = () => HD.allCases();
@@ -105,19 +104,36 @@ const App = (function () {
   function PrepareDecision({ q, back }) {
     const d = dOf(q.secret);
     const canEdit = d.status === "preparing";
+    // أنواع م14 والمدد من القوائم المرجعية (طبقة المحتوى) — والثوابت المجالية احتياط
+    const lookups = HD.getLookups();
+    const typeOptions = lookups.types;
+    const durationOptions = lookups.durations || DURATIONS;
     const [types, setTypes] = useState(d.types && d.types.length ? d.types : []);
     // المدة بالصياغة الموحّدة؛ المخزَّن القديم («30 يوماً» أو نصّ حرّ) يُطبَّع أو يُعامل مدةً محدّدة
+    // التطبيع بالقيمة لا بترتيب القائمة — القوائم المرجعية قابلة لإعادة الترتيب من الأدمن
+    const thirtyOpt = durationOptions.find((o) => durationDays(o) === 30) || durationOptions[0];
     const storedDuration = d.duration
-      ? (DURATIONS.includes(d.duration) ? d.duration : (durationDays(d.duration) === 30 ? DURATIONS[0] : "مدة محدّدة"))
-      : DURATIONS[0];
+      ? (durationOptions.includes(d.duration) ? d.duration : (durationDays(d.duration) === 30 ? thirtyOpt : "مدة محدّدة"))
+      : thirtyOpt;
     const [duration, setDuration] = useState(storedDuration);
     const [durationNote, setDurationNote] = useState(
-      d.duration && !DURATIONS.includes(d.duration) && durationDays(d.duration) !== 30 ? d.duration.replace(/^مدة محدّدة — /, "") : ""
+      d.duration && !durationOptions.includes(d.duration) && durationDays(d.duration) !== 30 ? d.duration.replace(/^مدة محدّدة — /, "") : ""
     );
     const finalDuration = duration === "مدة محدّدة" && durationNote.trim() ? "مدة محدّدة — " + durationNote.trim() : duration;
     const [reasoning, setReasoning] = useState(d.reasoning || HD.REASON_SKELETON);
+    // نطاق القرار المُعَدّ (حزمة 11): إلزامي؛ الجزئي بنصّ استثناء؛ الرفض بلا أنواع
+    const [scope, setScope] = useState(d.scope || "");
+    const [scopeNote, setScopeNote] = useState(d.scopeNote || "");
     const toggleType = (t) => setTypes((x) => x.includes(t) ? x.filter((y) => y !== t) : [...x, t]);
-    const ready = types.length > 0 && duration && (duration !== "مدة محدّدة" || durationNote.trim()) && reasoning.trim();
+    const isReject = scope === "رفض الحماية";
+    const ready = scope && (scope !== "قبول جزئي" || scopeNote.trim())
+      && (isReject || (types.length > 0 && duration && (duration !== "مدة محدّدة" || durationNote.trim())))
+      && reasoning.trim();
+    const decisionPatch = () => ({
+      types: isReject ? [] : types,
+      duration: isReject ? "" : finalDuration,
+      reasoning, scope, scopeNote: scope === "قبول جزئي" ? scopeNote.trim() : "",
+    });
     const lastReject = (d.rejections || []).slice(-1)[0];
     return (<div>
       <button className="link" onClick={back} style={{ marginBottom: 12 }}><I name="arrow_forward" size={16} /> رجوع لقائمة الإعداد</button>
@@ -127,16 +143,22 @@ const App = (function () {
         <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> إعداد قرار المركز</p>
         {lastReject && <InlineAlert kind="warning" title={"أُعيد إليك للتعديل من " + (lastReject.bySeat === "chair" ? "رئيس المركز" : lastReject.bySeat === "deputy" ? "نائب الرئيس" : "القيادة")} style={{ marginBottom: 14 }}>{lastReject.note} <span className="muted">({lastReject.when})</span></InlineAlert>}
         <InlineAlert kind="info" title="دورك: إعدادٌ محايد — لا توصية ولا تصويت" style={{ marginBottom: 14 }}>تُعِدّ القرار من الدراسات والتقييمات أعلاه ثم ترفعه لنائب رئيس المركز للاطّلاع والاعتماد؛ وبعد اعتماده يعود إليك لطرحه على أعضاء المجلس للتصويت. القرار خالصٌ للمجلس (م4/8).</InlineAlert>
-        <div className="fld"><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
-          <div className="chips">{PROTECTION_TYPES.map((t) => <button key={t} className={"chip" + (types.includes(t) ? " on" : "")} onClick={() => toggleType(t)}>{t}</button>)}</div></div>
-        <div className="fld"><span className="fld-label">مدّة الحماية</span>
-          <div className="chips">{DURATIONS.map((o) => <button key={o} className={"chip" + (duration === o ? " on" : "")} onClick={() => setDuration(o)}>{o}</button>)}</div>
-          {duration === "مدة محدّدة" && <input value={durationNote} onChange={(e) => setDurationNote(e.target.value)} placeholder="حدّد المدة…" dir="auto" style={{ marginTop: 8, maxWidth: 320 }} />}</div>
+        <div className="fld"><span className="fld-label">نطاق القرار المُعَدّ <span style={{ color: "var(--color-error)" }}>· إلزامي</span></span>
+          <div className="chips">{HD.SCOPES.map((o) => <button key={o} className={"chip" + (scope === o ? " on" : "") + (o === "رفض الحماية" ? " danger" : "")} onClick={() => setScope(o)}>{o}</button>)}</div>
+          <p className="muted" style={{ margin: "3px 2px 0", fontSize: 11.5 }}>يُحدَّد من الدراسات والتقييمات أعلاه — والقرار النهائي للمجلس.</p></div>
+        {scope === "قبول جزئي" && <div className="fld"><span className="fld-label">ما يُقبل وما يُستثنى <span style={{ color: "var(--color-error)" }}>· إلزامي</span></span>
+          <textarea value={scopeNote} onChange={(e) => setScopeNote(e.target.value)} dir="auto" placeholder="حدّد التدابير المقبولة والمستثناة ومسوّغاتها…" /></div>}
+        {!isReject && <div className="fld"><span className="fld-label">أنواع الحماية المقترحة (المادة 14)</span>
+          <div className="chips">{typeOptions.map((t) => <button key={t} className={"chip" + (types.includes(t) ? " on" : "")} onClick={() => toggleType(t)}>{t}</button>)}</div></div>}
+        {!isReject && <div className="fld"><span className="fld-label">مدّة الحماية</span>
+          <div className="chips">{durationOptions.map((o) => <button key={o} className={"chip" + (duration === o ? " on" : "")} onClick={() => setDuration(o)}>{o}</button>)}</div>
+          {duration === "مدة محدّدة" && <input value={durationNote} onChange={(e) => setDurationNote(e.target.value)} placeholder="حدّد المدة…" dir="auto" style={{ marginTop: 8, maxWidth: 320 }} />}</div>}
+        {isReject && <InlineAlert kind="warning" title="نطاق الرفض" style={{ marginBottom: 14 }}>قرار الرفض لا يقترح تدابير م14 ولا مدة — تكفي حيثياته، والتظلّم مكفول (م21).</InlineAlert>}
         <div className="fld"><span className="fld-label">حيثيات القرار <span style={{ color: "var(--color-error)" }}>· إلزامي</span></span>
           <textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} dir="auto" style={{ minHeight: 120 }} /></div>
         <div className="row" style={{ justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, { types, duration: finalDuration, reasoning }); }}><I name="save" size={17} /> حفظ المسوّدة</button>
-          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, { types, duration: finalDuration, reasoning }); back(); }}><I name="send" size={17} /> رفع لنائب الرئيس للاعتماد</button>
+          <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, decisionPatch()); }}><I name="save" size={17} /> حفظ المسوّدة</button>
+          <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, decisionPatch()); back(); }}><I name="send" size={17} /> رفع لنائب الرئيس للاعتماد</button>
         </div>
       </Card> : <React.Fragment>
         <DecisionView decision={d} foreign={q.foreign} />
@@ -206,6 +228,8 @@ const App = (function () {
     const allViewed = attachments.length === 0 || attachments.every((a) => viewed.indexOf(a.id) >= 0);
     const markViewed = (id) => setViewed((v) => v.indexOf(id) >= 0 ? v : v.concat([id]));
     const outcome = res.outcome;
+    // تبنّي المجلس (مقبول) لقرارٍ مُعَدٍّ نطاقُه «رفض الحماية» = إصدار رفضٍ مسبَّب بحيثياته
+    const adoptedReject = outcome === "مقبول" && d.scope === "رفض الحماية";
     const rejectNotes = VOTING_SEATS.map((s) => votesFor[s]).filter((v) => v && v.choice === "رفض" && v.note).map((v) => v.note);
     const defReason = outcome === "مقبول" ? (d.reasoning || "") : "أسباب الرفض المستندة إلى مداولة المجلس:\n- " + (rejectNotes.length ? rejectNotes.join("\n- ") : "لم تتوافر مسوّغات كافية للحماية وفق عوامل المادة 9.");
     useEffect(() => { if (res.closed && isLead && !d.issued) setReason((r) => r || defReason); }, [res.closed, outcome]);
@@ -229,11 +253,12 @@ const App = (function () {
           <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> إصدار قرار المركز</p>
           {q.foreign && outcome === "مقبول" && <InlineAlert kind="warning" title="مسار أجنبي — تُرفع للنائب العام" style={{ marginBottom: 12 }}>القرار في الطلب الأجنبي توصية تُرفع إلى النائب العام للبتّ النهائي (المادة 6)، ثمّ تُبلَّغ عبر اللجنة الدائمة.</InlineAlert>}
           <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">حصيلة تصويت المجلس</span><b style={{ color: outcome === "مقبول" ? "var(--color-success)" : "var(--color-error)" }}>{outcome} · قبول {res.accept} / رفض {res.reject}</b></div>
-          {outcome === "مقبول" ? <InlineAlert kind="success" title="قبول — وفق قرار المركز المُعَدّ" style={{ marginBottom: 12 }}>يصدر القبول باعتماد قرار المركز المُعَدّ (أنواع الحماية ومدّتها مبيّنة فيه). يُشعَر طالب الحماية والجهة (م10).</InlineAlert> : <InlineAlert kind="warning" title="قرار رفض مكتوب مسبّب" style={{ marginBottom: 12 }}>يُصدَر قرار رفضٍ مسبَّب يتضمّن حقّ التظلّم خلال 10 أيام (المادة 21).</InlineAlert>}
-          <div className="fld"><span className="fld-label">تسبيب قرار المركز {outcome === "مرفوض" && <span style={{ color: "var(--color-error)" }}>· إلزامي</span>}</span><textarea value={reason} onChange={(e) => setReason(e.target.value)} dir="auto" style={{ minHeight: 100 }} /></div>
+          {adoptedReject ? <InlineAlert kind="warning" title="تبنّى المجلس القرار المُعَدّ — ونطاقه رفض الحماية" style={{ marginBottom: 12 }}>القبول = تبنّي القرار المُعَدّ كما عُرض؛ وبما أن نطاقه «رفض الحماية» يصدر قرار <b>رفضٍ</b> مسبَّب بحيثياته المعتمدة، مع حقّ التظلّم خلال 10 أيام (م21).</InlineAlert>
+            : outcome === "مقبول" ? <InlineAlert kind="success" title="قبول — وفق قرار المركز المُعَدّ" style={{ marginBottom: 12 }}>يصدر القبول باعتماد قرار المركز المُعَدّ (أنواع الحماية ومدّتها مبيّنة فيه). يُشعَر طالب الحماية والجهة (م10).</InlineAlert> : <InlineAlert kind="warning" title="قرار رفض مكتوب مسبّب" style={{ marginBottom: 12 }}>يُصدَر قرار رفضٍ مسبَّب يتضمّن حقّ التظلّم خلال 10 أيام (المادة 21).</InlineAlert>}
+          <div className="fld"><span className="fld-label">تسبيب قرار المركز {(outcome === "مرفوض" || adoptedReject) && <span style={{ color: "var(--color-error)" }}>· إلزامي</span>}</span><textarea value={reason} onChange={(e) => setReason(e.target.value)} dir="auto" style={{ minHeight: 100 }} /></div>
           <InlineAlert kind="info" title="اعتماد القرار">يُصدره رئيس المركز بعد إغلاق التصويت — والحصيلة تُحسم في القاعدة، والإصدار يُشعِر طالب الحماية والجهة (م10).</InlineAlert>
           <div className="row" style={{ justifyContent: "flex-end", marginTop: 14 }}>
-            <button className="btn btn-primary" disabled={outcome === "مرفوض" && !reason.trim()} onClick={() => { HD.issue(q.secret, { reason }); back(); }}><I name="verified" size={18} /> إصدار القرار وإشعار الطرفين</button>
+            <button className="btn btn-primary" disabled={(outcome === "مرفوض" || adoptedReject) && !reason.trim()} onClick={() => { HD.issue(q.secret, { reason }); back(); }}><I name="verified" size={18} /> إصدار القرار وإشعار الطرفين</button>
           </div>
         </Card> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title="الإصدار بيد رئيس المركز">اكتمل التصويت وظهرت الحصيلة أعلاه. يتولّى <b>رئيس المركز</b> إصدار القرار وإشعار الطرفين (م10)؛ للنائب الاطّلاع والمتابعة.</InlineAlert></Card>)}
       </React.Fragment> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title={STATUS[d.status].t}>يُطرح للتصويت بعد اعتماد النائب وطرح المعدّ للقرار.</InlineAlert></Card>}

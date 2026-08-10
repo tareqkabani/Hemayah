@@ -328,6 +328,191 @@ begin
   end loop;
 end $$;
 
+-- ── 3ب) ثلاث حالات «حزمة الاطّلاع» (حزمة التسليم 11 — 10 أغسطس 2026) ──
+--   C-2026-0503: تباين آراء (دراسة كلي · تقييم جزئي · تقييم كلي) — مبلّغ/نزاهة/متوسط.
+--   C-2026-0517: مسار الرفض (توصية بعدم التوفير + دراسة رفض + تقييم جزئي) — خبير/النيابة/منخفض.
+--   C-2026-0524: عاجل الوجاهة (كلي ×2 + جزئي برفض الأسرة تغيير الإقامة) — شاهد/النيابة/حرِج.
+--   كل حالة بحزمة كاملة: subjects بالديموغرافيا والمصادر + جهة طوارئ + طلب مفصّل
+--   + توصية بنموذجها الموحّد (details) + الدراسات/التقييمات بمؤلّفين متمايزين — status=preparing.
+do $$
+declare
+  officer uuid; s1 uuid; s2 uuid; e1 uuid; e2 uuid; e3 uuid; cid uuid;
+begin
+  select id into officer from auth.users where email = '2000000005@nafath.local';
+  select id into s1 from auth.users where email = '2000000003@nafath.local';
+  select id into s2 from auth.users where email = '2000000031@nafath.local';
+  select id into e1 from auth.users where email = '2000000004@nafath.local';
+  select id into e2 from auth.users where email = '2000000041@nafath.local';
+  select id into e3 from auth.users where email = '2000000042@nafath.local';
+
+  -- ① C-2026-0503 — تباين الآراء
+  if not exists (select 1 from protection_cases where ref_no = 'REF-2026-0503') then
+    insert into protection_cases (ref_no, secret_code, category, status, source, officer_id, classification)
+    values ('REF-2026-0503', 'C-2026-0503', 'reporter', 'in_decision', 'local', officer, 'medium')
+    returning id into cid;
+    insert into subjects (case_id, subject_type, gender, nationality, birth_date, marital_status,
+                          national_address, employer, job_title, education_level, source_flags)
+    values (cid, 'principal', 'ذكر', 'سعودي', '1988-04-12', 'متزوج',
+            '{"short":"RHTA3344","building":"3344","street":"شارع الأمير محمد","secondary":"7710","district":"حي الشاطئ","postal":"32413","city":"الدمّام"}'::jsonb,
+            'أمانة المنطقة الشرقية', 'أخصائي مراجعة مالية', 'بكالوريوس',
+            '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
+    insert into emergency_contacts (case_id, relationship) values (cid, 'أخ');
+    insert into protection_requests (case_id, applicant_role, channel, details)
+    values (cid, 'reporter', 'seeker', jsonb_build_object(
+      'role','مبلّغ', 'crime','فساد إداري ومالي', 'waqia','بلاغ عن مخالفات مالية في عقود تشغيل',
+      'entity','هيئة الرقابة ومكافحة الفساد', 'prior_submit', true, 'prior_entity','هيئة الرقابة ومكافحة الفساد',
+      'case_no','2026/0503', 'threat','متوسط', 'extends','لا يمتدّ',
+      'reason','تلقّيت تهديدات مبطّنة بعد تقديم البلاغ، وأخشى الإضرار بوظيفتي وسمعتي.',
+      'files', jsonb_build_array('صورة البلاغ المقدّم', 'رسائل التهديد')));
+    insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
+                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+    values (cid, 'هيئة الرقابة ومكافحة الفساد', 'توفير',
+            '["إخفاء البيانات الشخصية وما يدل على الهوية","توفير وسائل الإبلاغ الفوري عن الخطر"]'::jsonb,
+            interval '30 days',
+            '{"جدية التهديد":"قائمة","أهمية الإفادة":"محورية في إثبات الواقعة"}'::jsonb,
+            now(), now() + interval '5 days', now(), 'electronic',
+            'البلاغ جوهري لكشف شبكة المخالفات؛ تُرى حمايته إجرائياً مع إخفاء بياناته.',
+            jsonb_build_object('officer','ضابط اتصال النزاهة (12)', 'rec_ref','NZH-2026-1187',
+              'approved_by','مدير إدارة الحماية بالهيئة', 'stage','التحقيق',
+              'health','سليم', 'criminal','لا سوابق', 'psych','قلق وظيفي عابر', 'reveal','لا يرغب في الكشف',
+              'case_summary','مخالفات مالية وإدارية في عقود تشغيل بلدية أسهم بلاغه في كشفها.',
+              'role_desc','مصدر البلاغ الأول وموثِّق المستندات المالية.',
+              'contacted','نعم — هاتفياً', 'crime_class','جريمة كبرى', 'crime_desc','فساد إداري ومالي',
+              'hide_identity','نعم (م2)', 'threat_exists','يوجد', 'threat_type','تهديد وظيفي ومعنوي',
+              'extends_who','لا يمتدّ', 'alt_solutions','النقل الوظيفي داخل الجهة',
+              'attachments', jsonb_build_array('محضر التواصل', 'مذكرة تقييم البلاغ')));
+    insert into studies (case_id, studier_id, recommendation, proposed_type, proposed_duration, notes,
+                         found_recommendation, found_request, submitted_at)
+    values (cid, s1, 'قبول كلي',
+            '["إخفاء البيانات الشخصية وما يدل على الهوية","توفير وسائل الإبلاغ الفوري عن الخطر"]'::jsonb,
+            interval '30 days',
+            'اطّلعتُ على الطلب والتوصية؛ المسوّغات قائمة والمستندات متسقة، وتتحقق شروط م9.',
+            true, true, now());
+    insert into assessments (case_id, evaluator_id, recommendation, partial_reason, proposed_type, proposed_duration,
+                             notes, found_recommendation, found_request, submitted_at)
+    values
+      (cid, e1, 'قبول جزئي', 'يُكتفى بالتدابير الإجرائية؛ لا حاجة لتغيير محل الإقامة في المرحلة الحالية.',
+       '["إخفاء البيانات الشخصية وما يدل على الهوية"]'::jsonb, interval '30 days',
+       'المقابلة تُظهر توازناً نفسياً مع قلق وظيفي؛ التدابير الإجرائية كافية حالياً.',
+       true, true, now()),
+      (cid, e2, 'قبول كلي', null,
+       '["إخفاء البيانات الشخصية وما يدل على الهوية","توفير وسائل الإبلاغ الفوري عن الخطر"]'::jsonb,
+       interval '30 days',
+       'مؤشّرات الضغط المعنوي متصاعدة؛ يُوصى بالحماية بأنواعها المقترحة كاملة.',
+       true, true, now());
+    insert into council_decisions (case_id, preparer_id, status, types)
+    values (cid, officer, 'preparing', '[]'::jsonb);
+  end if;
+
+  -- ② C-2026-0517 — مسار الرفض
+  if not exists (select 1 from protection_cases where ref_no = 'REF-2026-0517') then
+    insert into protection_cases (ref_no, secret_code, category, status, source, officer_id, classification)
+    values ('REF-2026-0517', 'C-2026-0517', 'expert', 'in_decision', 'local', officer, 'low')
+    returning id into cid;
+    insert into subjects (case_id, subject_type, gender, nationality, birth_date, marital_status,
+                          national_address, employer, job_title, education_level, source_flags)
+    values (cid, 'principal', 'ذكر', 'سعودي', '1975-11-02', 'متزوج',
+            '{"short":"MNRB5521","building":"5521","street":"طريق الهجرة","secondary":"6620","district":"حي العزيزية","postal":"42317","city":"المدينة المنورة"}'::jsonb,
+            'مكتب خبرة معتمد', 'خبير خطوط ومستندات', 'ماجستير',
+            '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
+    insert into emergency_contacts (case_id, relationship) values (cid, 'زوجة');
+    insert into protection_requests (case_id, applicant_role, channel, details)
+    values (cid, 'expert', 'seeker', jsonb_build_object(
+      'role','خبير', 'crime','تزوير محرّرات رسمية', 'waqia','إفادة خبرة في قضية تزوير',
+      'entity','النيابة العامة', 'prior_submit', true, 'prior_entity','النيابة العامة',
+      'case_no','2026/0517', 'threat','منخفض', 'extends','لا يمتدّ',
+      'reason','أخشى ردّ فعل أطراف القضية بعد إيداع تقرير الخبرة.',
+      'files', jsonb_build_array('صورة من تقرير الخبرة')));
+    insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
+                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+    values (cid, 'النيابة العامة بالمدينة المنورة', 'عدم توفير', '[]'::jsonb, null,
+            '{"جدية التهديد":"غير مؤكدة","أهمية الإفادة":"مساندة"}'::jsonb,
+            now(), now() + interval '5 days', now(), 'electronic',
+            'لم يثبت تهديد فعلي؛ والإفادة فنية مساندة يمكن أداؤها دون تدابير خاصة.',
+            jsonb_build_object('officer','ضابط اتصال النيابة (7)', 'rec_ref','PP-MND-2026-0441',
+              'approved_by','رئيس دائرة الحماية بالفرع', 'stage','المحاكمة',
+              'health','سليم', 'criminal','لا سوابق', 'psych','لا ملاحظات', 'reveal','لا مانع لديه من الكشف',
+              'case_summary','قضية تزوير محرّرات رسمية أودع فيها الخبير تقريره الفني.',
+              'role_desc','خبير مستندات معيّن من الدائرة — إفادته فنية مساندة.',
+              'contacted','نعم — كتابياً', 'crime_class','جريمة كبرى', 'crime_desc','تزوير محرّرات رسمية',
+              'hide_identity','لا', 'threat_exists','لا يوجد', 'extends_who','لا يمتدّ',
+              'alt_solutions','الاكتفاء بالمتابعة الدورية وقنوات البلاغ المعتادة',
+              'attachments', jsonb_build_array('محضر التواصل')));
+    insert into studies (case_id, studier_id, recommendation, reject_reasons, proposed_type, notes,
+                         found_recommendation, found_request, submitted_at)
+    values (cid, s2, 'رفض الحماية',
+            '[{"t":"انتفاء جدية التهديد","note":"لم يثبت تهديد فعلي أو وشيك بعد التحرّي."},{"t":"كفاية القنوات المعتادة","note":"طبيعة الإفادة الفنية لا تستلزم تدابير م14."}]'::jsonb,
+            '[]'::jsonb,
+            'بعد الاطّلاع على الطلب والتوصية لم تتحقق عوامل م9؛ يُرى عدم توفير الحماية.',
+            true, true, now());
+    insert into assessments (case_id, evaluator_id, recommendation, partial_reason, proposed_type, proposed_duration,
+                             notes, found_recommendation, found_request, submitted_at)
+    values (cid, e1, 'قبول جزئي', 'قلق مهني محدود يُعالج بوسائل الإبلاغ الفوري دون بقية التدابير.',
+            '["توفير وسائل الإبلاغ الفوري عن الخطر"]'::jsonb, interval '30 days',
+            'أثر نفسي محدود؛ يُكتفى بتمكينه من الإبلاغ الفوري عند أي مستجد.',
+            true, true, now());
+    insert into council_decisions (case_id, preparer_id, status, types)
+    values (cid, officer, 'preparing', '[]'::jsonb);
+  end if;
+
+  -- ③ C-2026-0524 — عاجل الوجاهة (حرِج)
+  if not exists (select 1 from protection_cases where ref_no = 'REF-2026-0524') then
+    insert into protection_cases (ref_no, secret_code, category, status, source, officer_id, classification)
+    values ('REF-2026-0524', 'C-2026-0524', 'witness', 'in_decision', 'local', officer, 'critical')
+    returning id into cid;
+    insert into subjects (case_id, subject_type, gender, nationality, birth_date, marital_status,
+                          national_address, employer, job_title, education_level, source_flags)
+    values (cid, 'principal', 'ذكر', 'سعودي', '1992-07-30', 'متزوج',
+            '{"short":"ABHA7789","building":"7789","street":"شارع الملك فيصل","secondary":"3312","district":"حي الموظفين","postal":"62521","city":"أبها"}'::jsonb,
+            'قطاع خاص — نقل ولوجستيات', 'مشرف مستودعات', 'دبلوم',
+            '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
+    insert into emergency_contacts (case_id, relationship) values (cid, 'أب');
+    insert into protection_requests (case_id, applicant_role, channel, details)
+    values (cid, 'witness', 'seeker', jsonb_build_object(
+      'role','شاهد', 'crime','اتّجار بالمواد المخدّرة', 'waqia','شهادة على شبكة تهريب وترويج',
+      'entity','النيابة العامة', 'prior_submit', true, 'prior_entity','النيابة العامة',
+      'case_no','2026/0524', 'threat','حرِج', 'extends','يشمل الزوجة والأبناء',
+      'reason','تلقّيت تهديدات مباشرة بالقتل أنا وأسرتي بعد الإدلاء بشهادتي.',
+      'files', jsonb_build_array('محضر الشهادة', 'بلاغ التهديد')));
+    insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
+                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+    values (cid, 'النيابة العامة بعسير', 'توفير',
+            '["الحماية الأمنية","المرافقة الأمنية وسلامة التنقّل","تغيير محل الإقامة"]'::jsonb, null,
+            '{"جدية التهديد":"مؤكدة ومتكررة","أهمية الإفادة":"محورية","خطورة الجريمة":"عالية"}'::jsonb,
+            now(), now() + interval '5 days', now(), 'electronic',
+            'التهديد منظّم وقابل للتنفيذ؛ تُرى الحماية العاجلة بأوسع تدابيرها.',
+            jsonb_build_object('officer','ضابط اتصال النيابة (3)', 'rec_ref','PP-ASR-2026-0902',
+              'approved_by','رئيس فرع النيابة بعسير', 'stage','التحقيق',
+              'health','ضغط نفسي ظاهر', 'criminal','لا سوابق', 'psych','قلق حادّ لديه ولدى أسرته', 'reveal','لا يرغب في الكشف مطلقاً',
+              'case_summary','شبكة اتّجار بالمخدّرات؛ شهادته حاسمة في تحديد رؤوسها.',
+              'role_desc','شاهد عيان رئيس — أقواله ركن الإدانة.',
+              'contacted','نعم — مقابلة ميدانية', 'crime_class','جريمة كبرى', 'crime_desc','اتّجار بالمواد المخدّرة',
+              'hide_identity','نعم (م2)', 'threat_exists','يوجد', 'threat_type','تهديد بالقتل',
+              'harm_type','ترصّد مركبته', 'extends_who','الزوجة والأبناء',
+              'alt_solutions','لا بدائل كافية',
+              'attachments', jsonb_build_array('محضر المقابلة الميدانية', 'تقرير رصد التهديدات')));
+    insert into studies (case_id, studier_id, recommendation, proposed_type, proposed_duration, notes,
+                         found_recommendation, found_request, submitted_at)
+    values (cid, s1, 'قبول كلي',
+            '["الحماية الأمنية","تغيير محل الإقامة","المرافقة الأمنية وسلامة التنقّل"]'::jsonb, null,
+            'الخطر جسيم وممتد للأسرة؛ تتحقق عوامل م9 كاملة ويلزم أوسع تدابير م14.',
+            true, true, now());
+    insert into assessments (case_id, evaluator_id, recommendation, partial_reason, proposed_type, proposed_duration,
+                             notes, found_recommendation, found_request, submitted_at)
+    values
+      (cid, e2, 'قبول كلي', null,
+       '["الحماية الأمنية","حماية المسكن","تغيير محل الإقامة"]'::jsonb, null,
+       'مؤشّرات خطر ميدانية مؤكدة؛ يُوصى بالتدابير كاملة حتى انتهاء القضية.',
+       true, true, now()),
+      (cid, e3, 'قبول جزئي', 'رفضت الأسرة تغيير محل الإقامة خارج المنطقة؛ يُستعاض بحماية المسكن والإرشاد.',
+       '["حماية المسكن","الإرشاد القانوني والنفسي والاجتماعي"]'::jsonb, interval '30 days',
+       'قلق حادّ لدى الشاهد وأسرته مع تمسّك بالبقاء في المنطقة.',
+       true, true, now());
+    insert into council_decisions (case_id, preparer_id, status, types)
+    values (cid, officer, 'preparing', '[]'::jsonb);
+  end if;
+end $$;
+
 -- ── 4) ثلاث رحلات تظلّم مكتملة الحزمة لبوابة المكتب الفني ──
 --   قضايا صدر فيها قرار مركزٍ (بحزمة توصية + دراسة + تقييم) ثم رُفع تظلّم:
 --   مُشغّلات الورود تتولى مرجع GRV والإسناد بالأقلّ عبئاً وإشعارات المستشارين والمدير.

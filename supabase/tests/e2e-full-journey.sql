@@ -137,7 +137,7 @@ do $$ declare j jr; c jc; _st text; begin
   select * into j from jr; select * into c from jc;
   perform pg_temp.act(j.preparer); set local role authenticated;
   perform council_save(c.case_id, '["الحماية الأمنية","إخفاء البيانات الشخصية وما يدل على الهوية"]'::jsonb, 'ثلاثون يوماً', 'حيثيات مؤيِّدة للحماية بناءً على الدراسات والتقييمات.');
-  select status into _st from council_submit(c.case_id, '["الحماية الأمنية"]'::jsonb, 'ثلاثون يوماً', 'حيثيات القرار المعدّ.');
+  select status into _st from council_submit(c.case_id, '["الحماية الأمنية"]'::jsonb, 'ثلاثون يوماً', 'حيثيات القرار المعدّ.', 'قبول كلي', null);
   reset role;
   if _st <> 'pending_deputy' then raise exception 'ف6: بعد الرفع % لا pending_deputy', _st; end if;
 
