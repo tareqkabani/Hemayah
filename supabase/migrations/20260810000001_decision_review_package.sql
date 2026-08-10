@@ -110,8 +110,10 @@ begin
   if _scope = 'قبول جزئي' and nullif(btrim(coalesce(_scope_note, '')), '') is null then
     raise exception 'مع «قبول جزئي» يلزم بيان ما يُقبل وما يُستثنى.';
   end if;
-  -- الرفض لا يقترح تدابير؛ وفيما عداه أنواع م14 مطلوبة
-  if _scope <> 'رفض الحماية' and (_types is null or jsonb_array_length(_types) = 0) then
+  -- الرفض لا يقترح تدابير (تُصفَّر جبراً)؛ وفيما عداه أنواع م14 مطلوبة
+  if _scope = 'رفض الحماية' then
+    _types := '[]'::jsonb; _duration := null;
+  elsif _types is null or jsonb_array_length(_types) = 0 then
     raise exception 'أنواع الحماية (م14) مطلوبة.';
   end if;
   if _reasoning is null or btrim(_reasoning) = '' then raise exception 'حيثيات القرار مطلوبة.'; end if;
@@ -131,35 +133,50 @@ end $$;
 revoke all on function public.council_submit(uuid, jsonb, text, text, text, text) from public, anon;
 grant execute on function public.council_submit(uuid, jsonb, text, text, text, text) to authenticated;
 
--- ── 5) council_issue: نسخ النطاق إلى السجلّ الصادر ───────────
+-- ── 5) council_issue: النوع الفعلي بحسب النطاق + نسخه للسجلّ الصادر ──
 -- (النصّ الحيّ من 20260808000001 + عمودا scope/scope_note في board_decisions)
+-- قاعدة الاتساق: «قبول» المجلس = تبنّي القرار المُعَدّ كما عُرض (نصّ صندوق
+-- التصويت) — فإن كان نطاقه «رفض الحماية» صدر القرار رفضاً مسبَّباً بحيثياته
+-- المعتمدة، لا قبولاً بلا تدابير. ورفض المجلس للقرار المُعَدّ يُصدر رفضاً
+-- للحماية بتسبيب الرئيس، ونطاق السجلّ الصادر حينها «رفض الحماية» لا نطاق
+-- المسوّدة التي لم تُتبنَّ.
 create or replace function public.council_issue(_case_id uuid, _reason text)
 returns table(outcome text) language plpgsql security definer set search_path = public, extensions as $$
 declare _uid uuid := auth.uid(); _ref text; _t record; _st text; _newcase case_status; _sec text; _vars jsonb;
-        _scope text; _scope_note text;
+        _scope text; _scope_note text; _reasoning text; _eff text;
 begin
   if _uid is null then raise exception 'unauthenticated'; end if;
   if not has_role(_uid, 'board_chair') then raise exception 'غير مصرَّح: الإصدار بيد رئيس المركز حصراً.'; end if;
-  select cd.status, cd.scope, cd.scope_note into _st, _scope, _scope_note
+  select cd.status, cd.scope, cd.scope_note, cd.reasoning into _st, _scope, _scope_note, _reasoning
     from council_decisions cd where cd.case_id = _case_id for update;
   if _st <> 'voting' then raise exception 'القرار ليس في التصويت (%).', _st; end if;
   select * into _t from public.council_tally(_case_id);
   if not _t.closed then raise exception 'لم يُغلق التصويت بعد (بلوغ 4/7 أو انتهاء المهلة).'; end if;
-  if _t.outcome = 'reject' and (_reason is null or btrim(_reason) = '') then
-    raise exception 'قرار الرفض يتطلّب تسبيباً مكتوباً (م21).';
+
+  -- النوع الفعلي للإصدار: تبنّي مُعَدٍّ نطاقُه الرفض ⇒ رفض
+  _eff := case when _t.outcome = 'accept' and _scope = 'رفض الحماية' then 'reject' else _t.outcome end;
+  if _eff = 'reject' and (_reason is null or btrim(_reason) = '') then
+    if _t.outcome = 'accept' then
+      -- تبنّى المجلس الرفض المُعَدّ — حيثياته المعتمدة هي التسبيب المكتوب (م21)
+      _reason := _reasoning;
+    else
+      raise exception 'قرار الرفض يتطلّب تسبيباً مكتوباً (م21).';
+    end if;
   end if;
   select ref_no, secret_code into _ref, _sec from protection_cases where id = _case_id;
 
   update council_decisions
-     set status = 'issued', issued_type = _t.outcome, issued_reason = _reason, issued_at = now(), updated_at = now()
+     set status = 'issued', issued_type = _eff, issued_reason = _reason, issued_at = now(), updated_at = now()
    where case_id = _case_id;
 
-  _newcase := case _t.outcome when 'accept' then 'accepted'::case_status else 'rejected'::case_status end;
+  _newcase := case _eff when 'accept' then 'accepted'::case_status else 'rejected'::case_status end;
   update protection_cases set status = _newcase, updated_at = now() where id = _case_id;
 
   insert into board_decisions (case_id, type, justification, decided_at, scope, scope_note)
-  values (_case_id, case _t.outcome when 'accept' then 'accept'::decision_type else 'reject'::decision_type end,
-          coalesce(_reason, 'قرار المجلس'), now(), _scope, _scope_note);
+  values (_case_id, case _eff when 'accept' then 'accept'::decision_type else 'reject'::decision_type end,
+          coalesce(_reason, 'قرار المجلس'), now(),
+          case when _t.outcome = 'accept' then _scope else 'رفض الحماية' end,
+          case when _t.outcome = 'accept' then _scope_note else null end);
 
   -- إشعار الطرف الأول: طالب الحماية (فوريّ — م10) — من notification_templates
   _vars := jsonb_build_object(
@@ -168,11 +185,11 @@ begin
     'أسباب_الرفض', coalesce(nullif(btrim(_reason), ''), '—'),
     'مهلة_التظلم', '10 أيام');
   perform notify_from_template(
-    case _t.outcome when 'accept' then 'n_dec_accept' else 'n_dec_reject' end,
+    case _eff when 'accept' then 'n_dec_accept' else 'n_dec_reject' end,
     _vars, _case_id, 'decision', 'requests');
 
   -- قرار القبول يستتبع دعوة توقيع الاتفاقية (م11)
-  if _t.outcome = 'accept' then
+  if _eff = 'accept' then
     perform notify_from_template('n_agreement', _vars, _case_id, 'agreement', 'requests');
   end if;
 
@@ -180,10 +197,10 @@ begin
   if exists (select 1 from recommendations rc where rc.case_id = _case_id) then
     perform notify_from_template('n_dec_entity',
       jsonb_build_object('الرمز_السري', coalesce(_sec, ''),
-        'نتيجة_القرار', case _t.outcome when 'accept' then 'قبول الحماية' else 'عدم القبول' end),
+        'نتيجة_القرار', case _eff when 'accept' then 'قبول الحماية' else 'عدم القبول' end),
       _case_id, 'decision', 'incoming', null, 'competent'::referral_authority);
   end if;
 
-  insert into audit_log (actor_id, action, target) values (_uid, 'council_issue_' || _t.outcome, _ref);
-  return query select _t.outcome;
+  insert into audit_log (actor_id, action, target) values (_uid, 'council_issue_' || _eff, _ref);
+  return query select _eff;
 end $$;

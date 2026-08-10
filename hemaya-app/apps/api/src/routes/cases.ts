@@ -159,6 +159,7 @@ cases.post("/:ref/council/draft", requireUser, zValidator("json", CouncilDraftSc
   const input = c.req.valid("json");
   await callRpc<unknown>(c.get("db"), "council_save", {
     _case_id: caseId, _types: input.types, _duration: input.duration ?? null, _reasoning: input.reasoning ?? null,
+    _scope: input.scope ?? null, _scope_note: input.scopeNote ?? null,
   });
   return c.json({ data: { ok: true } });
 });
@@ -169,6 +170,7 @@ cases.post("/:ref/council/submit", requireUser, zValidator("json", CouncilSubmit
   const input = c.req.valid("json");
   const rows = await callRpc<{ status: string }[]>(c.get("db"), "council_submit", {
     _case_id: caseId, _types: input.types, _duration: input.duration ?? null, _reasoning: input.reasoning,
+    _scope: input.scope, _scope_note: input.scopeNote ?? null,
   });
   const row = Array.isArray(rows) ? rows[0] : rows;
   return c.json({ data: { status: row?.status ?? null } });

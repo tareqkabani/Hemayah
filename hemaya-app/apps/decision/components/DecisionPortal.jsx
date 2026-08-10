@@ -24,7 +24,6 @@ const App = (function () {
   const S = DScreens;
   const { ReviewPackage, DecisionView, VoteBox, CouncilTally, Timer, I, STATUS, identOf, seatsOf, useStore, SecretChip, dayGroup, bizDaysSince } = S;
   const SEATS = HD.SEATS, PREPARERS = HD.PREPARERS, VOTING_SEATS = HD.VOTING_SEATS;
-  const PROTECTION_TYPES = HD.PROTECTION_TYPES;
   const DECISION_STAGES = HD.DECISION_STAGES;
   const dOf = HD.dOf, stageOf = HD.stageOf;
   const allCases = () => HD.allCases();
@@ -111,9 +110,11 @@ const App = (function () {
     const durationOptions = lookups.durations || DURATIONS;
     const [types, setTypes] = useState(d.types && d.types.length ? d.types : []);
     // المدة بالصياغة الموحّدة؛ المخزَّن القديم («30 يوماً» أو نصّ حرّ) يُطبَّع أو يُعامل مدةً محدّدة
+    // التطبيع بالقيمة لا بترتيب القائمة — القوائم المرجعية قابلة لإعادة الترتيب من الأدمن
+    const thirtyOpt = durationOptions.find((o) => durationDays(o) === 30) || durationOptions[0];
     const storedDuration = d.duration
-      ? (durationOptions.includes(d.duration) ? d.duration : (durationDays(d.duration) === 30 ? durationOptions[0] : "مدة محدّدة"))
-      : durationOptions[0];
+      ? (durationOptions.includes(d.duration) ? d.duration : (durationDays(d.duration) === 30 ? thirtyOpt : "مدة محدّدة"))
+      : thirtyOpt;
     const [duration, setDuration] = useState(storedDuration);
     const [durationNote, setDurationNote] = useState(
       d.duration && !durationOptions.includes(d.duration) && durationDays(d.duration) !== 30 ? d.duration.replace(/^مدة محدّدة — /, "") : ""
@@ -227,6 +228,8 @@ const App = (function () {
     const allViewed = attachments.length === 0 || attachments.every((a) => viewed.indexOf(a.id) >= 0);
     const markViewed = (id) => setViewed((v) => v.indexOf(id) >= 0 ? v : v.concat([id]));
     const outcome = res.outcome;
+    // تبنّي المجلس (مقبول) لقرارٍ مُعَدٍّ نطاقُه «رفض الحماية» = إصدار رفضٍ مسبَّب بحيثياته
+    const adoptedReject = outcome === "مقبول" && d.scope === "رفض الحماية";
     const rejectNotes = VOTING_SEATS.map((s) => votesFor[s]).filter((v) => v && v.choice === "رفض" && v.note).map((v) => v.note);
     const defReason = outcome === "مقبول" ? (d.reasoning || "") : "أسباب الرفض المستندة إلى مداولة المجلس:\n- " + (rejectNotes.length ? rejectNotes.join("\n- ") : "لم تتوافر مسوّغات كافية للحماية وفق عوامل المادة 9.");
     useEffect(() => { if (res.closed && isLead && !d.issued) setReason((r) => r || defReason); }, [res.closed, outcome]);
@@ -250,11 +253,12 @@ const App = (function () {
           <p className="sec-h"><I name="gavel" size={18} color="var(--color-primary)" /> إصدار قرار المركز</p>
           {q.foreign && outcome === "مقبول" && <InlineAlert kind="warning" title="مسار أجنبي — تُرفع للنائب العام" style={{ marginBottom: 12 }}>القرار في الطلب الأجنبي توصية تُرفع إلى النائب العام للبتّ النهائي (المادة 6)، ثمّ تُبلَّغ عبر اللجنة الدائمة.</InlineAlert>}
           <div className="ro-field" style={{ marginBottom: 12 }}><span className="muted">حصيلة تصويت المجلس</span><b style={{ color: outcome === "مقبول" ? "var(--color-success)" : "var(--color-error)" }}>{outcome} · قبول {res.accept} / رفض {res.reject}</b></div>
-          {outcome === "مقبول" ? <InlineAlert kind="success" title="قبول — وفق قرار المركز المُعَدّ" style={{ marginBottom: 12 }}>يصدر القبول باعتماد قرار المركز المُعَدّ (أنواع الحماية ومدّتها مبيّنة فيه). يُشعَر طالب الحماية والجهة (م10).</InlineAlert> : <InlineAlert kind="warning" title="قرار رفض مكتوب مسبّب" style={{ marginBottom: 12 }}>يُصدَر قرار رفضٍ مسبَّب يتضمّن حقّ التظلّم خلال 10 أيام (المادة 21).</InlineAlert>}
-          <div className="fld"><span className="fld-label">تسبيب قرار المركز {outcome === "مرفوض" && <span style={{ color: "var(--color-error)" }}>· إلزامي</span>}</span><textarea value={reason} onChange={(e) => setReason(e.target.value)} dir="auto" style={{ minHeight: 100 }} /></div>
+          {adoptedReject ? <InlineAlert kind="warning" title="تبنّى المجلس القرار المُعَدّ — ونطاقه رفض الحماية" style={{ marginBottom: 12 }}>القبول = تبنّي القرار المُعَدّ كما عُرض؛ وبما أن نطاقه «رفض الحماية» يصدر قرار <b>رفضٍ</b> مسبَّب بحيثياته المعتمدة، مع حقّ التظلّم خلال 10 أيام (م21).</InlineAlert>
+            : outcome === "مقبول" ? <InlineAlert kind="success" title="قبول — وفق قرار المركز المُعَدّ" style={{ marginBottom: 12 }}>يصدر القبول باعتماد قرار المركز المُعَدّ (أنواع الحماية ومدّتها مبيّنة فيه). يُشعَر طالب الحماية والجهة (م10).</InlineAlert> : <InlineAlert kind="warning" title="قرار رفض مكتوب مسبّب" style={{ marginBottom: 12 }}>يُصدَر قرار رفضٍ مسبَّب يتضمّن حقّ التظلّم خلال 10 أيام (المادة 21).</InlineAlert>}
+          <div className="fld"><span className="fld-label">تسبيب قرار المركز {(outcome === "مرفوض" || adoptedReject) && <span style={{ color: "var(--color-error)" }}>· إلزامي</span>}</span><textarea value={reason} onChange={(e) => setReason(e.target.value)} dir="auto" style={{ minHeight: 100 }} /></div>
           <InlineAlert kind="info" title="اعتماد القرار">يُصدره رئيس المركز بعد إغلاق التصويت — والحصيلة تُحسم في القاعدة، والإصدار يُشعِر طالب الحماية والجهة (م10).</InlineAlert>
           <div className="row" style={{ justifyContent: "flex-end", marginTop: 14 }}>
-            <button className="btn btn-primary" disabled={outcome === "مرفوض" && !reason.trim()} onClick={() => { HD.issue(q.secret, { reason }); back(); }}><I name="verified" size={18} /> إصدار القرار وإشعار الطرفين</button>
+            <button className="btn btn-primary" disabled={(outcome === "مرفوض" || adoptedReject) && !reason.trim()} onClick={() => { HD.issue(q.secret, { reason }); back(); }}><I name="verified" size={18} /> إصدار القرار وإشعار الطرفين</button>
           </div>
         </Card> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title="الإصدار بيد رئيس المركز">اكتمل التصويت وظهرت الحصيلة أعلاه. يتولّى <b>رئيس المركز</b> إصدار القرار وإشعار الطرفين (م10)؛ للنائب الاطّلاع والمتابعة.</InlineAlert></Card>)}
       </React.Fragment> : <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="info" title={STATUS[d.status].t}>يُطرح للتصويت بعد اعتماد النائب وطرح المعدّ للقرار.</InlineAlert></Card>}

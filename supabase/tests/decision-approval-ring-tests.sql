@@ -38,7 +38,7 @@ begin
   select * into i from t_ids; select * into c from t_case;
   perform pg_temp.impersonate(i.preparer);
   execute 'set local role authenticated';
-  select status into _st from council_submit(c.cid, '["الحماية الأمنية"]'::jsonb, '30 يوماً', 'حيثيات الاختبار.');
+  select status into _st from council_submit(c.cid, '["الحماية الأمنية"]'::jsonb, '30 يوماً', 'حيثيات الاختبار.', 'قبول كلي', null);
   execute 'reset role';
   if _st <> 'pending_deputy' then raise exception 'اختبار 1 فشل (%)', _st; end if;
   raise notice 'اختبار 1 ✓ الرفع يذهب لحلقة النائب أولاً';
@@ -157,7 +157,7 @@ begin
 
   perform pg_temp.impersonate(i.preparer);
   execute 'set local role authenticated';
-  perform council_submit(_cid2, '["الحماية الأمنية"]'::jsonb, '30 يوماً', 'حيثيات.');
+  perform council_submit(_cid2, '["الحماية الأمنية"]'::jsonb, '30 يوماً', 'حيثيات.', 'قبول كلي', null);
   execute 'reset role';
   perform pg_temp.impersonate(i.deputy);
   execute 'set local role authenticated';

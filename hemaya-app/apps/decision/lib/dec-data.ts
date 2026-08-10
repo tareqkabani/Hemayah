@@ -42,7 +42,10 @@ export async function getDecisionData() {
       recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes, details)`)
     // تشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
     .in("status", ["in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // ترتيب ثابت للمخرجات كي لا تتبادل «دراسة (١)/(٢)» أرقامها بين الجلبات
+    .order("submitted_at", { referencedTable: "studies", ascending: true })
+    .order("submitted_at", { referencedTable: "assessments", ascending: true });
   const cases = (caseResp.data ?? []) as any[];
   const withDecision = cases.filter((c) => one(c.council_decisions));
 
@@ -64,21 +67,34 @@ export async function getDecisionData() {
   // الأعمدة غير المشفّرة حصراً عبر service — لا اسم ولا هوية ولا هاتف هنا.
   const subjectByCase: Record<string, any> = {};
   const emergencyByCase: Record<string, any> = {};
+  const admin = createServiceClient();
   try {
-    const admin = createServiceClient();
     const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
     for (const u of list?.users ?? []) { const s = SEAT_BY_EMAIL[u.email || ""]; if (s) idToSeat[u.id] = s; }
+  } catch { /* تحلّ إلى لا شيء — تُعرض المقاعد المعروفة فقط */ }
+  try {
     if (ids.length) {
       const { data: subs } = await admin.from("subjects")
         .select("case_id, subject_type, gender, nationality, birth_date, marital_status, national_address, employer, job_title, education_level, source_flags")
         .in("case_id", ids).eq("subject_type", "principal");
       for (const s of (subs as any[]) ?? []) subjectByCase[s.case_id] = s;
-      // الجدول أحدث من types.gen — استدعاء ديناميكي إلى حين إعادة التوليد بعد تطبيق المهاجرة
-      const { data: ecs } = await (admin.from as (t: string) => ReturnType<typeof admin.from>)("emergency_contacts")
+      const { data: ecs } = await admin.from("emergency_contacts")
         .select("case_id, relationship").in("case_id", ids);
       for (const e of (ecs as any[]) ?? []) emergencyByCase[e.case_id] = { relationship: e.relationship };
     }
-  } catch { /* تحلّ إلى لا شيء — تُعرض المقاعد المعروفة فقط */ }
+  } catch { /* تحلّ إلى لا شيء — بطاقة البيانات تعرض حالتها الفارغة */ }
+
+  // تعقيم details قبل مغادرتها الخادم: مفاتيح الهوية لا تصل حزمة القرار —
+  // النيابة عن شخص تُختزل إلى الواقعة والعمر، وجهة الطوارئ إلى «مسجّلة» (م15/16)
+  const sanitizeRequest = (req: any) => {
+    if (!req) return { req: null, emergencyRegistered: false };
+    const dd = typeof req.details === "string" ? { reason: req.details } : { ...(req.details || {}) };
+    const ob = dd.onBehalf || dd.on_behalf;
+    const emergencyRegistered = !!dd.emergency_contact;
+    delete dd.identity; delete dd.emergency_contact; delete dd.on_behalf; delete dd.onBehalf;
+    if (ob) dd.onBehalf = { age: ob.age ?? null };
+    return { req: { ...req, details: dd }, emergencyRegistered };
+  };
 
   // أنواع م14 والمدد من القوائم المرجعية (طبقة المحتوى) — صياغة موحّدة لا ملف ثابت
   let lookups: { types: string[]; durations: string[] } | null = null;
@@ -153,15 +169,14 @@ export async function getDecisionData() {
     };
 
     // حزمة الاطّلاع الحقيقية: الطلب + الدراسات + التقييمات + توصية الجهة
-    const req = one(c.protection_requests) as any;
+    const { req, emergencyRegistered } = sanitizeRequest(one(c.protection_requests) as any);
     const rec = one(c.recommendations) as any;
     packages[secret] = {
-      // المستندان الكاملان بكل حقولهما — يعرضهما SeekerReq/AuthRec المشتركان
-      // (المصدر الواحد مع بوابتي الدارس والمقيّم) دون تسطيح ولا اختصار.
       docs: { request: req || null, recommendation: rec || null },
-      // بطاقة «بيانات طالب الحماية» (حزمة 11) — غير المعرِّف فقط، والهوية محجوبة
+      // بطاقة «بيانات طالب الحماية» (حزمة 11) — غير المعرِّف فقط، والهوية محجوبة؛
+      // حضور جهة الطوارئ من جدولها أو من علم الحضور في details (بلا محتواها)
       subject: subjectByCase[c.id] || null,
-      emergency: emergencyByCase[c.id] || null,
+      emergency: emergencyByCase[c.id] || (emergencyRegistered ? { relationship: null } : null),
       studies: ((c.studies as any[]) || []).filter((s) => s.submitted_at && !s.superseded_at).map((s) => ({
         rec: s.recommendation || "—", partial: s.partial_reason || "", notes: s.notes || "",
         proposed: Array.isArray(s.proposed_type) ? s.proposed_type : [], duration: s.proposed_duration || "", when: fmt(s.submitted_at),

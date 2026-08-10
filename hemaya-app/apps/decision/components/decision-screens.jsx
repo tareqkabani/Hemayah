@@ -302,7 +302,7 @@ export const DScreens = (function () {
       <DocCard icon="person" title="بيانات طالب الحماية" subtitle="الهوية محجوبة — لا كشف في هذه المرحلة (م15/16)"
         badges={<Tag tone="success" size="sm" iconLeft={<I name="verified_user" size={12} fill />}>موثّق عبر نفاذ</Tag>}
         meta={q.secret}>
-        {empty ? <InlineAlert kind="info" title="لا بيانات مجلوبة">لم تُجلب بيانات طالب الحماية لهذه القضية (سابقة لملحق المخطّط).</InlineAlert> :
+        {empty ? <InlineAlert kind="info" title="لا بيانات مجلوبة">لم تُجلب البيانات الإثرائية لطالب الحماية بعد — تُعرض هنا متى توافر جلبها من نفاذ/سُبل/الموارد لهذا الطلب.</InlineAlert> :
           <FormSections sections={[
             { title: "بيانات مقدم الطلب", icon: "badge", note: "الهوية محجوبة — تُعرض الصفات غير المعرِّفة فقط",
               rows: [["الجنس", s.gender, nafath], ["الجنسية", s.nationality, nafath], ["تاريخ الميلاد", s.birth_date, nafath], ["الحالة الاجتماعية", s.marital_status, nafath], ["المستوى التعليمي", s.education_level, nafath]] },
@@ -311,7 +311,9 @@ export const DScreens = (function () {
             (s.employer || s.job_title) && { title: "بيانات العمل", icon: "work", note: "تُستخدم لرصد الإجراءات الوظيفية المحظورة",
               rows: [["جهة العمل", s.employer, hrdf], ["المسمى الوظيفي", s.job_title, hrdf]] },
             { title: "جهة الاتصال في الحالات الطارئة", icon: "contact_emergency", note: "الاسم والهاتف محجوبان — يُكشفان للتنفيذ فقط",
-              rows: [["صلة القرابة", (emergency && emergency.relationship) || "مُسجّلة (محجوبة)"], ["بيانات التواصل", "محجوبة — تُكشف للتنفيذ فقط"]] },
+              rows: emergency
+                ? [["صلة القرابة", emergency.relationship || "مُسجّلة (محجوبة)"], ["بيانات التواصل", "محجوبة — تُكشف للتنفيذ فقط"]]
+                : [["الحالة", "لا جهة اتصال مسجّلة لهذا الطلب"]] },
           ]} />}
       </DocCard>
     );
@@ -442,7 +444,9 @@ export const DScreens = (function () {
               </div>))}</div>
           </div>}
           {proposed && proposed.length > 0 && <div className="row" style={{ gap: 6, marginBottom: 10 }}>{proposed.map((t) => <Tag key={t} tone="info" size="sm" iconLeft={<I name="shield" size={12} />}>{t}</Tag>)}</div>}
-          {(duration || (proposed && proposed.length > 0)) && <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{fmtInterval(duration || null)}</b></div>}
+          {/* interval فارغ ملتبس عمداً (يرمز «إلى حين انتهاء القضية» أو «مدة محدّدة»
+              المدوّنة في الملاحظات — عقد packages/study-eval/submit-params) فلا يُعرض */}
+          {duration ? <div className="ro-field" style={{ marginBottom: notes ? 10 : 0 }}><span className="muted">المدّة المقترحة</span><b style={{ color: "var(--text-strong)" }}>{fmtInterval(duration)}</b></div> : null}
           {notes && <div className="opin" style={{ marginTop: 0, borderInlineStart: "3px solid " + tc }}>{notes}</div>}
         </div>
       </details>

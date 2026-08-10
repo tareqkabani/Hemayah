@@ -52,18 +52,27 @@ export const StudyAssessmentSchema = z.object({
 export type StudyAssessmentInput = z.infer<typeof StudyAssessmentSchema>;
 
 /** مسوّدة قرار المجلس — council_save (المسوّغات اختياريّة في المسوّدة). */
+const COUNCIL_SCOPES = ["قبول كلي", "قبول جزئي", "رفض الحماية"] as const;
+
 export const CouncilDraftSchema = z.object({
   types: z.array(z.string()).default([]),
   duration: z.string().trim().optional(),
   reasoning: z.string().trim().optional(),
+  scope: z.enum(COUNCIL_SCOPES).optional(),
+  scopeNote: z.string().trim().optional(),
 });
 export type CouncilDraftInput = z.infer<typeof CouncilDraftSchema>;
 
-/** رفع قرار المجلس للاعتماد — council_submit (المسوّغات مطلوبة). */
+/** رفع قرار المجلس للاعتماد — council_submit (المسوّغات والنطاق مطلوبان،
+    و«قبول جزئي» يستلزم بيان ما يُقبل وما يُستثنى — حزمة 11). */
 export const CouncilSubmitSchema = z.object({
   types: z.array(z.string()).default([]),
   duration: z.string().trim().optional(),
   reasoning: z.string().trim().min(1, "المسوّغات مطلوبة للرفع."),
+  scope: z.enum(COUNCIL_SCOPES, { message: "نطاق القرار المُعَدّ مطلوب." }),
+  scopeNote: z.string().trim().optional(),
+}).refine((v) => v.scope !== "قبول جزئي" || (v.scopeNote && v.scopeNote.length > 0), {
+  message: "مع «قبول جزئي» يلزم بيان ما يُقبل وما يُستثنى.", path: ["scopeNote"],
 });
 export type CouncilSubmitInput = z.infer<typeof CouncilSubmitSchema>;
 
