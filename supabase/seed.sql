@@ -75,7 +75,10 @@ begin
     end if;
     insert into user_roles (user_id, role, attributes)
     values (uid, r.role::app_role, r.attrs)
-    on conflict (user_id, role) do update set attributes = excluded.attributes;
+    -- دمجٌ لا استبدال: إعادة تشغيل البذرة يجب ألا تدهس سمات كتبتها مهاجرات
+    -- لاحقة (authority=legal لموظف المركز، ag/technical للإشراف — درس 2026-08-10)
+    on conflict (user_id, role) do update
+      set attributes = coalesce(user_roles.attributes,'{}'::jsonb) || excluded.attributes;
   end loop;
 end $$;
 
@@ -108,10 +111,10 @@ begin
       returning id into cid;
 
       insert into protection_requests (case_id, applicant_role, channel, details)
-      values (cid, 'witness', specs.channel, jsonb_build_object(
+      values (cid, 'شاهد', specs.channel, jsonb_build_object(
         'entity','النيابة العامة بالرياض', 'case_no','2026/'|| right(specs.ref,4),
-        'crime','التستّر على جريمة اتّجار', 'waqia','بلاغ شاهدٍ عن واقعة تهديد',
-        'threat','مرتفع', 'extends','يشمل أفراد الأسرة'));
+        'crime','التستّر على جريمة اتّجار', 'prior_submit', true,
+        'reason','بلاغ شاهدٍ عن واقعة تهديد'));
 
       -- دراسة قانونية مُعتمَدة
       insert into studies (case_id, studier_id, recommendation, proposed_type, proposed_duration, notes, submitted_at)
@@ -233,17 +236,19 @@ begin
     returning id into cid;
 
     insert into protection_requests (case_id, applicant_role, channel, details)
-    values (cid, r.category, 'body', jsonb_build_object(
+    values (cid,
+      case r.category when 'witness' then 'شاهد' when 'victim' then 'مجني عليه'
+                      when 'expert' then 'خبير' when 'reporter' then 'مبلّغ' else r.category end,
+      'body', jsonb_build_object(
       'entity','النيابة العامة بمنطقة الرياض', 'case_no','ق-'|| right(r.ref,4) ||'/1447',
-      'incoming_no','17'|| right(r.ref,4), 'crime', r.waqia, 'waqia', r.waqia,
-      'threat', r.threat, 'extends','الزوج والأبناء'));
+      'reg_no','17'|| right(r.ref,4), 'crime', r.waqia, 'prior_submit', true));
 
     insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
                                  factors9, raised_at, due_at, received_at, channel, notes)
     values (cid, 'النيابة العامة بمنطقة الرياض', 'توفير',
       '["الحماية الأمنية","إخفاء البيانات الشخصية","سلامة التنقّل (مرافق أمني)"]'::jsonb,
       null,
-      '{"نوع الجريمة":"كبيرة موجبة للتوقيف","مستوى الخطر":"شديد","امتداد الخطر":"الزوج والأبناء","القدرة على التكيف":"نعم"}'::jsonb,
+      '{"crimeType":"كبيرة موجبة للتوقيف","riskLevel":"شديد","extends":"نعم","extendsWho":"الزوج والأبناء","adapt":"نعم"}'::jsonb,
       now() - interval '2 days', now() + interval '3 days', now() - interval '1 day', 'electronic',
       'جسامة الجريمة وكونها موجبة للتوقيف · وجود خطر شديد ومباشر · أهمية شهادته للمصلحة العامة.');
 
@@ -591,121 +596,122 @@ begin
   end loop;
 end $$;
 
--- ── 3-ب) اتّساق البيانات بالرمز — تحديث مراجع 2026-07-21 ──
+-- ── 3-ب) اتّساق البيانات بالرمز — تحديث مراجع 2026-07-21 (لهجة حيّة 2026-08-10) ──
 --   بيانات كل رمز متّسقة بين طلب الحماية الكامل (protection_requests.details)
---   والتوصية الكاملة من الجهة (recommendations.details) — REQ_DATA ↔ REC_DATA.
---   تحديثات idempotent: تُثري الصفوف القائمة ولا تُنشئ جديدة.
+--   وعوامل التوصية الكاملة (recommendations.factors9) — REQ_DATA ↔ REC_FACTORS.
+--   تحديثات idempotent: تُثري الصفوف القائمة ولا تُنشئ جديدة، وتُصفّي بقايا
+--   المفاتيح اليتيمة (details→role/prior_entity وrecommendations.details).
 do $$
 declare r record; cid uuid;
 begin
+  -- الإثراء على عقد الكُتّاب الأحياء: الصفة في عمود applicant_role، وتفاصيل
+  -- الطلب بمفاتيح submit_protection_request، وعوامل التوصية في factors9
+  -- بلهجة النموذج الموحّد (recommendations.details بلا كاتب — لا يُبذر).
   for r in
     select * from (values
-      ('C-2026-0481',
+      ('C-2026-0481', 'أصيل — عن نفسه',
        -- طلب الحماية كما ورد من طالبه
        jsonb_build_object(
-         'role','أصيل — عن نفسه', 'prior_submit', true, 'prior_entity','النيابة العامة',
+         'prior_submit', true, 'entity','النيابة العامة',
          'crime','الجرائم الاقتصادية · الماسة بالثقة العامة',
          'reason','تلقيّت تهديدات مباشرة بالقتل عقب إدلائي بشهادتي في القضية، وأخشى تنفيذها بحقّي وبحقّ أسرتي، وأطلب إخفاء بياناتي وتوفير حماية أمنية.',
          'files', jsonb_build_array('صورة محضر الشهادة','لقطات رسائل التهديد')),
-       -- التوصية الكاملة من الجهة
+       -- عوامل التوصية الكاملة من الجهة (factors9)
        jsonb_build_object(
-         'officer','أ. فهد القحطاني', 'rec_ref','REC-2026-1183', 'approved_by','رئيس الفرع المباشر',
          'health','سليم', 'criminal','لا يوجد', 'psych','لا توجد ملحوظات', 'reveal','لا يرغب',
-         'req_details','تعرّض لتهديدات مباشرة بالقتل عقب إدلائه بشهادته في القضية، ويُخشى تنفيذها بحقّه وذويه.',
-         'stage','التحقيق',
-         'case_summary','قضية جرائم اقتصادية واختلاس أموال عامة بمبالغ جسيمة داخل جهة حكومية.',
-         'role_desc','شاهد رئيسي يملك معلومات وأدلّة جوهرية يصعب إثبات الواقعة بدونها.',
-         'contacted','نعم — حضوري',
-         'crime_desc','اختلاس وتلاعب مالي منظّم بمستندات رسمية مزوّرة.',
-         'threat_type','تهديد مباشر بالقتل', 'harm_type','اعتداء جسدي', 'extends_who','الزوج والأبناء',
-         'alt_solutions','لا توجد',
-         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
-         'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
-      ('C-2026-0492',
+         'caseStage','التحقيق',
+         'caseSummary','قضية جرائم اقتصادية واختلاس أموال عامة بمبالغ جسيمة داخل جهة حكومية.',
+         'applicantRoleDesc','شاهد رئيسي يملك معلومات وأدلّة جوهرية يصعب إثبات الواقعة بدونها.',
+         'contacted','نعم', 'contactKind','حضوري',
+         'crimeDesc','اختلاس وتلاعب مالي منظّم بمستندات رسمية مزوّرة.',
+         'threatType','تهديد مباشر بالقتل', 'harmType','اعتداء جسدي',
+         'extends','نعم', 'extendsWho','الزوج والأبناء',
+         'alternatives','لا توجد',
+         'crimeType','كبيرة موجبة للتوقيف', 'hidden2','نعم', 'threatExists','يوجد',
+         'attachFiles', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
+      ('C-2026-0492', 'أصيل — عن نفسه',
        jsonb_build_object(
-         'role','أصيل — عن نفسه', 'prior_submit', true, 'prior_entity','هيئة الرقابة ومكافحة الفساد',
+         'prior_submit', true, 'entity','هيئة الرقابة ومكافحة الفساد',
          'crime','الفساد الإداري والمالي',
          'reason','بعد إبلاغي عن مخالفات مالية جسيمة في جهة عملي تعرّضت لمضايقات وتهديدات متكرّرة، وأخشى الفصل التعسفي وامتداد الضرر لأسرتي.',
          'files', jsonb_build_array('نسخة البلاغ','مستندات المخالفات')),
        jsonb_build_object(
-         'officer','أ. ناصر الشهراني', 'rec_ref','REC-2026-1201', 'approved_by','رئيس الفرع المباشر',
          'health','سليم', 'criminal','لا يوجد', 'psych','لا توجد ملحوظات', 'reveal','لا يرغب',
-         'req_details','تعرّض لمضايقات وتهديدات متكرّرة عقب إبلاغه عن مخالفات مالية جسيمة في جهة عمله، ويُخشى الفصل التعسفي وامتداد الضرر.',
-         'stage','جمع الاستدلالات',
-         'case_summary','قضية فساد إداري ومالي ومخالفات جسيمة في جهة حكومية محل تحقّق الهيئة.',
-         'role_desc','مبلّغ رئيسي قدّم مستندات المخالفات ويُعتمد على إفادته في الإثبات.',
-         'contacted','نعم — اتصال هاتفي',
-         'crime_desc','مخالفات مالية وإدارية جسيمة وإساءة استعمال سلطة.',
-         'threat_type','تهديد ومضايقة وظيفية', 'harm_type','مضايقات وتلويح بالفصل', 'extends_who','الأسرة',
-         'alt_solutions','لا توجد',
-         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
-         'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
-      ('C-2026-0488',
+         'caseStage','جمع الاستدلالات',
+         'caseSummary','قضية فساد إداري ومالي ومخالفات جسيمة في جهة حكومية محل تحقّق الهيئة.',
+         'applicantRoleDesc','مبلّغ رئيسي قدّم مستندات المخالفات ويُعتمد على إفادته في الإثبات.',
+         'contacted','نعم', 'contactKind','اتصال هاتفي',
+         'crimeDesc','مخالفات مالية وإدارية جسيمة وإساءة استعمال سلطة.',
+         'threatType','تهديد ومضايقة وظيفية', 'harmType','مضايقات وتلويح بالفصل',
+         'extends','نعم', 'extendsWho','الأسرة',
+         'alternatives','لا توجد',
+         'crimeType','كبيرة موجبة للتوقيف', 'hidden2','نعم', 'threatExists','يوجد',
+         'attachFiles', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','معلومات التهديد (وسائط)','طلب الحماية المسبّب'))),
+      ('C-2026-0488', 'وليّ — نيابةً عن المشمول',
        jsonb_build_object(
-         'role','وليّ — نيابةً عن المشمول', 'prior_submit', true, 'prior_entity','النيابة العامة',
+         'prior_submit', true, 'entity','النيابة العامة',
          'crime','الاتجار بالأشخاص',
          'reason','الضحية تعرّضت لإيذاء جسدي وتهديد مستمرّ من شبكة منظّمة، ويُلتمس توفير الحماية وتأمين المسكن والدعم النفسي.',
          'files', jsonb_build_array('التقرير الطبي','محضر الضبط')),
        jsonb_build_object(
-         'officer','أ. سارة المطيري', 'rec_ref','REC-2026-1195', 'approved_by','رئيس الفرع المباشر',
          'health','تحت رعاية طبية', 'criminal','لا يوجد', 'psych','حالة هشّة — تلزمها متابعة', 'reveal','لا يرغب',
-         'req_details','تعرّضت الضحية لإيذاء جسدي وتهديد مستمرّ من شبكة منظّمة، ويُلتمس توفير الحماية وتأمين المسكن.',
-         'stage','التحقيق',
-         'case_summary','قضية اتجار بالأشخاص منسوبة لشبكة منظّمة.',
-         'role_desc','ضحية رئيسة إفادتها جوهرية في تحديد أفراد الشبكة.',
-         'contacted','نعم — حضوري',
-         'crime_desc','استغلال وإيذاء جسدي من شبكة منظّمة عابرة.',
-         'threat_type','تهديد بالإيذاء الجسدي', 'harm_type','إيذاء جسدي موثّق طبّياً', 'extends_who','الأقارب من الدرجة الأولى',
-         'alt_solutions','لا توجد',
-         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
-         'attachments', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','طلب الحماية المسبّب'))),
-      ('C-2026-0475',
+         'caseStage','التحقيق',
+         'caseSummary','قضية اتجار بالأشخاص منسوبة لشبكة منظّمة.',
+         'applicantRoleDesc','ضحية رئيسة إفادتها جوهرية في تحديد أفراد الشبكة.',
+         'contacted','نعم', 'contactKind','حضوري',
+         'crimeDesc','استغلال وإيذاء جسدي من شبكة منظّمة عابرة.',
+         'threatType','تهديد بالإيذاء الجسدي', 'harmType','إيذاء جسدي موثّق طبّياً',
+         'extends','نعم', 'extendsWho','الأقارب من الدرجة الأولى',
+         'alternatives','لا توجد',
+         'crimeType','كبيرة موجبة للتوقيف', 'hidden2','نعم', 'threatExists','يوجد',
+         'attachFiles', jsonb_build_array('بيانات القضية والإجراءات النظامية','تقرير تقييم المخاطر','تقرير طبي للحالة الصحية','طلب الحماية المسبّب'))),
+      ('C-2026-0475', 'أصيل — عن نفسه',
        jsonb_build_object(
-         'role','أصيل — عن نفسه', 'prior_submit', true, 'prior_entity','النيابة العامة',
+         'prior_submit', true, 'entity','النيابة العامة',
          'crime','الاتجار بالأشخاص',
          'reason','تعرّضت لإيذاءٍ وتهديد مستمرّ بعد تعاوني مع جهات التحقيق، وأطلب الحماية وتأمين التنقّل.',
          'files', jsonb_build_array('التقرير الطبي')),
        jsonb_build_object(
-         'officer','أ. فهد القحطاني', 'rec_ref','REC-2026-1102', 'approved_by','رئيس الفرع المباشر',
          'health','سليم', 'criminal','لا يوجد', 'psych','لا توجد ملحوظات', 'reveal','لا يرغب',
-         'req_details','تعرّضت لإيذاءٍ وتهديد مستمرّ بعد تعاونها مع جهات التحقيق.',
-         'stage','التحقيق',
-         'case_summary','قضية اتجار بالأشخاص قيد التحقيق.',
-         'role_desc','ضحية إفادتها معتبرة في الإثبات.',
-         'contacted','نعم — اتصال هاتفي',
-         'crime_desc','استغلال وإيذاء من شبكة منظّمة.',
-         'threat_type','تهديد بالإيذاء', 'harm_type','إيذاء موثّق', 'extends_who','الأقارب من الدرجة الأولى',
-         'alt_solutions','لا توجد',
-         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
-         'attachments', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب'))),
-      ('C-2026-0470',
+         'caseStage','التحقيق',
+         'caseSummary','قضية اتجار بالأشخاص قيد التحقيق.',
+         'applicantRoleDesc','ضحية إفادتها معتبرة في الإثبات.',
+         'contacted','نعم', 'contactKind','اتصال هاتفي',
+         'crimeDesc','استغلال وإيذاء من شبكة منظّمة.',
+         'threatType','تهديد بالإيذاء', 'harmType','إيذاء موثّق',
+         'extends','نعم', 'extendsWho','الأقارب من الدرجة الأولى',
+         'alternatives','لا توجد',
+         'crimeType','كبيرة موجبة للتوقيف', 'hidden2','نعم', 'threatExists','يوجد',
+         'attachFiles', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب'))),
+      ('C-2026-0470', 'أصيل — عن نفسه',
        jsonb_build_object(
-         'role','أصيل — عن نفسه', 'prior_submit', true, 'prior_entity','النيابة العامة',
+         'prior_submit', true, 'entity','النيابة العامة',
          'crime','تزوير المستندات الرسمية',
          'reason','بصفتي خبيراً فاحصاً للمستندات تلقّيت تهديدات بعد تقريري الفنّي، وأطلب حماية بياناتي وسلامة تنقّلي.',
          'files', jsonb_build_array('التقرير الفنّي')),
        jsonb_build_object(
-         'officer','أ. ناصر الشهراني', 'rec_ref','REC-2026-1088', 'approved_by','رئيس الفرع المباشر',
          'health','سليم', 'criminal','لا يوجد', 'psych','لا توجد ملحوظات', 'reveal','لا يرغب',
-         'req_details','تلقّى تهديدات عقب تقريره الفنّي الحاسم في قضية تزوير.',
-         'stage','المحاكمة',
-         'case_summary','قضية تزوير مستندات رسمية معروضة على المحكمة.',
-         'role_desc','خبير فنّي تقريره ركنٌ في الإثبات.',
-         'contacted','نعم — حضوري',
-         'crime_desc','تزوير محرّرات رسمية واستعمالها.',
-         'threat_type','تهديد وترهيب', 'harm_type','لا يوجد بعد', 'extends_who','لا يمتدّ',
-         'alt_solutions','لا توجد',
-         'crime_class','كبيرة موجبة للتوقيف', 'hide_identity','نعم', 'threat_exists','يوجد',
-         'attachments', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب')))
-    ) as t(secret, req_extra, rec_details)
+         'caseStage','المحاكمة',
+         'caseSummary','قضية تزوير مستندات رسمية معروضة على المحكمة.',
+         'applicantRoleDesc','خبير فنّي تقريره ركنٌ في الإثبات.',
+         'contacted','نعم', 'contactKind','حضوري',
+         'crimeDesc','تزوير محرّرات رسمية واستعمالها.',
+         'threatType','تهديد وترهيب', 'harmType','لا يوجد بعد',
+         'extends','لا', 'extendsWho','لا يمتدّ',
+         'alternatives','لا توجد',
+         'crimeType','كبيرة موجبة للتوقيف', 'hidden2','نعم', 'threatExists','يوجد',
+         'attachFiles', jsonb_build_array('تقرير تقييم المخاطر','طلب الحماية المسبّب')))
+    ) as t(secret, role_ar, req_extra, rec_factors)
   loop
     select id into cid from protection_cases where secret_code = r.secret;
     if cid is null then continue; end if;
     update protection_requests
-       set details = coalesce(details,'{}'::jsonb) || r.req_extra
+       set applicant_role = r.role_ar,
+           details = (coalesce(details,'{}'::jsonb) - 'role' - 'prior_entity') || r.req_extra
      where case_id = cid;
     update recommendations
-       set details = coalesce(details,'{}'::jsonb) || r.rec_details
+       set factors9 = coalesce(factors9,'{}'::jsonb) || r.rec_factors,
+           details = null
      where case_id = cid;
   end loop;
 end $$;
