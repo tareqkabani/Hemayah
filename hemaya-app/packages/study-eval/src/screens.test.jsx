@@ -23,16 +23,17 @@ const task = (over = {}) => ({
   ...over,
 });
 
+// الثابت على عقد الكُتّاب الأحياء: الصفة في عمود applicant_role، وتفاصيل
+// الطلب بمفاتيح submit_protection_request، وعوامل التوصية في factors9
+// بلهجة النموذج الموحّد (recommendations.details بلا كاتب — لا وجود له هنا).
 const DETAIL = {
   request: {
     submitted_at: "2026-07-19T09:30:00Z",
+    applicant_role: "أصيل — عن نفسه",
     details: {
-      role: "أصيل — عن نفسه",
       prior_submit: true,
-      prior_entity: "النيابة العامة",
+      entity: "النيابة العامة",
       crime: "الجرائم الاقتصادية",
-      waqia: "فساد إداري ومالي",
-      threat: "مرتفع",
       case_no: "ق-0001/1447",
       reason: "تلقيّت تهديدات مباشرة عقب شهادتي.",
       files: ["صورة محضر الشهادة", "لقطات رسائل التهديد"],
@@ -44,21 +45,22 @@ const DETAIL = {
     proposed_type: ["الحماية الأمنية", "إخفاء البيانات الشخصية"],
     proposed_duration: null,
     received_at: "2026-07-20T10:00:00Z",
+    channel: "electronic",
     notes: "جسامة الجريمة ووجود خطر شديد.",
-    factors9: { "القدرة على التكيف": "نعم" },
-    details: {
-      officer: "أ. فهد القحطاني",
-      rec_ref: "REC-2026-1183",
-      approved_by: "رئيس الفرع المباشر",
+    factors9: {
       health: "سليم",
-      stage: "التحقيق",
-      case_summary: "قضية جرائم اقتصادية.",
-      role_desc: "شاهد رئيسي.",
-      contacted: "نعم — حضوري",
-      threat_type: "تهديد مباشر بالقتل",
-      harm_type: "اعتداء جسدي",
-      extends_who: "الزوج والأبناء",
-      attachments: ["تقرير تقييم المخاطر", "طلب الحماية المسبّب"],
+      caseStage: "التحقيق",
+      caseSummary: "قضية جرائم اقتصادية.",
+      applicantRoleDesc: "شاهد رئيسي.",
+      contacted: "نعم",
+      contactKind: "حضوري",
+      threatExists: "يوجد",
+      threatType: "تهديد مباشر بالقتل",
+      riskLevel: "مرتفع",
+      harmType: "اعتداء جسدي",
+      extendsWho: "الزوج والأبناء",
+      adapt: "نعم",
+      attachFiles: ["تقرير تقييم المخاطر", "طلب الحماية المسبّب"],
     },
   },
 };
@@ -133,8 +135,10 @@ describe("التوصية الكاملة (AuthRec)", () => {
     const groups = container.querySelectorAll(".grp-n");
     expect(groups).toHaveLength(8);
     expect(screen.getByText("الجهة صاحبة التوصية")).toBeTruthy();
-    expect(screen.getByText("أ. فهد القحطاني")).toBeTruthy();
-    expect(screen.getByText("REC-2026-1183")).toBeTruthy();
+    // العوامل من factors9 الحيّ لا من details اليتيم
+    expect(screen.getByText("التحقيق")).toBeTruthy();
+    expect(screen.getByText("تهديد مباشر بالقتل")).toBeTruthy();
+    expect(screen.getByText("نعم — حضوري")).toBeTruthy();
     expect(screen.getByText("موقّعة رقمياً")).toBeTruthy();
     expect(screen.getByText("تقرير تقييم المخاطر")).toBeTruthy();
   });
@@ -142,7 +146,7 @@ describe("التوصية الكاملة (AuthRec)", () => {
   it("توصية بلا مرفقات تعرض رسالة بديلة ولا تنهار", () => {
     const detail = {
       ...DETAIL,
-      recommendation: { ...DETAIL.recommendation, details: { ...DETAIL.recommendation.details, attachments: [] } },
+      recommendation: { ...DETAIL.recommendation, factors9: { ...DETAIL.recommendation.factors9, attachFiles: [] } },
     };
     render(<AuthRec task={task()} detail={detail} viewer="أ. خالد" onOpenDoc={() => {}} />);
     fireEvent.click(screen.getByText("التوصية الكاملة من الجهة المختصة"));
@@ -151,16 +155,16 @@ describe("التوصية الكاملة (AuthRec)", () => {
 });
 
 describe("صدق البيانات — لا اختلاق لغائب (تحقّق عدائي 2026-07-22)", () => {
-  it("توصية بلا details لا تختلق وقائع شخصية — تُعرض «—» والحقول الحقيقية فقط", () => {
+  it("توصية بلا factors9 لا تختلق وقائع شخصية — تُعرض «—» والحقول الحقيقية فقط", () => {
     const detail = {
       ...DETAIL,
-      recommendation: { ...DETAIL.recommendation, details: null },
+      recommendation: { ...DETAIL.recommendation, factors9: null },
     };
     render(<AuthRec task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
     fireEvent.click(screen.getByText("التوصية الكاملة من الجهة المختصة"));
     expect(screen.queryByText("سليم")).toBeNull();
     expect(screen.queryByText("لا يرغب")).toBeNull();
-    expect(screen.queryByText("رئيس الفرع المباشر")).toBeNull();
+    expect(screen.queryByText("تهديد مباشر بالقتل")).toBeNull();
     expect(screen.queryByText("كبيرة موجبة للتوقيف")).toBeNull();
     expect(screen.getAllByText("النيابة العامة — فرع الرياض").length).toBeGreaterThan(0);
     expect(screen.getAllByText("—").length).toBeGreaterThan(3);
@@ -177,14 +181,15 @@ describe("صدق البيانات — لا اختلاق لغائب (تحقّق �
     expect(screen.queryByText("ثلاثون يوماً")).toBeNull();
   });
 
-  it("امتداد الخطر بحسب الطالب (م5/4) يظهر في طلب الحماية", () => {
-    const detail = {
-      ...DETAIL,
-      request: { ...DETAIL.request, details: { ...DETAIL.request.details, extends: "الزوج والأبناء", entity: "النيابة العامة" } },
-    };
-    render(<SeekerReq task={task()} detail={detail} viewer="x" onOpenDoc={() => {}} />);
+  it("امتداد الخطر (م5/4) يُقرأ من عوامل التوصية — والصفة من عمود applicant_role", () => {
+    render(<AuthRec task={task()} detail={DETAIL} viewer="x" onOpenDoc={() => {}} />);
+    fireEvent.click(screen.getByText("التوصية الكاملة من الجهة المختصة"));
+    expect(screen.getByText("امتداد الخطر إلى الغير (م5/4)")).toBeTruthy();
+    expect(screen.getByText("الزوج والأبناء")).toBeTruthy();
+
+    render(<SeekerReq task={task()} detail={DETAIL} viewer="x" onOpenDoc={() => {}} />);
     fireEvent.click(screen.getByText("طلب الحماية كما ورد من طالب الحماية"));
-    expect(screen.getByText("امتداد الخطر إلى الغير — بحسب الطالب (م5/4)")).toBeTruthy();
+    expect(screen.getByText("أصيل — عن نفسه")).toBeTruthy();
     expect(screen.getByText("الجهة المختصة (بحسب الطلب)")).toBeTruthy();
   });
 
