@@ -79,6 +79,8 @@ MIGRATIONS=(
   # دفعة 10 أغسطس (دليل 10 §1 + ملحق #94)
   "20260810000001_decision_review_package.sql"
   "20260810000002_emergency_contact_encryption.sql"
+  # ملحق #96: تعبئة subjects من مسارَي التقديم (مفتاح Vault + اعتراض + backfill)
+  "20260810000003_subject_intake_sync.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
