@@ -357,30 +357,33 @@ begin
             'أمانة المنطقة الشرقية', 'أخصائي مراجعة مالية', 'بكالوريوس',
             '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
     insert into emergency_contacts (case_id, relationship) values (cid, 'أخ');
+    -- details بمفاتيح الكاتب الحيّ (submit_protection_request) حصراً — لا مفاتيح لا يكتبها أحد
     insert into protection_requests (case_id, applicant_role, channel, details)
-    values (cid, 'reporter', 'seeker', jsonb_build_object(
-      'role','مبلّغ', 'crime','فساد إداري ومالي', 'waqia','بلاغ عن مخالفات مالية في عقود تشغيل',
-      'entity','هيئة الرقابة ومكافحة الفساد', 'prior_submit', true, 'prior_entity','هيئة الرقابة ومكافحة الفساد',
-      'case_no','2026/0503', 'threat','متوسط', 'extends','لا يمتدّ',
+    values (cid, 'مبلّغ', 'seeker', jsonb_build_object(
+      'crime','فساد إداري ومالي',
+      'entity','هيئة الرقابة ومكافحة الفساد', 'prior_submit', true,
+      'case_no','2026/0503',
       'reason','تلقّيت تهديدات مبطّنة بعد تقديم البلاغ، وأخشى الإضرار بوظيفتي وسمعتي.',
       'files', jsonb_build_array('صورة البلاغ المقدّم', 'رسائل التهديد')));
+    -- عوامل التوصية في factors9 بلهجة نموذج التوصية (كاتبها الحيّ) — لا في details اليتيم
     insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
-                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+                                 factors9, raised_at, due_at, received_at, channel, notes)
     values (cid, 'هيئة الرقابة ومكافحة الفساد', 'توفير',
             '["إخفاء البيانات الشخصية وما يدل على الهوية","توفير وسائل الإبلاغ الفوري عن الخطر"]'::jsonb,
             interval '30 days',
-            '{"جدية التهديد":"قائمة","أهمية الإفادة":"محورية في إثبات الواقعة"}'::jsonb,
-            now(), now() + interval '5 days', now(), 'electronic',
-            'البلاغ جوهري لكشف شبكة المخالفات؛ تُرى حمايته إجرائياً مع إخفاء بياناته.',
-            jsonb_build_object('officer','ضابط اتصال النزاهة (12)', 'rec_ref','NZH-2026-1187',
-              'approved_by','مدير إدارة الحماية بالهيئة', 'stage','التحقيق',
+            jsonb_build_object(
               'health','سليم', 'criminal','لا سوابق', 'psych','قلق وظيفي عابر', 'reveal','لا يرغب في الكشف',
-              'case_summary','مخالفات مالية وإدارية في عقود تشغيل بلدية أسهم بلاغه في كشفها.',
-              'role_desc','مصدر البلاغ الأول وموثِّق المستندات المالية.',
-              'contacted','نعم — هاتفياً', 'crime_class','جريمة كبرى', 'crime_desc','فساد إداري ومالي',
-              'hide_identity','نعم (م2)', 'threat_exists','يوجد', 'threat_type','تهديد وظيفي ومعنوي',
-              'extends_who','لا يمتدّ', 'alt_solutions','النقل الوظيفي داخل الجهة',
-              'attachments', jsonb_build_array('محضر التواصل', 'مذكرة تقييم البلاغ')));
+              'caseSummary','مخالفات مالية وإدارية في عقود تشغيل بلدية أسهم بلاغه في كشفها.',
+              'caseStage','التحقيق', 'applicantRoleDesc','مصدر البلاغ الأول وموثِّق المستندات المالية.',
+              'contacted','نعم', 'contactKind','هاتفياً',
+              'crimeType','جريمة كبرى', 'crimeDesc','فساد إداري ومالي', 'hidden2','نعم (م2)',
+              'threatExists','يوجد', 'threatType','تهديد وظيفي ومعنوي', 'riskLevel','متوسط',
+              'extends','لا', 'extendsWho','لا يمتدّ',
+              'reasons', jsonb_build_array('جدية التهديد قائمة', 'أهمية الإفادة محورية في إثبات الواقعة'),
+              'alternatives','النقل الوظيفي داخل الجهة',
+              'attachFiles', jsonb_build_array('محضر التواصل', 'مذكرة تقييم البلاغ')),
+            now(), now() + interval '5 days', now(), 'electronic',
+            'البلاغ جوهري لكشف شبكة المخالفات؛ تُرى حمايته إجرائياً مع إخفاء بياناته.');
     insert into studies (case_id, studier_id, recommendation, proposed_type, proposed_duration, notes,
                          found_recommendation, found_request, submitted_at)
     values (cid, s1, 'قبول كلي',
@@ -417,27 +420,28 @@ begin
             '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
     insert into emergency_contacts (case_id, relationship) values (cid, 'زوجة');
     insert into protection_requests (case_id, applicant_role, channel, details)
-    values (cid, 'expert', 'seeker', jsonb_build_object(
-      'role','خبير', 'crime','تزوير محرّرات رسمية', 'waqia','إفادة خبرة في قضية تزوير',
-      'entity','النيابة العامة', 'prior_submit', true, 'prior_entity','النيابة العامة',
-      'case_no','2026/0517', 'threat','منخفض', 'extends','لا يمتدّ',
+    values (cid, 'خبير', 'seeker', jsonb_build_object(
+      'crime','تزوير محرّرات رسمية',
+      'entity','النيابة العامة', 'prior_submit', true,
+      'case_no','2026/0517',
       'reason','أخشى ردّ فعل أطراف القضية بعد إيداع تقرير الخبرة.',
       'files', jsonb_build_array('صورة من تقرير الخبرة')));
     insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
-                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+                                 factors9, raised_at, due_at, received_at, channel, notes)
     values (cid, 'النيابة العامة بالمدينة المنورة', 'عدم توفير', '[]'::jsonb, null,
-            '{"جدية التهديد":"غير مؤكدة","أهمية الإفادة":"مساندة"}'::jsonb,
-            now(), now() + interval '5 days', now(), 'electronic',
-            'لم يثبت تهديد فعلي؛ والإفادة فنية مساندة يمكن أداؤها دون تدابير خاصة.',
-            jsonb_build_object('officer','ضابط اتصال النيابة (7)', 'rec_ref','PP-MND-2026-0441',
-              'approved_by','رئيس دائرة الحماية بالفرع', 'stage','المحاكمة',
+            jsonb_build_object(
               'health','سليم', 'criminal','لا سوابق', 'psych','لا ملاحظات', 'reveal','لا مانع لديه من الكشف',
-              'case_summary','قضية تزوير محرّرات رسمية أودع فيها الخبير تقريره الفني.',
-              'role_desc','خبير مستندات معيّن من الدائرة — إفادته فنية مساندة.',
-              'contacted','نعم — كتابياً', 'crime_class','جريمة كبرى', 'crime_desc','تزوير محرّرات رسمية',
-              'hide_identity','لا', 'threat_exists','لا يوجد', 'extends_who','لا يمتدّ',
-              'alt_solutions','الاكتفاء بالمتابعة الدورية وقنوات البلاغ المعتادة',
-              'attachments', jsonb_build_array('محضر التواصل')));
+              'caseSummary','قضية تزوير محرّرات رسمية أودع فيها الخبير تقريره الفني.',
+              'caseStage','المحاكمة', 'applicantRoleDesc','خبير مستندات معيّن من الدائرة — إفادته فنية مساندة.',
+              'contacted','نعم', 'contactKind','كتابياً',
+              'crimeType','جريمة كبرى', 'crimeDesc','تزوير محرّرات رسمية', 'hidden2','لا',
+              'threatExists','لا يوجد', 'riskLevel','منخفض',
+              'extends','لا', 'extendsWho','لا يمتدّ',
+              'reasons', jsonb_build_array('جدية التهديد غير مؤكدة', 'أهمية الإفادة مساندة'),
+              'alternatives','الاكتفاء بالمتابعة الدورية وقنوات البلاغ المعتادة',
+              'attachFiles', jsonb_build_array('محضر التواصل')),
+            now(), now() + interval '5 days', now(), 'electronic',
+            'لم يثبت تهديد فعلي؛ والإفادة فنية مساندة يمكن أداؤها دون تدابير خاصة.');
     insert into studies (case_id, studier_id, recommendation, reject_reasons, proposed_type, notes,
                          found_recommendation, found_request, submitted_at)
     values (cid, s2, 'رفض الحماية',
@@ -468,29 +472,30 @@ begin
             '{"nafath":"live","spl":"manual","hrdf":"manual"}'::jsonb);
     insert into emergency_contacts (case_id, relationship) values (cid, 'أب');
     insert into protection_requests (case_id, applicant_role, channel, details)
-    values (cid, 'witness', 'seeker', jsonb_build_object(
-      'role','شاهد', 'crime','اتّجار بالمواد المخدّرة', 'waqia','شهادة على شبكة تهريب وترويج',
-      'entity','النيابة العامة', 'prior_submit', true, 'prior_entity','النيابة العامة',
-      'case_no','2026/0524', 'threat','حرِج', 'extends','يشمل الزوجة والأبناء',
+    values (cid, 'شاهد', 'seeker', jsonb_build_object(
+      'crime','اتّجار بالمواد المخدّرة',
+      'entity','النيابة العامة', 'prior_submit', true,
+      'case_no','2026/0524',
       'reason','تلقّيت تهديدات مباشرة بالقتل أنا وأسرتي بعد الإدلاء بشهادتي.',
       'files', jsonb_build_array('محضر الشهادة', 'بلاغ التهديد')));
     insert into recommendations (case_id, source_body, decision, proposed_type, proposed_duration,
-                                 factors9, raised_at, due_at, received_at, channel, notes, details)
+                                 factors9, raised_at, due_at, received_at, channel, notes)
     values (cid, 'النيابة العامة بعسير', 'توفير',
             '["الحماية الأمنية","المرافقة الأمنية وسلامة التنقّل","تغيير محل الإقامة"]'::jsonb, null,
-            '{"جدية التهديد":"مؤكدة ومتكررة","أهمية الإفادة":"محورية","خطورة الجريمة":"عالية"}'::jsonb,
-            now(), now() + interval '5 days', now(), 'electronic',
-            'التهديد منظّم وقابل للتنفيذ؛ تُرى الحماية العاجلة بأوسع تدابيرها.',
-            jsonb_build_object('officer','ضابط اتصال النيابة (3)', 'rec_ref','PP-ASR-2026-0902',
-              'approved_by','رئيس فرع النيابة بعسير', 'stage','التحقيق',
+            jsonb_build_object(
               'health','ضغط نفسي ظاهر', 'criminal','لا سوابق', 'psych','قلق حادّ لديه ولدى أسرته', 'reveal','لا يرغب في الكشف مطلقاً',
-              'case_summary','شبكة اتّجار بالمخدّرات؛ شهادته حاسمة في تحديد رؤوسها.',
-              'role_desc','شاهد عيان رئيس — أقواله ركن الإدانة.',
-              'contacted','نعم — مقابلة ميدانية', 'crime_class','جريمة كبرى', 'crime_desc','اتّجار بالمواد المخدّرة',
-              'hide_identity','نعم (م2)', 'threat_exists','يوجد', 'threat_type','تهديد بالقتل',
-              'harm_type','ترصّد مركبته', 'extends_who','الزوجة والأبناء',
-              'alt_solutions','لا بدائل كافية',
-              'attachments', jsonb_build_array('محضر المقابلة الميدانية', 'تقرير رصد التهديدات')));
+              'caseSummary','شبكة اتّجار بالمخدّرات؛ شهادته حاسمة في تحديد رؤوسها.',
+              'caseStage','التحقيق', 'applicantRoleDesc','شاهد عيان رئيس — أقواله ركن الإدانة.',
+              'contacted','نعم', 'contactKind','مقابلة ميدانية',
+              'crimeType','جريمة كبرى', 'crimeDesc','اتّجار بالمواد المخدّرة', 'hidden2','نعم (م2)',
+              'threatExists','يوجد', 'threatType','تهديد بالقتل', 'riskLevel','حرِج',
+              'harmExists','يوجد', 'harmType','ترصّد مركبته',
+              'extends','نعم', 'extendsWho','الزوجة والأبناء',
+              'reasons', jsonb_build_array('جدية التهديد مؤكدة ومتكررة', 'أهمية الإفادة محورية', 'خطورة الجريمة عالية'),
+              'alternatives','لا بدائل كافية',
+              'attachFiles', jsonb_build_array('محضر المقابلة الميدانية', 'تقرير رصد التهديدات')),
+            now(), now() + interval '5 days', now(), 'electronic',
+            'التهديد منظّم وقابل للتنفيذ؛ تُرى الحماية العاجلة بأوسع تدابيرها.');
     insert into studies (case_id, studier_id, recommendation, proposed_type, proposed_duration, notes,
                          found_recommendation, found_request, submitted_at)
     values (cid, s1, 'قبول كلي',

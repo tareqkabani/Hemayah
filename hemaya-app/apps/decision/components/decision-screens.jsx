@@ -7,6 +7,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, DeadlineTimer } from "@hemaya/ui";
+import { normalizeFactors9 } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { HemayaDecision } from "./decision-store";
 import { FoundLine } from "./FoundLine";
@@ -184,30 +185,32 @@ export const DScreens = (function () {
     "الحي": "subjects.national_address→district", "الرمز البريدي": "subjects.national_address→postal", "المدينة": "subjects.national_address→city",
     "جهة العمل": "subjects.employer", "المسمى الوظيفي": "subjects.job_title",
     "صلة القرابة": "emergency_contacts.relationship", "الاسم (جهة الطوارئ)": "emergency_contacts.name_enc", "رقم الجوال (جهة الطوارئ)": "emergency_contacts.phone_enc",
-    "صفة مقدم الطلب": "protection_requests.details→role", "دور طالب الحماية في القضية": "protection_cases.category",
+    "صفة مقدم الطلب": "protection_requests.applicant_role", "دور طالب الحماية في القضية": "protection_cases.category",
     "قناة الورود": "protection_requests.channel", "نوع الجريمة محل القضية": "protection_requests.details→crime",
     "الجهة المختصة (بحسب الطلب)": "protection_requests.details→entity",
     "هل سبق التقديم للجهة المختصة؟": "protection_requests.details→prior_submit", "رقم القضية (إن وجد)": "protection_requests.details→case_no",
-    "مستوى التهديد — بحسب الطالب": "protection_requests.details→threat", "امتداد الخطر إلى الغير (م5/4)": "protection_requests.details→extends",
     "مسوّغات طلب الحماية": "protection_requests.details→reason", "مرفقات الطلب": "protection_requests.details→files",
-    "رقم الوارد": "protection_requests.details→incoming_no", "تاريخ الوارد": "protection_cases.created_at",
+    "رقم الوارد": "protection_requests.details→reg_no (قيد الورود — الإدخال اليدوي)", "تاريخ الوارد": "protection_cases.created_at",
     "طلب نيابةً عن شخص": "protection_requests.details→onBehalf (العمر فقط — الاسم والهوية محجوبان)",
     "تصنيف الخطر المبدئي (من الفرز)": "protection_cases.classification",
-    "الجهة المختصة": "recommendations.source_body", "ضابط الاتصال المعتمد": "recommendations.details→officer",
-    "مرجع التوصية": "recommendations.details→rec_ref", "تاريخ الرفع": "recommendations.received_at", "اعتمدها": "recommendations.details→approved_by",
-    "الحالة الصحية": "recommendations.details→health", "التاريخ الجنائي": "recommendations.details→criminal",
-    "التاريخ النفسي": "recommendations.details→psych", "رغبة الكشف عن الهوية": "recommendations.details→reveal",
-    "تفاصيل وأسباب الطلب": "recommendations.details→req_details", "رقم القضية": "recommendations.details→case_no ∪ protection_requests.details→case_no",
-    "المرحلة الحالية للقضية": "recommendations.details→stage", "ملخّص القضية": "recommendations.details→case_summary",
-    "دور مقدّم الطلب وأهمية معلوماته": "recommendations.details→role_desc",
-    "هل تم التواصل مع مقدّم الطلب؟": "recommendations.details→contacted", "نوع الجريمة": "recommendations.details→crime_class",
-    "الواقعة": "protection_requests.details→waqia", "الوصف الإجرامي": "recommendations.details→crime_desc",
-    "إخفاء البيانات (م2)": "recommendations.details→hide_identity", "وجود خطر يهدّد طالب الحماية": "recommendations.details→threat_exists",
-    "نوع الخطر": "recommendations.details→threat_type", "نوع الضرر": "recommendations.details→harm_type",
-    "إلى من يمتدّ الخطر": "recommendations.details→extends_who", "عوامل المادة (9)": "recommendations.factors9",
-    "توصية الجهة": "recommendations.decision", "أسباب التوصية": "recommendations.notes",
-    "الأنواع المقترحة من الجهة": "recommendations.proposed_type", "الحلول البديلة": "recommendations.details→alt_solutions",
-    "المدة المقترحة": "recommendations.proposed_duration", "مرفقات التوصية": "recommendations.details→attachments",
+    // عوامل التوصية كلها من recommendations.factors9 عبر normalizeFactors9 (لهجتا الكاتبَين الورقي/الإلكتروني) — recommendations.details بلا كاتب فلا يُقرأ منه شيء
+
+    "الجهة المختصة": "recommendations.source_body", "تاريخ الرفع": "recommendations.received_at",
+    "الحالة الصحية": "factors9→health(+healthNote)", "التاريخ الجنائي": "factors9→criminal(+criminalNote)",
+    "التاريخ النفسي": "factors9→psych(+psychHistory)", "رغبة الكشف عن الهوية": "factors9→reveal",
+    "تفاصيل وأسباب الطلب": "protection_requests.details→reason", "رقم القضية": "protection_requests.details→case_no",
+    "المرحلة الحالية للقضية": "factors9→caseStage", "ملخّص القضية": "factors9→caseSummary",
+    "دور مقدّم الطلب وأهمية معلوماته": "factors9→applicantRoleDesc|role_desc",
+    "هل تم التواصل مع مقدّم الطلب؟": "factors9→contacted(+contactKind)", "نوع الجريمة": "factors9→crimeType|crime_type",
+    "الواقعة": "factors9→waqia", "الوصف الإجرامي": "factors9→crimeDesc ∪ protection_requests.details→crime",
+    "إخفاء البيانات (م2)": "factors9→hidden2|hidden_m2", "وجود خطر يهدّد طالب الحماية": "factors9→threatExists|threat",
+    "نوع الخطر": "factors9→threatType|threat_type", "مستوى الخطر": "factors9→riskLevel|risk_level",
+    "وجود ضرر واقع": "factors9→harmExists|harm", "نوع الضرر": "factors9→harmType|harm_type",
+    "انطباق شرط التكيّف (م9)": "factors9→adapt",
+    "امتداد الخطر إلى الغير (م5/4)": "factors9→extends|extends_others", "إلى من يمتدّ الخطر": "factors9→extendsWho|extends_who",
+    "توصية الجهة": "recommendations.decision", "أسباب التوصية": "recommendations.notes ∪ factors9→reasons",
+    "الأنواع المقترحة من الجهة": "recommendations.proposed_type", "الحلول البديلة": "factors9→alternatives",
+    "المدة المقترحة": "recommendations.proposed_duration", "مرفقات التوصية": "factors9→attachFiles|attach_files",
     "بالاطّلاع تبيّن — التوصية": "studies.found_recommendation ∪ assessments.found_recommendation",
     "بالاطّلاع تبيّن — الطلب": "studies.found_request ∪ assessments.found_request",
     "توصية المُعِدّ": "studies.recommendation ∪ assessments.recommendation",
@@ -333,20 +336,18 @@ export const DScreens = (function () {
         badges={<Tag tone="success" size="sm" iconLeft={<I name="verified" size={12} fill />}>موثّق عبر نفاذ</Tag>}
         meta={(q.ref || "—") + (req.submitted_at ? " · " + fmtWhen(req.submitted_at) : "")}>
         <FormSections sections={[
-          (dd.incoming_no || q.createdAt) && { title: "بيانات الورود والإحالة", icon: "folder_shared", note: "مجلوبة آلياً · للقراءة",
-            rows: [["رقم الوارد", dd.incoming_no], ["تاريخ الوارد", q.createdAt], ["تصنيف الخطر المبدئي (من الفرز)", q.risk !== "—" ? q.risk : null]] },
+          (dd.reg_no || q.createdAt) && { title: "بيانات الورود والإحالة", icon: "folder_shared", note: "مجلوبة آلياً · للقراءة",
+            rows: [["رقم الوارد", dd.reg_no], ["تاريخ الوارد", q.createdAt], ["تصنيف الخطر المبدئي (من الفرز)", q.risk !== "—" ? q.risk : null]] },
           { title: "تفاصيل الطلب — كما أدخلها مقدّمه", icon: "how_to_reg",
             rows: [
               ["قناة الورود", channel],
-              ["صفة مقدم الطلب", dd.role],
+              ["صفة مقدم الطلب", req.applicant_role],
               ["دور طالب الحماية في القضية", q.cat],
               ["طلب نيابةً عن شخص", ob ? "نعم" + (ob.age ? " — العمر: " + ob.age : "") + " (اسم الشخص وهويته محجوبان)" : null],
-              ["نوع الجريمة محل القضية", dd.crime || dd.waqia],
+              ["نوع الجريمة محل القضية", dd.crime],
               ["الجهة المختصة (بحسب الطلب)", dd.entity],
-              ["هل سبق التقديم للجهة المختصة؟", dd.prior_submit === true ? "نعم — " + (dd.prior_entity || dd.entity || "الجهة المختصة") : dd.prior_submit === false ? "لا" : null],
+              ["هل سبق التقديم للجهة المختصة؟", dd.prior_submit === true ? "نعم — " + (dd.entity || "الجهة المختصة") : dd.prior_submit === false ? "لا" : null],
               ["رقم القضية (إن وجد)", dd.case_no],
-              ["مستوى التهديد — بحسب الطالب", dd.threat],
-              ["امتداد الخطر إلى الغير (م5/4)", dd.extends],
             ],
             blocks: [["مسوّغات طلب الحماية — بنصّ مقدّمه", dd.reason]] },
         ]} />
@@ -363,46 +364,50 @@ export const DScreens = (function () {
   }
 
   // ③ توصية الجهة المختصة — بنموذجها الموحّد (استشارية — القرار خالص للمركز م9)
+  // العوامل من recommendations.factors9 عبر موحِّد اللهجتين normalizeFactors9 —
+  // (recommendations.details بلا كاتب اليوم فلا يُقرأ منه شيء).
   function RecCard({ q, recommendation, request, onOpenDoc }) {
     const rec = recommendation;
     if (!rec) return null;
-    const rd = rec.details || {};
     const dd = (request && request.details) || {};
     const types = Array.isArray(rec.proposed_type) ? rec.proposed_type : [];
-    const atts = Array.isArray(rd.attachments) ? rd.attachments : [];
-    const factors = rec.factors9 && typeof rec.factors9 === "object" ? Object.entries(rec.factors9) : [];
+    const f = normalizeFactors9(rec.factors9);
+    const atts = f ? f.attachments : [];
+    const withNote = (v, note) => (v ? v + (note ? " — " + note : "") : null);
     const negative = String(rec.decision || "").indexOf("عدم") >= 0;
     return (
       <DocCard icon="recommend" title={q.foreign ? "خطاب اللجنة الدائمة — المسار الأجنبي (م6)" : "توصية الجهة المختصة — بنموذجها الموحّد"}
         badges={<Tag tone={negative ? "warning" : "success"} size="sm" iconLeft={<I name="recommend" size={12} />}>{rec.decision === "توفير" ? "توفير الحماية" : rec.decision || "—"}</Tag>}
-        meta={(rd.rec_ref || "") + (rec.received_at ? (rd.rec_ref ? " · " : "") + fmtWhen(rec.received_at) : "")}>
+        meta={rec.received_at ? fmtWhen(rec.received_at) : ""}>
         <FormSections sections={[
           { title: "الجهة صاحبة التوصية", icon: "account_balance",
-            rows: [["الجهة المختصة", rec.source_body], ["ضابط الاتصال المعتمد", rd.officer], ["مرجع التوصية", rd.rec_ref], ["تاريخ الرفع", rec.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : null], ["اعتمدها", rd.approved_by]] },
-          { title: "بيانات مقدّم الطلب (محجوبة الهوية)", icon: "badge", note: "يُشار إليه بالرمز السري " + q.secret,
-            rows: [["صفة مقدّم الطلب", q.cat], ["الحالة الصحية", rd.health], ["التاريخ الجنائي", rd.criminal], ["التاريخ النفسي", rd.psych], ["رغبة الكشف عن الهوية", rd.reveal]] },
-          (rd.req_details || dd.reason) && { title: "تفاصيل وأسباب طلب الحماية", icon: "notes", text: rd.req_details || dd.reason },
-          { title: "ملخّص القضية ودور مقدّم الطلب", icon: "cases",
-            rows: [["رقم القضية", rd.case_no || dd.case_no], ["المرحلة الحالية للقضية", rd.stage]],
-            blocks: [["ملخّص القضية", rd.case_summary], ["دور مقدّم الطلب وأهمية معلوماته", rd.role_desc]] },
+            rows: [["الجهة المختصة", rec.source_body], ["قناة الورود", rec.channel === "paper" ? "خطاب ورقي" : rec.channel === "electronic" ? "إلكترونية — بوابة الجهة" : rec.channel || null], ["تاريخ الرفع", rec.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : null]] },
+          f && (f.health || f.criminal || f.psych || f.reveal) && { title: "بيانات مقدّم الطلب (محجوبة الهوية)", icon: "badge", note: "يُشار إليه بالرمز السري " + q.secret,
+            rows: [["صفة مقدّم الطلب", q.cat], ["الحالة الصحية", withNote(f.health, f.healthNote)], ["التاريخ الجنائي", withNote(f.criminal, f.criminalNote)], ["التاريخ النفسي", withNote(f.psych, f.psychHistory)], ["رغبة الكشف عن الهوية", f.reveal]] },
+          dd.reason && { title: "تفاصيل وأسباب طلب الحماية", icon: "notes", text: dd.reason },
+          f && (f.caseSummary || f.caseStage || f.roleDesc || dd.case_no) && { title: "ملخّص القضية ودور مقدّم الطلب", icon: "cases",
+            rows: [["رقم القضية", dd.case_no], ["المرحلة الحالية للقضية", f.caseStage]],
+            blocks: [["ملخّص القضية", f.caseSummary], ["دور مقدّم الطلب وأهمية معلوماته", f.roleDesc]] },
           { title: "مسوّغات توفير الحماية", icon: "rule",
-            rows: [
-              ["هل تم التواصل مع مقدّم الطلب؟", rd.contacted],
-              ["نوع الجريمة", rd.crime_class],
-              ["الواقعة", dd.waqia],
-              ["إخفاء البيانات (م2)", rd.hide_identity],
-              ["وجود خطر يهدّد طالب الحماية", rd.threat_exists || (rd.threat_type ? "يوجد" : null)],
-              ["نوع الخطر", rd.threat_type],
-              ["مستوى الخطر", dd.threat],
-              ["نوع الضرر", rd.harm_type],
-              ["امتداد الخطر إلى الغير (م5/4)", rd.extends_who ? (rd.extends_who === "لا يمتدّ" ? "لا" : "نعم") : null],
-              ["إلى من يمتدّ", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? rd.extends_who : null],
-              ...factors.map(([k, v]) => [k, String(v)]),
+            rows: f ? [
+              ["هل تم التواصل مع مقدّم الطلب؟", withNote(f.contacted, f.contactKind)],
+              ["نوع الجريمة", f.crimeType],
+              ["الواقعة", f.waqia.join(" · ")],
+              ["إخفاء البيانات (م2)", f.hideIdentity],
+              ["وجود خطر يهدّد طالب الحماية", f.threatExists || (f.threatType ? "يوجد" : null)],
+              ["نوع الخطر", f.threatType],
+              ["مستوى الخطر", f.riskLevel],
+              ["وجود ضرر واقع", f.harmExists],
+              ["نوع الضرر", f.harmType],
+              ["انطباق شرط التكيّف (م9)", f.adapt],
+              ["امتداد الخطر إلى الغير (م5/4)", f.extendsOthers || (f.extendsWho ? (f.extendsWho === "لا يمتدّ" ? "لا" : "نعم") : null)],
+              ["إلى من يمتدّ", f.extendsWho && f.extendsWho !== "لا يمتدّ" ? f.extendsWho : null],
               ["توصية الجهة", rec.decision === "توفير" ? "توفير الحماية" : rec.decision],
-            ],
-            blocks: [["الوصف الإجرامي", rd.crime_desc || dd.crime], ["أسباب التوصية", rec.notes]] },
+            ] : [["توصية الجهة", rec.decision === "توفير" ? "توفير الحماية" : rec.decision]],
+            list: f && f.reasons.length ? f.reasons : null,
+            blocks: [["الوصف الإجرامي", (f && f.crimeDesc) || dd.crime], ["أسباب التوصية", rec.notes]] },
           { title: "أنواع الحماية المقترحة من الجهة (م14) — اقتراحٌ لا يُقيّد المجلس", icon: "shield",
-            chips: types, rows: [["الحلول البديلة", rd.alt_solutions || "لا توجد"]] },
+            chips: types, rows: [["الحلول البديلة", (f && f.alternatives) || "لا توجد"]] },
           { title: "مدة الحماية المقترحة", icon: "schedule", rows: [["المدة", fmtInterval(rec.proposed_duration)]] },
         ]} />
         {atts.length > 0 && <div className="fsec">
