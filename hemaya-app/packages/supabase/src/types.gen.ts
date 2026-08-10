@@ -2088,6 +2088,7 @@ export type Database = {
     }
     Functions: {
       _actor_name: { Args: { _uid: string }; Returns: string }
+      _emergency_contact_key: { Args: never; Returns: string }
       _next_decision_ref: { Args: never; Returns: string }
       _next_grv_ref: { Args: never; Returns: string }
       _notify_deputies: {
@@ -2099,6 +2100,10 @@ export type Database = {
         Returns: undefined
       }
       _scope_ar: { Args: { _scope: string }; Returns: string }
+      _store_emergency_contact: {
+        Args: { _case_id: string; _ec: Json }
+        Returns: undefined
+      }
       admin_add_branch_unit: {
         Args: { _city: string; _name?: string; _parent: string }
         Returns: string
@@ -2311,6 +2316,14 @@ export type Database = {
       }
       council_vote_open: { Args: { _case_id: string }; Returns: boolean }
       current_officer_caseids: { Args: never; Returns: string[] }
+      execution_emergency_contact: {
+        Args: { _case_id: string }
+        Returns: {
+          name: string
+          phone: string
+          relationship: string
+        }[]
+      }
       has_authority: {
         Args: { _authority: Database["public"]["Enums"]["referral_authority"] }
         Returns: boolean
@@ -3069,4 +3082,3 @@ export const Constants = {
     },
   },
 } as const
-
