@@ -29,8 +29,8 @@ export function Tasks({ cfg, rows, open }) {
     <div>
       <h2 className="h2">الطلبات الواردة</h2>
       <p className="lede">
-        طلبات {cfg.strings.output} الواردة إليك — <b>توزيع آليّ بالعبء</b>. يُستقبَل المخرَج ضمن يوم عمل في مظلّة 3
-        أيام (م10).
+        طلبات {cfg.strings.output} الواردة إليك — <b>يصلك كلُّ طلبٍ يبلغ مرحلة الدراسة</b>، ويعمل كلُّ زميلٍ بمعزلٍ عن
+        الآخرين. يُستقبَل المخرَج ضمن يوم عمل في مظلّة 3 أيام (م10).
       </p>
       <Card className="card">
         <div className="tbl-wrap">
@@ -850,7 +850,7 @@ export function Dashboard({ cfg, rows, openTask, go, notifs, onOpenNotif }) {
   return (
     <div>
       <h2 className="h2">لوحة المعلومات</h2>
-      <p className="lede">مهامّك أنت فقط. مبدأ الحاجة إلى المعرفة — لا اطّلاع على أعمال أقرانك، والتوزيع آليّ بالعبء.</p>
+      <p className="lede">مهامّك أنت فقط. مبدأ الحاجة إلى المعرفة — يصلك كلُّ طلبٍ وارد، ولا اطّلاع على أعمال أقرانك.</p>
       {hero ? (
         <div className="card pad" style={{ marginBottom: 16 }}>
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
@@ -961,7 +961,7 @@ export function Profile({ cfg, me }) {
     ["المصادقة الثنائية (MFA)", "مُفعّلة"],
   ];
   const perms = [
-    "استقبال الطلبات المُسندة إليّ آلياً بالعبء",
+    "استقبال كلِّ الطلبات البالغة مرحلة الدراسة آلياً",
     "الاطّلاع على معلومات الحالة وتوصية الجهة (هوية محجوبة)",
     "إعداد " + cfg.strings.output + " وإبداء الرأي (قبول/رفض) واقتراح الأنواع",
     "اعتماد المخرَج وإرساله موقّعاً عبر نفاذ",

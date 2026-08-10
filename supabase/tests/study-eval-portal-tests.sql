@@ -5,7 +5,7 @@
 --  الأسلوب (نمط triage-portal-tests): معاملة واحدة تُدحرج في النهاية —
 --  لا أثر يبقى في القاعدة؛ قضايا الاختبار تُنشأ داخل المعاملة فلا تعتمد
 --  على حالة بيانات العرض؛ الانتحال بـ request.jwt.claims + set local role.
---  التغطية: الإسناد الآليّ بالعبء (المشغّل) · إشعارات الإسناد والمهلة ·
+--  التغطية: البثّ للجميع عند under_study (المشغّل) · إشعارات الإسناد والمهلة ·
 --  my_study_tasks/my_assessment_tasks · submit_study/submit_assessment
 --  (بندا الاطّلاع · الجزئي · الرفض · upsert · حرّاس الدور والحالة) ·
 --  كشف الرمز وفتح المرفقات بالتدقيق (م15/16) · العزل الصفّي بالاتجاهين ·
@@ -36,18 +36,6 @@ do $$ begin
   end if;
 end $$;
 
--- أحمال المؤلّفين قبل الإسناد (لإثبات «الأقل عبئاً»)
-create temp table t_loads as
-select ur.user_id, ur.role::text as role,
-  -- معيار العبء نفسه المعتمد في assign_study_eval (مهاجرة المرونة): المُستبدَل لا يُحتسب
-  case when ur.role = 'studier'
-    then (select count(*) from studies s where s.studier_id = ur.user_id
-           and s.submitted_at is null and s.superseded_at is null)
-    else (select count(*) from assessments a where a.evaluator_id = ur.user_id
-           and a.submitted_at is null and a.superseded_at is null)
-  end as load
-from user_roles ur where ur.role in ('studier','evaluator');
-
 insert into protection_cases (ref_no, secret_code, category, status, source)
 values ('REF-TEST-9901','C-TEST-9901','witness','submitted','local'),
        ('REF-TEST-9902','C-TEST-9902','victim','submitted','urgent'),
@@ -67,34 +55,31 @@ begin
     jsonb_build_object('sub', _uid, 'role', 'authenticated')::text, true);
 end $$;
 
--- ─── 1) الإسناد الآليّ بالعبء عند under_study + إشعاراته ───
+-- ─── 1) البثّ للجميع عند under_study + إشعاراته (20260810000004) ───
 do $$
-declare i record; c record; _s int; _a int; _n int; _worstpick int; _bestrest int;
+declare i record; c record; _s int; _a int; _n int; _studiers int; _evals int;
 begin
   select * into i from t_ids; select * into c from t_cases;
+  select count(*) into _studiers from user_roles where role='studier';
+  select count(*) into _evals from user_roles where role='evaluator';
 
   update protection_cases set status='under_study' where id in (c.c1, c.c2, c.c3);
 
   select count(*), count(distinct studier_id) into _s, _n from studies where case_id = c.c1;
-  if _s <> 2 or _n <> 2 then raise exception 'اختبار 1أ فشل: إسناد دارسين اثنين متمايزين (وجد %)', _s; end if;
+  if _s <> _studiers or _n <> _studiers then
+    raise exception 'اختبار 1أ فشل: البثّ لكل الدارسين (وجد % من %)', _s, _studiers; end if;
   select count(*) into _a from assessments where case_id = c.c1;
-  if _a <> 2 then raise exception 'اختبار 1ب فشل: إسناد مقيّمين اثنين (وجد %)', _a; end if;
-
-  -- «الأقل عبئاً»: أسوأ مُختارٍ لا يتجاوز أفضل مستبعَد (قبل الإسناد)
-  select max(l.load) into _worstpick from t_loads l
-   where l.role='studier' and l.user_id in (select studier_id from studies where case_id=c.c1);
-  select min(l.load) into _bestrest from t_loads l
-   where l.role='studier' and l.user_id not in (select studier_id from studies where case_id=c.c1);
-  if _bestrest is not null and _worstpick > _bestrest then
-    raise exception 'اختبار 1ج فشل: الإسناد ليس بالأقل عبئاً (% > %)', _worstpick, _bestrest;
-  end if;
+  if _a <> _evals then
+    raise exception 'اختبار 1ب فشل: البثّ لكل المقيّمين (وجد % من %)', _a, _evals; end if;
 
   -- إشعار «assign» لكل مُسنَدٍ إليه، والعاجل يزيد إشعار مهلة crit
   select count(*) into _n from notifications where case_id=c.c1 and type='assign';
-  if _n <> 4 then raise exception 'اختبار 1د فشل: 4 إشعارات إسناد (وجد %)', _n; end if;
+  if _n <> _studiers + _evals then
+    raise exception 'اختبار 1د فشل: إشعار إسناد لكل الطاقم (وجد % من %)', _n, _studiers + _evals; end if;
   select count(*) into _n from notifications where case_id=c.c2 and type='deadline' and crit;
-  if _n <> 4 then raise exception 'اختبار 1هـ فشل: إشعارات مهلة عاجلة crit (وجد %)', _n; end if;
-  raise notice 'اختبار 1 ✓ الإسناد الآلي بالعبء + إشعارات الإسناد والمهلة';
+  if _n <> _studiers + _evals then
+    raise exception 'اختبار 1هـ فشل: إشعارات مهلة عاجلة crit (وجد % من %)', _n, _studiers + _evals; end if;
+  raise notice 'اختبار 1 ✓ البثّ للجميع + إشعارات الإسناد والمهلة';
 end $$;
 
 -- ─── 2) my_study_tasks / my_assessment_tasks — كلٌّ يرى مهامّه فقط ───
@@ -234,14 +219,13 @@ begin
     and target='REF-TEST-9901 · تقرير تقييم المخاطر';
   if _n <> 1 then raise exception 'اختبار 5ب فشل: فتح المرفق غير مسجَّل بصيغته'; end if;
 
-  -- غير مُسنَد على c1 (مؤلّف لم يُختَر لها)
-  select user_id into _out from t_loads
-   where role='evaluator' and user_id not in (select evaluator_id from assessments where case_id=c.c1)
-   limit 1;
-  if _out is null then
-    select user_id into _out from t_loads
-     where role='studier' and user_id not in (select studier_id from studies where case_id=c.c1) limit 1;
-  end if;
+  -- غير مُسنَد على c1: مع البثّ للجميع لا مؤلّف «لم يُختَر» — نمثّله بمقيّمةٍ
+  -- سُحب اطّلاعها بوسم إقفال الميعاد (المسار الفعلي لفقد الإسناد بعد 20260810000004)
+  select evaluator_id into _out from assessments
+   where case_id = c.c1 and superseded_at is null limit 1;
+  update assessments set superseded_at = now(),
+    superseded_reason = 'انقضى الميعاد النظامي (م10)'
+   where case_id = c.c1 and evaluator_id = _out;
   perform pg_temp.impersonate(_out);
   execute 'set local role authenticated';
   begin
@@ -337,22 +321,10 @@ begin
   execute 'reset role';
   if not _ok then raise exception 'اختبار 7ج فشل: الرسالة الفارغة لم تُرفض'; end if;
 
-  -- غير المُسنَد مرفوض
-  select user_id into _out from t_loads
-   where role='studier' and user_id not in (select studier_id from studies where case_id=c.c1) limit 1;
-  _ok := false;
-  if _out is not null then
-    perform pg_temp.impersonate(_out);
-    execute 'set local role authenticated';
-    begin
-      perform send_leader_message(c.c1, 'deputy', 'محاولة غير مشروعة');
-      raise exception 'FORCE';
-    exception when others then
-      if sqlerrm like '%غير مُسنَد%' then _ok := true; else raise; end if;
-    end;
-    execute 'reset role';
-    if not _ok then raise exception 'اختبار 7د فشل: غير المُسنَد أرسل'; end if;
-  end if;
+  -- مع البثّ للجميع لا موظف «غير مُسنَد» يُختبر رفضه — نكتفي بعزل الخيوط
+  -- بين المُسنَدين أنفسهم (زميل مُسنَد لا يقرأ خيط زميله — 7ز أدناه)
+  select studier_id into _out from studies
+   where case_id = c.c1 and studier_id <> _uid limit 1;
 
   -- ردّ القيادة (direction=in) يولّد إشعار «msg» للموظف، وفتح الخيط يثبت القراءة
   perform pg_temp.impersonate(i.deputy);
