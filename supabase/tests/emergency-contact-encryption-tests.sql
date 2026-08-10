@@ -67,8 +67,13 @@ begin
   if _d ? 'emergency_contact' then
     raise exception 'FAIL 1أ: emergency_contact ما زالت نصّاً صريحاً في details بعد الإدخال الورقيّ';
   end if;
-  if not (_d ? 'city' and _d ? 'identity') then
+  if not (_d ? 'city' and _d ? 'channel') then
     raise exception 'FAIL 1ب: البتر أسقط مفاتيح مجاورة من details';
+  end if;
+  -- identity صارت تُعترض هي الأخرى إلى subjects (مهاجرة 20260810000003) —
+  -- تغطيتها الكاملة في subject-intake-tests.sql
+  if _d ? 'identity' then
+    raise exception 'FAIL 1ب٢: identity بقيت نصّاً صريحاً في details بعد اعتراض subjects';
   end if;
   select count(*) into _n from emergency_contacts where case_id = _cid
     and name_enc is not null and phone_enc is not null and relationship = 'أخ';
