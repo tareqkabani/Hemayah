@@ -50,7 +50,32 @@ const App = (function () {
 
   const modeFor = (scope, me, q) => scope === "preparer" ? "prepare" : (scope === "leadership" && ["pending_deputy", "pending_chair"].includes(dOf(q.secret).status)) ? "approve" : "session";
   const isApprovalAction = (scope, me, q) => { const s = dOf(q.secret).status; return scope === "leadership" && ((me === "deputy" && s === "pending_deputy") || (me === "chair" && s === "pending_chair")); };
-  const poolOf = (scope) => scope === "preparer" ? allCases().filter((q) => { const d = dOf(q.secret); return d.mine || d.unclaimed; }) : allCases();
+  // طور التجميع لمعدّ القرار وحده — لا تبلغ القضيةُ المجلسَ قبل طرحها للتصويت
+  const poolOf = (scope) => scope === "preparer"
+    ? allCases().filter((q) => { const d = dOf(q.secret); return d.mine || d.unclaimed; })
+    : allCases().filter((q) => dOf(q.secret).status !== "collecting");
+
+  // عدّاد التجميع: ما وصل من المخرجات وما بقي منتظَراً (المُلغى بالميعاد خارجهما)
+  const IntakeProgress = ({ intake }) => {
+    if (!intake) return null;
+    const row = (icon, label, c) => (
+      <div className="ro-field">
+        <span className="row" style={{ gap: 7 }}><I name={icon} size={16} color="var(--color-primary)" />{label}</span>
+        <b style={{ color: c.done >= 1 ? "var(--color-success)" : "var(--text-secondary)" }}>
+          {c.done} من {c.total} {c.done < c.total ? "· بانتظار " + (c.total - c.done) : "· اكتملت"}
+        </b>
+      </div>
+    );
+    return (<div style={{ display: "grid", gap: 8 }}>
+      {row("balance", "الدراسات الواردة", intake.studies)}
+      {row("psychology", "التقييمات الواردة", intake.assessments)}
+    </div>);
+  };
+  const intakeTag = (d) => d.status === "collecting" && d.intake
+    ? <Tag tone="neutral" size="sm" iconLeft={<I name="inventory" size={12} />}>
+        وصل {d.intake.studies.done + d.intake.assessments.done} من {d.intake.studies.total + d.intake.assessments.total}
+      </Tag>
+    : null;
 
   // ————————————————— الإشعارات — مشتقّة من حالة المخزن الحقيقية —————————————————
   const NT = { info: ["var(--info-10)", "var(--color-info)"], primary: ["var(--green-10)", "var(--color-primary)"], warning: ["var(--warning-10)", "var(--color-warning)"], success: ["var(--success-10)", "var(--color-success)"], error: ["var(--error-10)", "var(--color-error)"] };
@@ -87,6 +112,17 @@ const App = (function () {
           time: when || "", ts: whenTs, group: dayGroup(whenTs),
           deadline: urgent ? { label: "مظلّة إصدار القرار والإشعار", total: 3, elapsed: bizDaysSince(whenTs), ref: "م10" } : null,
           action: dest, actionLabel: dest === "approvals" ? "مراجعة واعتماد" : "اتّخذ الإجراء",
+        });
+      }
+      // طور التجميع: يُعلَم المعدّ بما ورد وما بقي — بلا مطالبته بإجراء
+      if (scope === "preparer" && d.status === "collecting" && d.intake) {
+        const done = d.intake.studies.done + d.intake.assessments.done;
+        const total = d.intake.studies.total + d.intake.assessments.total;
+        out.push({
+          id: "task:" + q.secret + ":collecting:" + done, cat: "task", icon: "inventory", tone: "info",
+          t: "وردت مخرجات جديدة — القضية قيد التجميع",
+          d: "الطلب " + q.secret + " — وصل " + done + " من " + total + " (دراسات " + d.intake.studies.done + "/" + d.intake.studies.total + " · تقييمات " + d.intake.assessments.done + "/" + d.intake.assessments.total + "). الاطّلاع مفتوح، ويُفتح الإعداد عند اكتمال التجميع.",
+          time: "", ts: null, group: dayGroup(null), action: "cases", actionLabel: "الاطّلاع على الوارد",
         });
       }
       if (scope === "preparer" && d.status === "preparing" && (d.rejections || []).length && (d.mine || d.unclaimed)) {
@@ -160,6 +196,12 @@ const App = (function () {
           <button className="btn btn-ghost" onClick={() => { HD.saveDecision(q.secret, decisionPatch()); }}><I name="save" size={17} /> حفظ المسوّدة</button>
           <button className="btn btn-primary" disabled={!ready} onClick={() => { HD.submitForApproval(q.secret, decisionPatch()); back(); }}><I name="send" size={17} /> رفع لنائب الرئيس للاعتماد</button>
         </div>
+      </Card> : d.status === "collecting" ? <Card className="card pad">
+        <p className="sec-h"><I name="inventory" size={18} color="var(--color-primary)" /> تجميع الدراسات والتقييمات</p>
+        <InlineAlert kind="info" title="المخرجات ترد تباعاً — الاطّلاع مفتوح والإعداد لم يُفتح بعد" style={{ marginBottom: 14 }}>
+          يُعرض عليك كل مخرَج فور وروده في حزمة الاطّلاع أعلاه، وتُضاف إليه بقيّة المخرجات كما تصل. ويُفتح إعداد قرار المركز عند اكتمال التجميع — بتسليم الطاقم كلّه أو بإقفال الميعاد النظامي (م10)، أيّهما أسبق.
+        </InlineAlert>
+        <IntakeProgress intake={d.intake} />
       </Card> : <React.Fragment>
         <DecisionView decision={d} foreign={q.foreign} />
         {d.status === "pending_deputy" && <Card className="card pad" style={{ marginTop: 16 }}><InlineAlert kind="warning" title="بانتظار اعتماد نائب رئيس المركز">رُفع القرار المُعَدّ للاطّلاع والاعتماد — الحلقة الأولى (النائب) ثم الثانية (الرئيس)، وبعدهما يعود إليك لطرحه على أعضاء المجلس للتصويت، أو يُعاد إليك للتعديل بملاحظات القيادة.</InlineAlert></Card>}
@@ -276,7 +318,7 @@ const App = (function () {
     const heroD = heroQ ? dOf(heroQ.secret) : null;
     const stage = heroD ? stageOf(heroD.status) : null;
     const ledes = {
-      preparer: "تستقبل الدراسات والتقييمات المُجمَّعة وتُعِدّ عليها قرار المركز إعداداً محايداً، ثم ترفعه لنائب رئيس المركز للاعتماد؛ وبعد اعتماده يعود إليك لطرحه على أعضاء المجلس للتصويت. كل ما يتطلّب إجراءً منك يظهر هنا أولاً.",
+      preparer: "تصلك الدراسات والتقييمات فور ورودها فتتابع تجميعها أولاً بأول، وعند اكتمالها تُعِدّ عليها قرار المركز إعداداً محايداً، ثم ترفعه لنائب رئيس المركز للاعتماد؛ وبعد اعتماده يعود إليك لطرحه على أعضاء المجلس للتصويت. كل ما يتطلّب إجراءً منك يظهر هنا أولاً.",
       members: "تطّلع على قرارات المركز المطروحة وتدلي بصوتك (قبول/رفض) مستقلّاً — كل ما يتطلّب إجراءً منك يظهر هنا أولاً.",
       leadership: me === "deputy" ? "تطّلع على القرار المُعَدّ وتعتمده فيعود للمعدّ لطرحه للتصويت، وتصوّت كعضو — كل ما يتطلّب إجراءً منك يظهر هنا أولاً." : "تتابع الاعتماد (بيد النائب)، وتصوّت كعضو، ثم تُصدر قرار المركز وتُشعِر الطرفين — كل ما يتطلّب إجراءً منك يظهر هنا أولاً.",
     };
@@ -284,6 +326,7 @@ const App = (function () {
     const readyToIssue = pool.filter((q) => { const d = dOf(q.secret); return d.status === "voting" && HD.resultFor(q.secret).closed && !d.issued; }).length;
     const pendingMyVote = pool.filter((q) => { const d = dOf(q.secret); return d.status === "voting" && d.voteOpen && !HD.getVotes(q.secret)[me]; }).length;
     const stats = scope === "preparer" ? [
+      ["inventory", st("collecting"), "قيد التجميع", "var(--info-10)", "var(--color-info)", "cases"],
       ["edit_note", st("preparing"), "بانتظار الإعداد", "var(--warning-10)", "var(--color-warning)", "cases"],
       ["task_alt", st("approved"), "بانتظار الطرح", "var(--green-10)", "var(--color-primary)", "cases"],
       ["how_to_vote", st("pending_deputy") + st("pending_chair") + st("voting"), "قيد الدورة", "var(--info-10)", "var(--color-info)", "cases"],
@@ -315,6 +358,7 @@ const App = (function () {
               <span className="row" style={{ gap: 8, marginBottom: 4 }}>
                 <b style={{ fontSize: 15, color: "var(--text-strong)" }}>{hero ? "العمل الأبرز لديك" : "لا إجراء مطلوباً منك الآن"}</b>
                 {heroD && <Tag tone={STATUS[heroD.status].tone} size="sm" iconLeft={<I name={STATUS[heroD.status].icon} size={12} />}>{STATUS[heroD.status].t}</Tag>}
+                {heroD && intakeTag(heroD)}
                 {hero && <Tag tone="warning" size="sm" iconLeft={<I name="touch_app" size={12} />}>يتطلّب إجراء</Tag>}
               </span>
               <span className="muted" style={{ display: "block" }}>الرمز السري <span className="mono">{heroQ.secret}</span>{heroQ.cat && heroQ.cat !== "—" ? " · " + heroQ.cat : ""}{foreignBadge(heroQ)}</span>
@@ -366,7 +410,7 @@ const App = (function () {
       const mine = poolOf("preparer");
       return (<div>
         <h2 className="h2">طلبات إعداد القرار</h2>
-        <p className="lede">طلبات اكتملت دراستها وتقييمها ومُسنَدة إليك (كلٌّ معزول). افتح الطلب لإعداد قرار المركز ورفعه لنائب الرئيس، ثم طرحه للتصويت بعد اعتماده.</p>
+        <p className="lede">طلبات بلغتك مخرجاتها ومُسنَدة إليك (كلٌّ معزول). ما زال بعضها في طور التجميع — تُعرض مخرجاته فور ورودها ويُفتح إعداده عند اكتماله؛ وما اكتمل تُعِدّ عليه قرار المركز وترفعه لنائب الرئيس، ثم تطرحه للتصويت بعد اعتماده.</p>
         {mine.length === 0 ? <Card className="card pad" style={{ textAlign: "center", color: "var(--text-secondary)" }}>لا طلبات مُسنَدة إليك بعد.</Card>
         : <Card className="card" style={{ overflow: "hidden" }}><div className="tbl-wrap"><table>
           <thead><tr><th>الرمز السري</th><th>الفئة</th><th>تصنيف الخطر</th><th>الحالة</th><th></th></tr></thead>
@@ -375,8 +419,8 @@ const App = (function () {
               <td className="mono" style={{ fontWeight: 700, color: "var(--text-strong)" }}>{q.secret}{foreignBadge(q)}{act && <span style={{ display: "block", marginTop: 5, fontSize: 11.5, fontWeight: 600, color: "var(--warning-70)", fontFamily: "var(--font-sans)" }}>الإجراء المطلوب منك: {act}</span>}</td>
               <td>{q.cat && q.cat !== "—" ? <Tag tone="info" size="sm">{q.cat}</Tag> : <span className="muted">—</span>}</td>
               <td>{q.risk && q.risk !== "—" ? <RiskLevel level={q.risk} /> : <span className="muted">—</span>}</td>
-              <td><div className="row" style={{ gap: 6 }}><Tag tone={st.tone} size="sm" iconLeft={<I name={st.icon} size={12} />}>{st.t}</Tag>{act && <Tag tone="warning" size="sm" iconLeft={<I name="touch_app" size={12} />}>يتطلّب إجراء</Tag>}</div></td>
-              <td><span className="link">{d.status === "preparing" ? "إعداد القرار" : d.status === "approved" ? "طرح للتصويت" : "عرض"} <I name="chevron_left" size={16} /></span></td>
+              <td><div className="row" style={{ gap: 6 }}><Tag tone={st.tone} size="sm" iconLeft={<I name={st.icon} size={12} />}>{st.t}</Tag>{intakeTag(d)}{act && <Tag tone="warning" size="sm" iconLeft={<I name="touch_app" size={12} />}>يتطلّب إجراء</Tag>}</div></td>
+              <td><span className="link">{d.status === "collecting" ? "الاطّلاع على الوارد" : d.status === "preparing" ? "إعداد القرار" : d.status === "approved" ? "طرح للتصويت" : "عرض"} <I name="chevron_left" size={16} /></span></td>
             </tr>); })}</tbody>
         </table></div></Card>}
       </div>);

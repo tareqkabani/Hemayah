@@ -21,8 +21,9 @@ export const DScreens = (function () {
     <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>
   );
 
-  // آلة الحالة الخمسية: preparing → pending_deputy → approved → voting → issued
+  // آلة الحالة: collecting → preparing → pending_deputy → pending_chair → approved → voting → issued
   const STATUS = {
+    collecting:     { t: "قيد تجميع الدراسات والتقييمات", tone: "info", icon: "inventory" },
     preparing:      { t: "قيد إعداد القرار",           tone: "neutral", icon: "edit_note" },
     pending_deputy: { t: "بانتظار اعتماد النائب",       tone: "warning", icon: "approval" },
     pending_chair:  { t: "بانتظار اعتماد الرئيس",       tone: "warning", icon: "workspace_premium" },
