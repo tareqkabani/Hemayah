@@ -11,7 +11,7 @@
    ============================================================ */
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
-import { businessDaysBetween, PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL, RISK_LEVEL } from "@hemaya/domain";
+import { businessDaysBetween, PROTECTION_TYPE_LABELS_14 as PROTECTION_TYPES, REGION_LABEL as REGIONS, PAPER_INTAKE_LABEL, RISK_LEVEL, buildFactors9 } from "@hemaya/domain";
 import {
   submitPaperIntake,
   submitPaperRecommendation,
@@ -503,20 +503,22 @@ function Intake({ applicantRoles }) {
         const res = await submitPaperRecommendation({
           caseId: linkSel.caseId,
           provide: d.provide === 'توفير',
-          factors9: {
-            health: d.health || '', healthNote: d.healthNote || '',
-            criminal: d.criminal || '', criminalNote: d.criminalNote || '',
-            psych: d.psych || '', psychHistory: d.psychHistory || '', reveal: d.reveal || '',
-            crimeType: d.crimeType || '', waqia: d.waqia || [], crimeDesc: d.crimeDesc || '', hidden2: d.hidden2 || '',
-            threatExists: d.threatExists || '', threatType: d.threatType || '', riskLevel: d.riskLevel || '',
-            harmExists: d.harmExists || '', harmType: d.harmType || '',
-            extends: d.extends || '', extendsWho: d.extendsWho || '', adapt: d.adapt || '',
-            attachFiles: (d.attachFiles || []).filter(Boolean),
-            caseSummary: d.caseSummary || '', caseStage: d.caseStage || '', applicantRoleDesc: d.applicantRole || '',
-            contacted: d.contacted || '', contactKind: d.contactKind || '',
+          // الكتابة عبر العقد الموحّد (@hemaya/domain) — نقطة كتابةٍ واحدة
+          // للكاتبَين، والخاوي يُسقَط فلا تُخزَّن مفاتيح بلا قيمة.
+          factors9: buildFactors9({
+            health: d.health, healthNote: d.healthNote,
+            criminal: d.criminal, criminalNote: d.criminalNote,
+            psych: d.psych, psychHistory: d.psychHistory, reveal: d.reveal,
+            crimeType: d.crimeType, waqia: d.waqia, crimeDesc: d.crimeDesc, hideIdentity: d.hidden2,
+            threatExists: d.threatExists, threatType: d.threatType, riskLevel: d.riskLevel,
+            harmExists: d.harmExists, harmType: d.harmType,
+            extendsOthers: d.extends, extendsWho: d.extendsWho, adapt: d.adapt,
+            attachments: d.attachFiles,
+            caseSummary: d.caseSummary, caseStage: d.caseStage, roleDesc: d.applicantRole,
+            contacted: d.contacted, contactKind: d.contactKind,
             reasons: [d.why1, d.why2, d.why3].filter(Boolean),
-            alternatives: d.alternatives || '', duration: d.duration || '', durationNote: d.durationNote || '',
-          },
+            alternatives: d.alternatives, duration: d.duration, durationNote: d.durationNote,
+          }),
           types: d.types || [],
           durationDays,
           notes: 'توصية ' + entName + ' الواردة بخطاب رسمي عبر البريد بشأن الطلب المُحال (' + letterStamp() + ' · ' + regStamp() + ').',

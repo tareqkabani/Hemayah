@@ -5,7 +5,7 @@
    ============================================================ */
 import React, { useState } from "react";
 import { Tag } from "@hemaya/ui";
-import { REGION_LABEL, regionDisp } from "@hemaya/domain";
+import { REGION_LABEL, regionDisp, normalizeFactors9 } from "@hemaya/domain";
 import { fmtDate, daysLeft } from "./recommendation-store";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => (
@@ -81,14 +81,21 @@ function HeadApprovals({ branchName, queue, onOpen }) {
 
 // عوامل المادة (٩) كما يكتبها نموذج التوصية (approve() في البوابة) —
 // المفتاح هنا هو الحقل نفسه في recommendations.factors9، لا نصٌّ موازٍ.
+// المفاتيح هنا هي الأسماء القانونية لعقد @hemaya/domain لا لهجة نموذجٍ بعينه —
+// القراءة تمرّ بـnormalizeFactors9 فتُفهَم الصفوف القديمة (snake_case) والجديدة معاً.
 const F9_LABELS = [
-  ['contacted', 'التواصل مع مقدم الطلب'], ['contact_kind', 'نوع التواصل'],
-  ['crime_type', 'نوع الجريمة'], ['waqia', 'الواقعة'],
-  ['hidden_m2', 'إخفاء البيانات (م٢)'], ['threat', 'وجود خطر يهدد طالب الحماية'],
-  ['risk_level', 'مستوى الخطر'], ['harm', 'وجود ضرر نتيجة دوره في القضية'],
-  ['harm_type', 'نوع الضرر'], ['extends_others', 'امتداد الخطر للغير (م٥/٤)'],
-  ['extends_who', 'إلى من يمتدّ'], ['adapt', 'القدرة على التكيّف مع البرنامج'],
-  ['psych', 'التاريخ النفسي'], ['psych_history', 'تفاصيل التاريخ النفسي'],
+  ['contacted', 'التواصل مع مقدم الطلب'], ['contactKind', 'نوع التواصل'],
+  ['crimeType', 'نوع الجريمة'], ['waqia', 'الواقعة'],
+  ['hideIdentity', 'إخفاء البيانات (م٢)'], ['threatExists', 'وجود خطر يهدد طالب الحماية'],
+  ['riskLevel', 'مستوى الخطر'], ['harmExists', 'وجود ضرر نتيجة دوره في القضية'],
+  ['harmType', 'نوع الضرر'], ['extendsOthers', 'امتداد الخطر للغير (م٥/٤)'],
+  ['extendsWho', 'إلى من يمتدّ'], ['adapt', 'القدرة على التكيّف مع البرنامج'],
+  ['psych', 'التاريخ النفسي'], ['psychHistory', 'تفاصيل التاريخ النفسي'],
+  ['threatType', 'نوع الخطر'], ['crimeDesc', 'الوصف الإجرامي'],
+  ['caseStage', 'المرحلة الحالية للقضية'], ['caseSummary', 'ملخّص القضية'],
+  ['roleDesc', 'دور مقدّم الطلب وأهمية معلوماته'],
+  ['health', 'الحالة الصحية'], ['criminal', 'التاريخ الجنائي'], ['reveal', 'رغبة الكشف عن الهوية'],
+  ['alternatives', 'الحلول البديلة'],
 ];
 
 /** مدة postgres interval كما تصل من PostgREST — بلا ترجمةٍ مُخترعة. */
@@ -108,10 +115,10 @@ function durationText(v) {
 function HeadReview({ item, branchName, onApprove, onReturn, onBack, busy }) {
   const [note, setNote] = useState('');
   const [showFull, setShowFull] = useState(true);
-  const f9 = item.factors9 || {};
+  const f9 = normalizeFactors9(item.factors9);
   const val = (v) => (Array.isArray(v) ? (v.length ? v.join(' · ') : null) : (v === '' || v === null || v === undefined ? null : String(v)));
-  const f9Fields = F9_LABELS.map(([k, l]) => [l, val(f9[k])]).filter(([, v]) => v);
-  const attach = Array.isArray(f9.attach_files) ? f9.attach_files.filter(Boolean) : [];
+  const f9Fields = f9 ? F9_LABELS.map(([k, l]) => [l, val(f9[k])]).filter(([, v]) => v) : [];
+  const attach = f9 ? f9.attachments : [];
   const capMap = { 'شاهد': 'شاهد في قضية جزائية قائمة', 'مبلّغ': 'مبلّغ عن جريمة في قضية قائمة', 'خبير': 'خبير مكلّف في قضية قائمة', 'ضحية': 'مجنيٌّ عليه في قضية قائمة' };
   const cap = capMap[item.cat] || 'ذو صفة في قضية قائمة';
   const reqFields = [['الرمز السري', item.secret], ['الصفة', item.cat], ['رقم القضية', item.caseNo], ['الجهة المُحيلة', 'مركز حماية الشهود والمبلّغين'], ['الفرع المختص', branchName], ['صفة مقدم الطلب (م١)', cap], ['تاريخ الإحالة', item.referred]];

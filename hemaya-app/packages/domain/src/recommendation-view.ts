@@ -1,15 +1,15 @@
 /**
- * توحيد قراءة عوامل توصية الجهة (recommendations.factors9).
+ * عقد عوامل توصية الجهة (recommendations.factors9) — كتابةً وقراءةً.
  *
- * للعمود كاتبان بلهجتين مختلفتين من المفاتيح للبيانات المنطقية نفسها:
- *  - الإدخال الورقي (PaperIntakePortal): camelCase — threatExists · crimeType ·
- *    attachFiles · applicantRoleDesc … مع حقول الفحوص (health/criminal/reveal).
- *  - بوابة الجهة الإلكترونية (recordLinkedRecommendation): snake_case —
- *    threat · crime_type · attach_files · extends_others … (رقعة أضيق).
+ * كان للعمود كاتبان بلهجتين مختلفتين للبيانات المنطقية نفسها:
+ *  - الإدخال الورقي (PaperIntakePortal): camelCase — threatExists · crimeType…
+ *  - بوابة الجهة الإلكترونية: snake_case — threat · crime_type · attach_files…
+ * فوُحّدت القراءة أولاً بـnormalizeFactors9، ثم وُحّدت الكتابة ببانٍ واحد
+ * (buildFactors9) يُنتج اللهجة القانونية camelCase — فلا يولد اختلافٌ جديد.
  *
- * كل شاشة كانت تجتهد بقراءتها (وبعضها يقرأ من recommendations.details الذي
- * لا كاتب له أصلاً فتُعرض شرطات) — هذا الموحِّد هو نقطة القراءة الوحيدة،
- * وأي مفتاح جديد في أي من الكاتبَين يُضاف هنا لا في الشاشات.
+ * القاعدة: **الكتابة عبر buildFactors9 حصراً، والقراءة عبر normalizeFactors9
+ * حصراً.** لا تقرأ مفتاحاً خاماً من الحمولة في أي شاشة — الصفوف القديمة
+ * بلهجة snake_case ما زالت في القاعدة، والموحِّد وحده يعرف اللهجتين.
  */
 
 export type RecommendationFactors = {
@@ -79,18 +79,18 @@ export function normalizeFactors9(f9: unknown): RecommendationFactors | null {
     crimeType: pick(f, "crimeType", "crime_type"),
     waqia: arr(f.waqia),
     crimeDesc: pick(f, "crimeDesc", "crime_desc"),
-    hideIdentity: pick(f, "hidden2", "hidden_m2", "hide_identity"),
+    hideIdentity: pick(f, "hideIdentity", "hidden2", "hidden_m2", "hide_identity"),
     threatExists: pick(f, "threatExists", "threat"),
     riskLevel: pick(f, "riskLevel", "risk_level"),
     threatType: pick(f, "threatType", "threat_type"),
     harmExists: pick(f, "harmExists", "harm"),
     harmType: pick(f, "harmType", "harm_type"),
-    extendsOthers: pick(f, "extends", "extends_others"),
+    extendsOthers: pick(f, "extendsOthers", "extends", "extends_others"),
     extendsWho: pick(f, "extendsWho", "extends_who"),
     adapt: pick(f, "adapt"),
     caseSummary: pick(f, "caseSummary", "case_summary"),
     caseStage: pick(f, "caseStage", "case_stage"),
-    roleDesc: pick(f, "applicantRoleDesc", "role_desc"),
+    roleDesc: pick(f, "roleDesc", "applicantRoleDesc", "role_desc"),
     contacted: pick(f, "contacted"),
     contactKind: pick(f, "contactKind", "contact_kind"),
     reasons: arr(f.reasons),
@@ -99,4 +99,41 @@ export function normalizeFactors9(f9: unknown): RecommendationFactors | null {
     durationNote: pick(f, "durationNote", "duration_note"),
     attachments: arr((f as any).attachFiles ?? (f as any).attach_files ?? (f as any).attachments),
   };
+}
+
+/** مدخلات باني العوامل — بأسماء الحقول القانونية (camelCase) لا بلهجة نموذجٍ بعينه. */
+export type FactorsInput = Partial<Record<keyof RecommendationFactors, unknown>>;
+
+/** ترتيب المفاتيح في الحمولة المكتوبة — ثابتٌ كي تتشابه الصفوف في القاعدة. */
+const FACTOR_KEYS: (keyof RecommendationFactors)[] = [
+  "health", "healthNote", "criminal", "criminalNote", "psych", "psychHistory", "reveal",
+  "crimeType", "waqia", "crimeDesc", "hideIdentity",
+  "threatExists", "riskLevel", "threatType", "harmExists", "harmType",
+  "extendsOthers", "extendsWho", "adapt",
+  "caseSummary", "caseStage", "roleDesc", "contacted", "contactKind",
+  "reasons", "alternatives", "duration", "durationNote", "attachments",
+];
+
+const ARRAY_KEYS = new Set<keyof RecommendationFactors>(["waqia", "reasons", "attachments"]);
+
+/**
+ * يبني حمولة factors9 القانونية من مدخلات النموذج.
+ * — يُسقط الخاوي (سلسلةً أو مصفوفةً) فلا تُخزَّن مفاتيح بلا قيمة؛
+ * — يُنقّي المصفوفات من العناصر الفارغة؛
+ * — لا يخترع قيمةً غائبة: ما لم يُمرَّر لا يُكتب.
+ */
+export function buildFactors9(input: FactorsInput | null | undefined): Record<string, unknown> {
+  if (!input || typeof input !== "object") return {};
+  const out: Record<string, unknown> = {};
+  for (const k of FACTOR_KEYS) {
+    const raw = (input as Record<string, unknown>)[k];
+    if (ARRAY_KEYS.has(k)) {
+      const list = arr(raw);
+      if (list.length) out[k] = list;
+    } else {
+      const v = s(raw);
+      if (v) out[k] = v;
+    }
+  }
+  return out;
 }

@@ -10,7 +10,7 @@ import { RecommendationForm, UrgentForm } from "./RecommendationForm";
 import { HemayaBranch } from "./branch-roles";
 import { useRecommendations, daysLeft } from "./recommendation-store";
 import { submitRecommendation, submitForApproval, decideApproval } from "@/lib/entity-actions";
-import { durationDays, isCustomDuration } from "@hemaya/domain";
+import { durationDays, isCustomDuration, buildFactors9 } from "@hemaya/domain";
 import "./entities.css";
 
 const I = ({ name, size = 20, fill = false, color = 'currentColor', style }) => <span className="material-symbols-rounded" style={{ fontSize: size, color, fontVariationSettings: `'FILL' ${fill ? 1 : 0}`, ...style }}>{name}</span>;
@@ -411,14 +411,16 @@ function App({ level }) {
       const res = await submitForApproval({
         caseId: r.caseId,
         provide: fd.provide ? fd.provide === 'توفير' : true,
-        factors9: {
-          contacted: fd.contacted, contact_kind: fd.contactKind, crime_type: fd.crimeType,
-          waqia: (fd.waqia || []).filter(Boolean), hidden_m2: fd.hidden2, threat: fd.threatExists,
-          risk_level: fd.riskLevel, harm: fd.harmExists, harm_type: fd.harmType,
-          extends_others: fd.extends, extends_who: fd.extendsWho, adapt: fd.adapt,
-          psych: fd.psych, psych_history: fd.psychHistory,
-          attach_files: (fd.attachFiles || []).filter(Boolean),
-        },
+        // الكتابة عبر العقد الموحّد (@hemaya/domain) — كانت هذه البوابة تكتب
+        // لهجة snake_case والإدخال الورقي camelCase للبيانات نفسها.
+        factors9: buildFactors9({
+          contacted: fd.contacted, contactKind: fd.contactKind, crimeType: fd.crimeType,
+          waqia: fd.waqia, hideIdentity: fd.hidden2, threatExists: fd.threatExists,
+          riskLevel: fd.riskLevel, harmExists: fd.harmExists, harmType: fd.harmType,
+          extendsOthers: fd.extends, extendsWho: fd.extendsWho, adapt: fd.adapt,
+          psych: fd.psych, psychHistory: fd.psychHistory,
+          attachments: fd.attachFiles,
+        }),
         types: (fd.types || []).filter(Boolean),
         durationDays: durationDays(fd.duration),
         notes: [fd.reasons || [fd.why1, fd.why2, fd.why3].filter(Boolean).join(' · '),
