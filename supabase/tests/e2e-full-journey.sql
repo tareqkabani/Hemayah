@@ -97,6 +97,14 @@ do $$ declare j jr; c jc; _rid uuid; _st case_status; _as text; begin
     raise exception 'ف3: الرفع للاعتماد نقل الحالة قبل اعتماد الرئيس'; end if;
   if exists (select 1 from recommendations where id=_rid and received_at is not null) then
     raise exception 'ف3: التوصية وصلت المركز بلا اعتماد'; end if;
+  -- (منقولة من #104) أثر الإعداد وصفّ الاعتماد المفتوح بميعاده
+  if not exists (select 1 from recommendations
+      where id=_rid and prepared_by=j.clerk and prepared_at is not null) then
+    raise exception 'ف3: أثر الإعداد (prepared_by/at) لم يُسجَّل'; end if;
+  if not exists (select 1 from recommendation_approvals
+      where recommendation_id=_rid and approver='branch_head'
+        and decided_at is null and due_at is not null) then
+    raise exception 'ف3: لا صفّ اعتمادٍ مفتوحٌ بميعادٍ لرئيس الفرع'; end if;
 
   perform pg_temp.act(j.branch_head); set local role authenticated;
   select new_approval_status, new_case_status into _as, _st
@@ -109,6 +117,24 @@ do $$ declare j jr; c jc; _rid uuid; _st case_status; _as text; begin
   if not exists (select 1 from recommendation_approvals
       where recommendation_id=_rid and decision='approved' and approver_id=j.branch_head and decided_at is not null) then
     raise exception 'ف3: أثر الاعتماد لم يُقيَّد في recommendation_approvals'; end if;
+  if not exists (select 1 from audit_log
+      where action='recommendation_approved_and_raised' and target=c.ref) then
+    raise exception 'ف3: اعتماد الرئيس ورفعه لم يُقيَّد في التدقيق'; end if;
+
+  -- (ج) المسار المباشر مقفولٌ على القناة الإلكترونية — الحارس هو ركن السلسلة
+  begin
+    perform pg_temp.act(j.clerk); set local role authenticated;
+    perform record_recommendation(c.case_id, 'توفير', 'electronic', '{}'::jsonb,
+                                  '[]'::jsonb, null, 'تجاوز السلسلة',
+                                  null, null, null, null, null);
+    reset role;
+    raise exception 'ف3-ج: record_recommendation الإلكترونية مرّت رغم سلسلة الاعتماد';
+  exception when others then
+    reset role;
+    if sqlerrm like 'ف3-ج%' then raise; end if;
+    if sqlerrm not like '%سلسلة اعتماد رئيس الفرع%' then
+      raise exception 'ف3-ج: رُفضت برسالةٍ غير رسالة السلسلة: %', sqlerrm; end if;
+  end;
   raise notice '✓ 3) التوصية: أعدّها الموظف ← اعتمدها رئيس الفرع ← مُستلَمة (توفير) والحالة عادت triage';
 end $$;
 
