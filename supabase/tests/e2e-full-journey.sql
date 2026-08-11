@@ -82,17 +82,79 @@ do $$ declare j jr; c jc; _st case_status; begin
 end $$;
 
 -- ═══════════ 3) تسجيل توصية الجهة (موظف مختصّ) ═══════════
-do $$ declare j jr; c jc; _st case_status; begin
-  select * into j from jr; select * into c from jc;
-  perform pg_temp.act(j.clerk); set local role authenticated;
-  select status into _st from record_recommendation(
-    c.case_id, 'توفير', 'electronic',
-    '{"risk":"مرتفع"}'::jsonb, '["الحماية الأمنية"]'::jsonb, null, 'توصية بالتوفير', null, null, null, null, null);
+-- القناة الإلكترونية لا تصل المركز إلا معتمدةً من رئيس الفرع (صاحب الصلاحية):
+-- الموظف يُعِدّ ويرفع (submit_recommendation_for_approval)، والرئيس يعتمد
+-- (decide_recommendation_approval) فيُسجَّل الورود وتعود الحالة للفرز.
+-- المُعِدّ والمعتمِد يُستخرجان من فرع القضية نفسه — لا هويةً مثبّتة — كي يبقى
+-- الاختبار صحيحاً أياً كان توزيع المستويات على حسابات البذور.
+create temp table j3 as select
+  (select branch_id from recommendations
+    where case_id=(select case_id from jc) and received_at is null
+    order by created_at desc limit 1) as branch;
+
+do $$ declare j jr; c jc; _b uuid; _prep uuid; _head uuid; _rid uuid; _as text; _st case_status; begin
+  select * into j from jr; select * into c from jc; select branch into _b from j3;
+  if _b is null then raise exception 'ف3: التوصية المعلّقة بلا فرع — لا سلسلة اعتماد'; end if;
+
+  -- المُعِدّ: موظف الفرع (أو رئيسه عند غيابه) — والمعتمِد: رئيس الفرع حصراً.
+  select ur.user_id into _prep from user_roles ur
+   where ur.role='competent_body' and ur.attributes ? 'branch_id'
+     and (ur.attributes->>'branch_id')::uuid = _b
+     and ur.attributes->>'level' in ('clerk','head')
+   order by (ur.user_id = j.clerk) desc, (ur.attributes->>'level' = 'clerk') desc limit 1;
+  select ur.user_id into _head from user_roles ur
+   where ur.role='competent_body' and ur.attributes ? 'branch_id'
+     and (ur.attributes->>'branch_id')::uuid = _b
+     and ur.attributes->>'level' = 'head' limit 1;
+  if _prep is null then raise exception 'ف3: لا منسوبَ جهةٍ مرتبطٌ بفرع القضية (سمتا level/branch_id)'; end if;
+  if _head is null then raise exception 'ف3: لا رئيسَ فرعٍ لفرع القضية — تعذّر اعتماد التوصية'; end if;
+
+  -- (أ) الرفع للاعتماد: الحالة تبقى referred والدرجة تُفتح بمهلتها
+  perform pg_temp.act(_prep); set local role authenticated;
+  select recommendation_id, approval_status into _rid, _as
+    from submit_recommendation_for_approval(
+      c.case_id, 'توفير', '{"risk":"مرتفع"}'::jsonb, '["الحماية الأمنية"]'::jsonb, null, 'توصية بالتوفير');
   reset role;
-  if _st <> 'triage' then raise exception 'ف3: الحالة % لا triage بعد التوصية', _st; end if;
-  if not exists (select 1 from recommendations where case_id=c.case_id and received_at is not null and decision='توفير') then
-    raise exception 'ف3: التوصية لم تُستلَم'; end if;
-  raise notice '✓ 3) التوصية: مُستلَمة (توفير) والحالة عادت triage للقرار الثاني';
+  if _as <> 'pending_head' then raise exception 'ف3-أ: التوصية % لا pending_head', _as; end if;
+  if (select status from protection_cases where id=c.case_id) <> 'referred' then
+    raise exception 'ف3-أ: الحالة غادرت referred قبل اعتماد الرئيس'; end if;
+  if not exists (select 1 from recommendation_approvals
+      where recommendation_id=_rid and approver='branch_head' and decided_at is null and due_at is not null) then
+    raise exception 'ف3-أ: لم تُفتح درجةُ اعتماد رئيس الفرع بمهلتها'; end if;
+  if not exists (select 1 from recommendations where id=_rid and prepared_by=_prep and prepared_at is not null) then
+    raise exception 'ف3-أ: أثر الإعداد (prepared_by/at) لم يُسجَّل'; end if;
+
+  -- (ب) الاعتماد = الرفع للمركز: ورودٌ فعليّ وعودةٌ للفرز لقرارٍ ثانٍ
+  perform pg_temp.act(_head); set local role authenticated;
+  select new_approval_status, new_case_status into _as, _st
+    from decide_recommendation_approval(_rid, 'approved', 'مطابقةٌ للأصول — تُرفع للمركز');
+  reset role;
+  if _as <> 'approved' then raise exception 'ف3-ب: الاعتماد % لا approved', _as; end if;
+  if _st <> 'triage' then raise exception 'ف3-ب: الحالة % لا triage بعد الاعتماد', _st; end if;
+  if not exists (select 1 from recommendations
+      where id=_rid and received_at is not null and decision='توفير' and channel='electronic') then
+    raise exception 'ف3-ب: التوصية لم تُستلَم إلكترونياً'; end if;
+  if not exists (select 1 from recommendation_approvals
+      where recommendation_id=_rid and decision='approved' and approver_id=_head and decided_at is not null) then
+    raise exception 'ف3-ب: أثر بتّ الرئيس لم يُسجَّل'; end if;
+  if not exists (select 1 from audit_log where action='recommendation_approved_and_raised' and target=c.ref) then
+    raise exception 'ف3-ب: لا أثر تدقيق للاعتماد'; end if;
+  raise notice '✓ 3) التوصية: رفعٌ للاعتماد ← اعتماد رئيس الفرع → مُستلَمة (توفير) والحالة عادت triage';
+end $$;
+
+-- (ج) الحارس: القناة الإلكترونية لا تُسجَّل بالاستدعاء المباشر، بل بالسلسلة وحدها
+do $$ declare j jr; c jc; begin
+  select * into j from jr; select * into c from jc;
+  begin
+    perform pg_temp.act(j.clerk); set local role authenticated;
+    perform record_recommendation(c.case_id, 'توفير', 'electronic',
+      '{}'::jsonb, '[]'::jsonb, null, null, null, null, null, null, null);
+    raise exception 'ف3-ج: record_recommendation الإلكترونية مرّت رغم سلسلة الاعتماد';
+  exception when others then
+    if position('سلسلة اعتماد رئيس الفرع' in sqlerrm) = 0 then raise; end if;
+  end;
+  reset role;
+  raise notice '✓ 3-ج) الحارس: الاستدعاء الإلكتروني المباشر مرفوضٌ ويدلّ على السلسلة';
 end $$;
 
 -- ═══════════ 4) القبول للدراسة (موظف الفرز) → إسناد آلي ═══════════
