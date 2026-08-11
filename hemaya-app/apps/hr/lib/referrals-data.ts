@@ -12,7 +12,10 @@ function fmt(ts: string | null): string {
 }
 
 // يجلب إحالات م14 للسلطة (health) مربوطةً بالقضية، ويعيّنها لشكل صفّ البوابة.
-export async function getReferrals(authority = "health") {
+// الافتراضي «hr» لا «health»: الملف منسوخٌ عن بوابة الصحة، وبقاء افتراضها
+// يجعل أول استدعاءٍ بلا وسيطٍ يعرض إحالات جهةٍ أخرى. المسارات الحيّة تمرّر
+// السلطة صراحةً اليوم، فهذا سدُّ لغمٍ لا إصلاح عطبٍ قائم.
+export async function getReferrals(authority = "hr") {
   const s = createServerClient();
   const { data, error } = await s
     .from("referrals")
