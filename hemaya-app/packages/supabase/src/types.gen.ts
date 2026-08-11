@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      _asr: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      _med: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      _nzh: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           active: boolean
@@ -682,6 +718,78 @@ export type Database = {
           },
         ]
       }
+      e1: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      e2: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      e3: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      eid1: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      eid2: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      eid3: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       emergency_contacts: {
         Row: {
           case_id: string
@@ -765,6 +873,18 @@ export type Database = {
           entity?: Database["public"]["Enums"]["competent_entity"]
           mode?: string
           note?: string | null
+        }
+        Relationships: []
+      }
+      evaluator: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
         }
         Relationships: []
       }
@@ -1361,6 +1481,18 @@ export type Database = {
           },
         ]
       }
+      officer: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       periodic_reviews: {
         Row: {
           case_id: string
@@ -1848,6 +1980,78 @@ export type Database = {
           },
         ]
       }
+      s1: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      s2: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      sid1: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      sid2: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      sid3: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
+      studier: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       studies: {
         Row: {
           case_id: string
@@ -2301,6 +2505,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      council_seat_map: {
+        Args: never
+        Returns: {
+          email: string
+          user_id: string
+        }[]
+      }
       council_send_message: {
         Args: {
           _body: string
@@ -2356,6 +2567,24 @@ export type Database = {
         Returns: {
           new_approval_status: string
           new_case_status: Database["public"]["Enums"]["case_status"]
+        }[]
+      }
+      decision_case_parties: {
+        Args: { _case_ids: string[] }
+        Returns: {
+          birth_date: string
+          case_id: string
+          education_level: string
+          emergency_registered: boolean
+          emergency_relationship: string
+          employer: string
+          gender: string
+          job_title: string
+          marital_status: string
+          national_address: Json
+          nationality: string
+          source_flags: Json
+          subject_type: string
         }[]
       }
       execution_emergency_contact: {
@@ -2683,6 +2912,7 @@ export type Database = {
         Returns: string
       }
       study_dossier: { Args: { _case_id: string }; Returns: Json }
+      study_eval_deadline_days: { Args: never; Returns: number }
       study_eval_requests: {
         Args: { _case_ids: string[] }
         Returns: {
@@ -2693,7 +2923,6 @@ export type Database = {
           submitted_at: string
         }[]
       }
-      study_eval_deadline_days: { Args: never; Returns: number }
       study_eval_watchdog: {
         Args: never
         Returns: {
