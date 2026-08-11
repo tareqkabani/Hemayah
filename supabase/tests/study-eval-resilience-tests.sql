@@ -1,9 +1,9 @@
 -- ============================================================
---  حالات اختبار الإسناد المرن — الاسترداد الصامت ونظافة النصاب وسحب الاطّلاع
+--  حالات اختبار الإقفال الزمني (م10) — البثّ للجميع ومُقفِل الميعاد
+--  (بديل «الإسناد المرن»: أُلغيت إعادة الإسناد بالعبء في 20260810000004)
 --  التشغيل:  docker exec -i supabase_db_Hemayah psql -U postgres -d postgres \
 --            -v ON_ERROR_STOP=1 -f - < supabase/tests/study-eval-resilience-tests.sql
---  الأسلوب: معاملة واحدة تُدحرج — قضايا الاختبار تُنشأ داخلها؛ الحارس يُفعَّل
---  محلياً بـ set_config(app.settings.watchdog) داخل المعاملة فقط.
+--  الأسلوب: معاملة واحدة تُدحرج — قضايا الاختبار تُنشأ داخلها.
 -- ============================================================
 \set QUIET on
 begin;
@@ -12,27 +12,59 @@ select set_config('app.settings.watchdog', 'on', true);
 
 create temp table t_ids as
 select
-  (select id from auth.users where email = '2000000009@nafath.local') as deputy;
+  (select id from auth.users where email = '2000000009@nafath.local') as deputy,
+  (select count(*)::int from user_roles where role = 'studier') as n_studiers,
+  (select count(*)::int from user_roles where role = 'evaluator') as n_evals;
 
 insert into protection_cases (ref_no, secret_code, category, status, source)
 values ('REF-RSL-9911','C-RSL-9911','witness','submitted','local'),
        ('REF-RSL-9912','C-RSL-9912','victim','submitted','local'),
-       ('REF-RSL-9913','C-RSL-9913','reporter','submitted','local');
+       ('REF-RSL-9913','C-RSL-9913','reporter','submitted','local'),
+       ('REF-RSL-9914','C-RSL-9914','witness','submitted','local'),
+       ('REF-RSL-9915','C-RSL-9915','victim','submitted','local');
 
 create temp table t_cases as
 select
   (select id from protection_cases where secret_code='C-RSL-9911') as c1,
   (select id from protection_cases where secret_code='C-RSL-9912') as c2,
-  (select id from protection_cases where secret_code='C-RSL-9913') as c3;
+  (select id from protection_cases where secret_code='C-RSL-9913') as c3,
+  (select id from protection_cases where secret_code='C-RSL-9914') as c4,
+  (select id from protection_cases where secret_code='C-RSL-9915') as c5;
 
 update protection_cases set status='under_study'
- where id in (select c1 from t_cases union select c2 from t_cases union select c3 from t_cases);
+ where id in (select c1 from t_cases union select c2 from t_cases
+              union select c3 from t_cases union select c4 from t_cases
+              union select c5 from t_cases);
 
 create or replace function pg_temp.impersonate(_uid uuid) returns void
 language plpgsql as $$
 begin
   perform set_config('request.jwt.claims',
     jsonb_build_object('sub', _uid, 'role', 'authenticated')::text, true);
+end $$;
+
+-- تسليم دراسة/تقييم باسم مؤلَّفٍ ما (يغلّف الانتحال والدورين)
+create or replace function pg_temp.submit_one(_case uuid, _kind text) returns uuid
+language plpgsql as $$
+declare _uid uuid;
+begin
+  if _kind = 'study' then
+    select studier_id into _uid from studies
+     where case_id=_case and submitted_at is null and superseded_at is null
+     order by studier_id limit 1;
+    perform pg_temp.impersonate(_uid);
+    execute 'set local role authenticated';
+    perform submit_study(_case, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+  else
+    select evaluator_id into _uid from assessments
+     where case_id=_case and submitted_at is null and superseded_at is null
+     order by evaluator_id limit 1;
+    perform pg_temp.impersonate(_uid);
+    execute 'set local role authenticated';
+    perform submit_assessment(_case, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+  end if;
+  execute 'reset role';
+  return _uid;
 end $$;
 
 -- ─── 1) أيام العمل: مرآة صحيحة (الجمعة والسبت لا يُحتسبان) ───
@@ -48,53 +80,62 @@ begin
   raise notice 'اختبار 1 ✓ business_days_between يطابق تعريف domain (عطلة الجمعة والسبت)';
 end $$;
 
--- ─── 2) الاسترداد الصامت: المتعثر يُحال ويُشعَر النائب ويبقى الأثر ───
+-- ─── 2) الإقفال الزمني: نصاب أدنى وارد + ميعاد منقضٍ → وسم المتأخرين وتقدُّم القضية ───
 do $$
-declare c record; i record; _old uuid; _oldrow uuid; _new uuid; _re int; _ex int; _n int;
+declare c record; i record; _n int; _st case_status; _cl int; _al int;
 begin
   select * into c from t_cases; select * into i from t_ids;
-  select id, studier_id into _oldrow, _old from studies where case_id = c.c1 limit 1;
 
-  -- تعثّر: نُرجع تاريخ الإسناد أسبوعاً (يتجاوز يوم العمل قطعاً)
-  update studies set created_at = now() - interval '7 days' where id = _oldrow;
+  -- نصاب أدنى: دراسة واحدة وتقييم واحد
+  perform pg_temp.submit_one(c.c1, 'study');
+  perform pg_temp.submit_one(c.c1, 'assessment');
 
-  select * into _re, _ex from study_eval_watchdog();
-  if _re < 1 then raise exception 'اختبار 2أ فشل: لم يُعد الإسناد (re=%)', _re; end if;
+  -- انقضاء الميعاد: نُرجع بداية المرحلة أسبوعاً
+  update studies set created_at = now() - interval '7 days' where case_id = c.c1;
+  update assessments set created_at = now() - interval '7 days' where case_id = c.c1;
 
-  -- الصف القديم موسوم لا محذوف
-  select count(*) into _n from studies where id = _oldrow
-    and superseded_at is not null and superseded_reason like '%أُعيد الإسناد%';
-  if _n <> 1 then raise exception 'اختبار 2ب فشل: الأثر التدقيقي للصف القديم'; end if;
+  select * into _cl, _al from study_eval_watchdog();
+  if _cl < 1 then raise exception 'اختبار 2أ فشل: المُقفِل لم يُقفل (closed=%)', _cl; end if;
 
-  -- بديل مختلف أُسند، والنشِط على القضية بقي اثنين
-  select studier_id into _new from studies
-   where case_id = c.c1 and superseded_at is null and studier_id <> _old
-   order by created_at desc limit 1;
-  if _new is null or _new = _old then raise exception 'اختبار 2ج فشل: لا بديل مختلف'; end if;
-  select count(*) into _n from studies where case_id = c.c1 and superseded_at is null;
-  if _n <> 2 then raise exception 'اختبار 2د فشل: النشِط <> 2 (%)', _n; end if;
+  select status into _st from protection_cases where id = c.c1;
+  if _st <> 'in_decision' then raise exception 'اختبار 2ب فشل: القضية لم تتقدّم (%)', _st; end if;
+  if not exists (select 1 from council_decisions where case_id = c.c1 and status = 'preparing') then
+    raise exception 'اختبار 2ج فشل: لا صف إعداد قرار'; end if;
 
-  -- إشعار النائب + إشعار إسناد للبديل + تدقيق
+  -- المتأخرون وُسموا «انقضى الميعاد النظامي» لا حُذفوا، والمُقدِّمون سالمون
+  select count(*) into _n from (
+    select 1 from studies where case_id=c.c1 and submitted_at is null
+      and superseded_reason like '%انقضى الميعاد النظامي%'
+    union all
+    select 1 from assessments where case_id=c.c1 and submitted_at is null
+      and superseded_reason like '%انقضى الميعاد النظامي%') x;
+  if _n <> (i.n_studiers - 1) + (i.n_evals - 1) then
+    raise exception 'اختبار 2د فشل: وسم المتأخرين ناقص (% من %)', _n, (i.n_studiers - 1) + (i.n_evals - 1); end if;
+  if exists (select 1 from studies where case_id=c.c1 and submitted_at is not null and superseded_at is not null)
+     or exists (select 1 from assessments where case_id=c.c1 and submitted_at is not null and superseded_at is not null) then
+    raise exception 'اختبار 2هـ فشل: مخرَج وارد وُسم بالانقضاء'; end if;
+
+  -- توثيق: تدقيق الإقفال والتقدُّم + إشعار «توثيقاً لا عقوبة» لكل متأخر
+  select count(*) into _n from audit_log where action='deadline_close_study_eval' and target='REF-RSL-9911';
+  if _n <> 1 then raise exception 'اختبار 2و فشل: لا تدقيق للإقفال'; end if;
+  select count(*) into _n from audit_log where action='auto_send_to_decision' and target='REF-RSL-9911';
+  if _n < 1 then raise exception 'اختبار 2ز فشل: لا تدقيق للتقدُّم'; end if;
   select count(*) into _n from notifications
-   where case_id = c.c1 and recipient_id = i.deputy and title like 'إعادة إسناد آلية%';
-  if _n < 1 then raise exception 'اختبار 2هـ فشل: النائب لم يُشعَر'; end if;
-  select count(*) into _n from notifications
-   where case_id = c.c1 and recipient_id = _new and type = 'assign';
-  if _n < 1 then raise exception 'اختبار 2و فشل: البديل لم يُشعَر'; end if;
-  select count(*) into _n from audit_log where action='reassign_study' and target='REF-RSL-9911';
-  if _n <> 1 then raise exception 'اختبار 2ز فشل: لا تدقيق لإعادة الإسناد'; end if;
-  raise notice 'اختبار 2 ✓ الاسترداد الصامت: إحالة + وسم + إشعارا النائب والبديل + تدقيق';
+   where case_id=c.c1 and type='deadline' and title like 'انقضى الميعاد النظامي%';
+  if _n <> (i.n_studiers - 1) + (i.n_evals - 1) then
+    raise exception 'اختبار 2ح فشل: إشعارات المتأخرين (% من %)', _n, (i.n_studiers - 1) + (i.n_evals - 1); end if;
+  raise notice 'اختبار 2 ✓ الإقفال الزمني: وسم المتأخرين + تقدُّم القضية + التوثيق الكامل';
 end $$;
 
--- ─── 3) سحب الاطّلاع: المُحال عنه يفقد القضية من طابوره وصلاحياته ───
+-- ─── 3) سحب الاطّلاع بعد الإقفال + رفض المخرَج المتأخر رفضاً نظيفاً ───
 do $$
-declare c record; _old uuid; _n int; _ok boolean := false;
+declare c record; _late uuid; _n int; _ok boolean := false;
 begin
   select * into c from t_cases;
-  select studier_id into _old from studies
+  select studier_id into _late from studies
    where case_id = c.c1 and superseded_at is not null limit 1;
 
-  perform pg_temp.impersonate(_old);
+  perform pg_temp.impersonate(_late);
   execute 'set local role authenticated';
   select count(*) into _n from my_study_tasks() t where t.case_id = c.c1;
   begin
@@ -104,176 +145,193 @@ begin
     if sqlerrm like '%not assigned%' then _ok := true; else raise; end if;
   end;
   execute 'reset role';
+  if _n <> 0 then raise exception 'اختبار 3أ فشل: القضية ما تزال في طابور الموسوم'; end if;
+  if not _ok then raise exception 'اختبار 3ب فشل: الموسوم ما يزال يفتح المرفقات'; end if;
 
-  if _n <> 0 then raise exception 'اختبار 3أ فشل: القضية ما تزال في طابور المُحال عنه'; end if;
-  if not _ok then raise exception 'اختبار 3ب فشل: المُحال عنه ما يزال يفتح المرفقات'; end if;
-  raise notice 'اختبار 3 ✓ سحب الاطّلاع: الطابور والصلاحيات سُحبا من المُحال عنه فوراً';
+  -- المخرَج المتأخر بعد التقدُّم: رفض صريح بحارس الحالة (القضية غادرت الدراسة)
+  _ok := false;
+  perform pg_temp.impersonate(_late);
+  execute 'set local role authenticated';
+  begin
+    perform submit_study(c.c1, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
+    raise exception 'FORCE';
+  exception when others then
+    if sqlerrm like '%ليست في الدراسة%' then _ok := true; else raise; end if;
+  end;
+  execute 'reset role';
+  if not _ok then raise exception 'اختبار 3ج فشل: المخرَج المتأخر لم يُرفض بحارس الحالة'; end if;
+  if exists (select 1 from studies where case_id=c.c1 and submitted_at is not null and superseded_at is not null) then
+    raise exception 'اختبار 3د فشل: صف submitted+superseded معاً'; end if;
+  raise notice 'اختبار 3 ✓ سحب الاطّلاع بعد الإقفال + رفض المخرَج المتأخر';
 end $$;
 
--- ─── 4) النصاب الكامل (20260727000006): لا تقدُّم إلا بتسليم كل المُسنَدين ───
--- عُدِّل هذا الاختبار مع مهاجرة النصاب الكامل التي ألغت «اكتُفي بالنصاب»
--- (نصاب الواحد): الغاية تعدّد الآراء المستقلّة، فتُجمَّع كل المخرجات.
+-- ─── 4) قبل الميعاد لا مساس: نصاب أدنى وارد والميعاد لم ينقضِ → لا إقفال ───
 do $$
-declare c record; r record; _n int; _st case_status; _done int;
+declare c record; _st case_status; _n int;
 begin
   select * into c from t_cases;
+  perform pg_temp.submit_one(c.c2, 'study');
+  perform pg_temp.submit_one(c.c2, 'assessment');
 
-  -- تسليم أوّل دارس وأوّل مقيّم فقط: لا يكفي — القضية تبقى قيد الدراسة
-  select studier_id into r from studies where case_id=c.c2 and superseded_at is null order by studier_id limit 1;
-  perform pg_temp.impersonate(r.studier_id); execute 'set local role authenticated';
-  perform submit_study(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
-  execute 'reset role';
-  select evaluator_id into r from assessments where case_id=c.c2 and superseded_at is null order by evaluator_id limit 1;
-  perform pg_temp.impersonate(r.evaluator_id); execute 'set local role authenticated';
-  perform submit_assessment(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
-  execute 'reset role';
+  perform study_eval_watchdog();
 
   select status into _st from protection_cases where id = c.c2;
-  if _st = 'in_decision' then raise exception 'اختبار 4أ فشل: تقدّمت القضية بنصاب الواحد (أُلغي)'; end if;
-
-  -- لا وسم «اكتُفي بالنصاب» بعد اليوم — الباقون يبقون نشطين لا مُستبدَلين
+  if _st <> 'under_study' then
+    raise exception 'اختبار 4أ فشل: أُقفلت قبل الميعاد (%) — عاد نصاب الواحد الملغى', _st; end if;
   select count(*) into _n from (
-    select 1 from studies where case_id=c.c2 and superseded_reason like '%اكتُفي بالنصاب%'
+    select 1 from studies where case_id=c.c2 and superseded_at is not null
     union all
-    select 1 from assessments where case_id=c.c2 and superseded_reason like '%اكتُفي بالنصاب%') x;
-  if _n <> 0 then raise exception 'اختبار 4ب فشل: عاد وسم نصاب الواحد الملغى'; end if;
+    select 1 from assessments where case_id=c.c2 and superseded_at is not null) x;
+  if _n <> 0 then raise exception 'اختبار 4ب فشل: وسم قبل انقضاء الميعاد'; end if;
+  raise notice 'اختبار 4 ✓ قبل الميعاد لا إقفال — تعدُّد الآراء يُنتظر مهلته كاملة';
+end $$;
 
-  -- تسليم بقية المُسنَدين → عندها فقط تتقدّم القضية للقرار
-  for r in select studier_id as uid from studies where case_id=c.c2 and submitted_at is null and superseded_at is null loop
+-- ─── 5) ورود مخرجات الجميع يُقدِّم فوراً دون انتظار الميعاد ───
+do $$
+declare c record; i record; r record; _st case_status; _done int;
+begin
+  select * into c from t_cases; select * into i from t_ids;
+
+  for r in select studier_id as uid from studies
+            where case_id=c.c2 and submitted_at is null and superseded_at is null loop
     perform pg_temp.impersonate(r.uid); execute 'set local role authenticated';
     perform submit_study(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
     execute 'reset role';
   end loop;
-  for r in select evaluator_id as uid from assessments where case_id=c.c2 and submitted_at is null and superseded_at is null loop
+  for r in select evaluator_id as uid from assessments
+            where case_id=c.c2 and submitted_at is null and superseded_at is null loop
     perform pg_temp.impersonate(r.uid); execute 'set local role authenticated';
     perform submit_assessment(c.c2, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
     execute 'reset role';
   end loop;
 
   select status into _st from protection_cases where id = c.c2;
-  if _st <> 'in_decision' then raise exception 'اختبار 4ج فشل: النصاب الكامل لم يقدّم القضية (%)', _st; end if;
-  -- كل المخرجات محفوظة (لا استبعاد) — تعدّد الآراء بلغ المجلس
+  if _st <> 'in_decision' then raise exception 'اختبار 5أ فشل: اكتمال الجميع لم يقدّم (%)', _st; end if;
+  -- كل المخرجات محفوظة بلا وسم — تعدّد الآراء بلغ المجلس كاملاً
   select count(*) into _done from (
     select 1 from studies where case_id=c.c2 and submitted_at is not null and superseded_at is null
     union all
     select 1 from assessments where case_id=c.c2 and submitted_at is not null and superseded_at is null) x;
-  if _done < 4 then raise exception 'اختبار 4د فشل: لم تُجمَّع كل المخرجات (%)', _done; end if;
-  raise notice 'اختبار 4 ✓ النصاب الكامل: لا تقدُّم بنصاب الواحد، وكل المخرجات تُجمَّع للمجلس';
+  if _done <> i.n_studiers + i.n_evals then
+    raise exception 'اختبار 5ب فشل: لم تُجمَّع كل المخرجات (% من %)', _done, i.n_studiers + i.n_evals; end if;
+  raise notice 'اختبار 5 ✓ اكتمال الجميع يُقدِّم فوراً وكل المخرجات تبلغ المجلس';
 end $$;
 
--- ─── 5) عجز الطاقم: لا سحب بلا بديل — المهمة تبقى نشطة والإنذار مرة يومياً ───
+-- ─── 6) ميعاد منقضٍ بلا نصاب: القضية تبقى مفتوحة + إنذار النائب مرة يومياً، وأول نصابٍ يُقفِل ───
 do $$
-declare c record; i record; r record; _n int; _re int; _ex int; _stale uuid;
+declare c record; i record; _st case_status; _n int; _n2 int; _cl int; _al int;
 begin
   select * into c from t_cases; select * into i from t_ids;
 
-  -- نشغل كل الدارسين بصفٍّ على c3 كي لا يبقى بديل
-  for r in select ur.user_id from user_roles ur where ur.role='studier' loop
-    insert into studies (case_id, studier_id) values (c.c3, r.user_id)
-    on conflict (case_id, studier_id) do nothing;
-  end loop;
-  select id into _stale from studies where case_id=c.c3 and superseded_at is null limit 1;
-  update studies set created_at = now() - interval '7 days' where id = _stale;
+  -- لا مخرجات إطلاقاً والميعاد منقضٍ
+  update studies set created_at = now() - interval '7 days' where case_id = c.c3;
+  update assessments set created_at = now() - interval '7 days' where case_id = c.c3;
 
-  select * into _re, _ex from study_eval_watchdog();
-  if _ex < 1 then raise exception 'اختبار 5أ فشل: العجز لم يُرصد (ex=%)', _ex; end if;
+  select * into _cl, _al from study_eval_watchdog();
+  if _al < 1 then raise exception 'اختبار 6أ فشل: العجز لم يُرصد (alerted=%)', _al; end if;
 
-  -- جوهر الإصلاح: المهمة لم تُسحب — بقيت نشطة بيد صاحبها (لا شلل للقضية)
-  if exists (select 1 from studies where id=_stale and superseded_at is not null) then
-    raise exception 'اختبار 5ب فشل: سُحبت المهمة رغم غياب البديل (شلل)';
-  end if;
-  select count(*) into _n from studies where case_id=c.c3 and superseded_at is null;
-  if _n < 1 then raise exception 'اختبار 5ج فشل: القضية بلا صف نشط'; end if;
+  select status into _st from protection_cases where id = c.c3;
+  if _st <> 'under_study' then raise exception 'اختبار 6ب فشل: تقدّمت بلا نصاب (%)', _st; end if;
+  if exists (select 1 from studies where case_id=c.c3 and superseded_at is not null) then
+    raise exception 'اختبار 6ج فشل: وُسم مؤلّف والقضية بلا نصاب'; end if;
 
   select count(*) into _n from notifications
-   where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة';
-  if _n < 1 then raise exception 'اختبار 5د فشل: لا إنذار عجز للنائب'; end if;
-  select count(*) into _n from audit_log where action='study_pool_exhausted' and target='REF-RSL-9913';
-  if _n < 1 then raise exception 'اختبار 5هـ فشل: لا تدقيق للعجز'; end if;
+   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
+  if _n < 1 then raise exception 'اختبار 6د فشل: لا إنذار للنائب'; end if;
+  select count(*) into _n from audit_log where action='study_eval_deadline_no_quorum' and target='REF-RSL-9913';
+  if _n < 1 then raise exception 'اختبار 6هـ فشل: لا تدقيق للعجز'; end if;
 
   -- الإنذار غير مُغرِق: جولة ثانية خلال اليوم لا تكرّره
   select count(*) into _n from notifications
-   where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة';
+   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
   perform study_eval_watchdog();
-  if (select count(*) from notifications
-      where case_id = c.c3 and recipient_id = i.deputy and title = 'عجز طاقم الدراسة') <> _n then
-    raise exception 'اختبار 5و فشل: إنذار العجز يتكرر كل جولة (إغراق)';
-  end if;
-  raise notice 'اختبار 5 ✓ العجز: لا سحب بلا بديل، القضية حيّة، والإنذار مرة يومياً';
+  select count(*) into _n2 from notifications
+   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
+  if _n2 <> _n then raise exception 'اختبار 6و فشل: إنذار العجز يتكرر كل جولة (إغراق)'; end if;
+
+  -- أول نصابٍ بعد الميعاد: الجولة التالية تُقفِل
+  perform pg_temp.submit_one(c.c3, 'study');
+  perform pg_temp.submit_one(c.c3, 'assessment');
+  select status into _st from protection_cases where id = c.c3;
+  if _st <> 'under_study' then raise exception 'اختبار 6ز فشل: تقدّمت قبل جولة المُقفِل (%)', _st; end if;
+  select * into _cl, _al from study_eval_watchdog();
+  select status into _st from protection_cases where id = c.c3;
+  if _st <> 'in_decision' then raise exception 'اختبار 6ح فشل: النصاب اللاحق لم يُقفِل (%)', _st; end if;
+  raise notice 'اختبار 6 ✓ بلا نصاب: بقاء مفتوحة + إنذار يومي واحد، وأول نصابٍ لاحقٍ يُقفِل';
 end $$;
 
--- ─── 6) الحارس معطّل افتراضياً: لا يمسّ شيئاً حين الإعداد off ───
+-- ─── 7) الحارس معطّل (app_settings): لا يمسّ شيئاً حين الإعداد off ───
 do $$
-declare c record; _before int; _after int; _re int; _ex int;
+declare c record; _before int; _after int; _cl int; _al int; _st case_status;
 begin
   select * into c from t_cases;
-  -- مفتاح الحارس انتقل إلى app_settings (20260727000007) — يُعطَّل بالجدول لا بالـGUC
+  perform pg_temp.submit_one(c.c4, 'study');
+  perform pg_temp.submit_one(c.c4, 'assessment');
+  update studies set created_at = now() - interval '7 days' where case_id = c.c4;
+  update assessments set created_at = now() - interval '7 days' where case_id = c.c4;
+
   update app_settings set value = 'off' where key = 'watchdog';
-  update studies set created_at = now() - interval '7 days'
-   where case_id = c.c1 and superseded_at is null;
   select count(*) into _before from studies where superseded_at is not null;
-  select * into _re, _ex from study_eval_watchdog();
+  select * into _cl, _al from study_eval_watchdog();
   select count(*) into _after from studies where superseded_at is not null;
   update app_settings set value = 'on' where key = 'watchdog';
-  if _re <> 0 or _ex <> 0 or _before <> _after then
-    raise exception 'اختبار 6 فشل: الحارس عمل وهو معطّل'; end if;
-  raise notice 'اختبار 6 ✓ الحارس معطّل افتراضياً — التفعيل قرار بيئة صريح';
+
+  select status into _st from protection_cases where id = c.c4;
+  if _cl <> 0 or _al <> 0 or _before <> _after or _st <> 'under_study' then
+    raise exception 'اختبار 7 فشل: المُقفِل عمل وهو معطّل'; end if;
+  raise notice 'اختبار 7 ✓ المُقفِل معطّل بالإعداد — التفعيل قرار بيئة صريح';
 end $$;
 
--- ─── 7) حارس الإحياء: المُحال عنه لا «يُحيي» صفه باعتمادٍ متأخر ───
+-- ─── 8) المهلة قابلة للضبط: study_eval_deadline_days=0 → إقفال أول جولة (رافعة العرض) ───
 do $$
-declare c record; _old uuid; _ok boolean := false;
+declare c record; _st case_status;
 begin
   select * into c from t_cases;
-  select studier_id into _old from studies
-   where case_id = c.c1 and superseded_at is not null limit 1;
-  perform pg_temp.impersonate(_old);
-  execute 'set local role authenticated';
-  begin
-    perform submit_study(c.c1, 'قبول كلي', null, '["الحماية الأمنية"]'::jsonb, null, null, null, true, true);
-    raise exception 'FORCE';
-  exception when others then
-    if sqlerrm like '%أُعيد إسناد هذه المهمة%' then _ok := true; else raise; end if;
-  end;
-  execute 'reset role';
-  if not _ok then raise exception 'اختبار 7أ فشل: الصف المُحال أُحيي باعتماد متأخر'; end if;
-  if exists (select 1 from studies where case_id=c.c1 and submitted_at is not null and superseded_at is not null) then
-    raise exception 'اختبار 7ب فشل: صف submitted+superseded معاً';
-  end if;
-  raise notice 'اختبار 7 ✓ حارس الإحياء: مخرَج المُحال عنه مرفوض صراحةً';
+  insert into app_settings (key, value) values ('study_eval_deadline_days', '0')
+  on conflict (key) do update set value = excluded.value;
+
+  perform pg_temp.submit_one(c.c5, 'study');
+  perform pg_temp.submit_one(c.c5, 'assessment');
+  perform study_eval_watchdog();
+
+  delete from app_settings where key = 'study_eval_deadline_days';
+
+  select status into _st from protection_cases where id = c.c5;
+  if _st <> 'in_decision' then raise exception 'اختبار 8 فشل: مهلة الصفر لم تُقفل فوراً (%)', _st; end if;
+  raise notice 'اختبار 8 ✓ المهلة قابلة للضبط — الصفر يُقفل بأول جولة بعد النصاب';
 end $$;
 
--- ─── 8) تحصين TRUNCATE: سجل التدقيق والجداول محصّنة من التفريغ ───
+-- ─── 9) تحصين TRUNCATE: سجل التدقيق والجداول محصّنة من التفريغ ───
 do $$
 begin
   if has_table_privilege('authenticated','public.audit_log','TRUNCATE')
      or has_table_privilege('anon','public.audit_log','TRUNCATE')
      or has_table_privilege('authenticated','public.protection_cases','TRUNCATE')
      or has_table_privilege('anon','public.studies','TRUNCATE') then
-    raise exception 'اختبار 8 فشل: TRUNCATE ما يزال ممنوحاً';
+    raise exception 'اختبار 9 فشل: TRUNCATE ما يزال ممنوحاً';
   end if;
-  raise notice 'اختبار 8 ✓ TRUNCATE محجوب عن anon/authenticated (سجل التدقيق محصّن)';
+  raise notice 'اختبار 9 ✓ TRUNCATE محجوب عن anon/authenticated (سجل التدقيق محصّن)';
 end $$;
 
--- ─── 9) قفل الكتابة: تعديل studies/assessments مباشرةً ممنوع (RPC فقط) ───
+-- ─── 10) قفل الكتابة: تعديل studies/assessments مباشرةً ممنوع (RPC فقط) ───
 do $$
-declare c record; _old uuid; _ok boolean := false;
+declare c record; _late uuid; _ok boolean := false;
 begin
   select * into c from t_cases;
-  select studier_id into _old from studies
+  select studier_id into _late from studies
    where case_id = c.c1 and superseded_at is not null limit 1;
-  perform pg_temp.impersonate(_old);
+  perform pg_temp.impersonate(_late);
   execute 'set local role authenticated';
   begin
     update studies set superseded_at = null, submitted_at = now(), recommendation = 'RESURRECTED'
-     where case_id = c.c1 and studier_id = _old;
+     where case_id = c.c1 and studier_id = _late;
     raise exception 'FORCE';
   exception when insufficient_privilege then _ok := true;
   end;
   execute 'reset role';
-  if not _ok then raise exception 'اختبار 9 فشل: الكتابة المباشرة نفذت — حارس الإحياء قابل للتجاوز'; end if;
-  raise notice 'اختبار 9 ✓ قفل الكتابة: لا إحياء ولا تعديل مباشر — الدوالّ المدقَّقة هي الباب الوحيد';
+  if not _ok then raise exception 'اختبار 10 فشل: الكتابة المباشرة نفذت — الوسم قابل للتجاوز'; end if;
+  raise notice 'اختبار 10 ✓ قفل الكتابة: لا إحياء ولا تعديل مباشر — الدوالّ المدقَّقة هي الباب الوحيد';
 end $$;
 
 rollback;
-\echo '✓✓ اختبارات الإسناد المرن اجتازت كاملة — أُرجعت المعاملة، لا أثر في القاعدة'
+\echo '✓✓ اختبارات الإقفال الزمني اجتازت كاملة — أُرجعت المعاملة، لا أثر في القاعدة'

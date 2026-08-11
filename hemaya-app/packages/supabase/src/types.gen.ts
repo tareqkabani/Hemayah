@@ -2656,11 +2656,12 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      study_eval_deadline_days: { Args: never; Returns: number }
       study_eval_watchdog: {
         Args: never
         Returns: {
-          exhausted: number
-          reassigned: number
+          alerted: number
+          closed: number
         }[]
       }
       submit_assessment: {
