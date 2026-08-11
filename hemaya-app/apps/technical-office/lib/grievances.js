@@ -7,8 +7,8 @@ export const GRIEVANCE_SELECT = `id, ref, case_id, scope, against, applicant_rea
   advisor_decision, office_decision, return_log,
   protection_cases(id, ref_no, secret_code, category, status, classification, source, created_at,
     recommendations(source_body, decision, proposed_type, notes, raised_at, received_at),
-    studies(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at),
-    assessments(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at),
+    studies(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at, superseded_at),
+    assessments(recommendation, reject_reasons, proposed_type, proposed_duration, notes, partial_reason, submitted_at, superseded_at),
     council_decisions(ref, status, types, duration, reasoning, issued_type, issued_reason, issued_at))`;
 
 const CAT_AR = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
@@ -37,7 +37,11 @@ export function mapGrievances(rows, now = new Date()) {
     const outputs = [
       ...many(c.studies).map((s) => ({ ...s, who: "الدراسة القانونية", icon: "rate_review" })),
       ...many(c.assessments).map((s) => ({ ...s, who: "التقييم النفسي/الاجتماعي", icon: "psychology" })),
-    ].filter((s) => s.submitted_at);
+      // المتجاوَز مستبعَدٌ صراحةً كما في حزمة القرار: كلُّ مسارٍ حيٍّ اليوم لا
+      // يتجاوز إلا صفّاً غير مُقدَّم (فالفلترة بـsubmitted_at تكفي عملياً)، لكنّ
+      // التصريح يمنع أن يبني المستشار رأيه في التظلّم على مخرَجٍ مُلغى إن
+      // استجدّ مسارُ تجاوزٍ لمُقدَّم — والفرق بين البوابتين لا يجوز أن يبقى.
+    ].filter((s) => s.submitted_at && !s.superseded_at);
 
     const filed = g.filed_at ? new Date(g.filed_at).getTime() : now.getTime();
     const daysElapsed = Math.max(0, Math.floor((now.getTime() - filed) / DAY));
