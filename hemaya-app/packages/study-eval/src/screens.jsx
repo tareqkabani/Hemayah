@@ -511,7 +511,7 @@ export function TriageDossier({ d, cat }) {
         {hasChecks && <div style={{ marginTop: 12 }}>
           <b style={{ fontSize: 13.5, color: "var(--text-strong)" }}>نتيجة الفحص الشكليّ</b>
           <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "grid", gap: 6 }}>
-            {TRIAGE_CHECK_ITEMS.map((it, i) => <li key={i} className="row" style={{ gap: 8, fontSize: 13 }}><I name={okOf(checkVals[it.id]) ? "check_circle" : "cancel"} size={17} fill color={okOf(checkVals[it.id]) ? "var(--color-success)" : "var(--color-error)"} /><span>{it.label}</span><span className="pill" style={{ marginInlineStart: "auto" }}>{it.ref}</span></li>)}
+            {TRIAGE_CHECK_ITEMS.map((it, i) => <li key={i} className="row" style={{ gap: 8, fontSize: 13 }}><I name={okOf(checkVals[it.id]) ? "check_circle" : "cancel"} size={17} fill color={okOf(checkVals[it.id]) ? "var(--color-success)" : "var(--color-error)"} /><span>{it.label}</span></li>)}
           </ul>
         </div>}
         {!!calls.length && <div style={{ marginTop: 14 }}>
