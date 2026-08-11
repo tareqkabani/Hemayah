@@ -67,6 +67,9 @@ as $$
       where s.key = 'study_eval_deadline_days' and s.value ~ '^\d+$'),
     1));
 $$;
+-- السحب الصريح عُرفُ هذا المستودع لكل دالة مساعدة (نظير watchdog_enabled) —
+-- الافتراض المتشدد يغطّيها، والتصريح دفاعٌ إن طُبّقت المهاجرة بدورٍ آخر.
+revoke execute on function public.study_eval_deadline_days() from public, anon, authenticated;
 
 -- ─── 3) الحارس: مُقفِل ميعاد لا مُعيد إسناد ───
 drop function if exists public.study_eval_watchdog();
@@ -165,11 +168,27 @@ comment on function public.study_eval_watchdog is
 
 -- ─── 4) لَحاق القضايا الجارية: بثّ الإسناد لمن فاتهم في قضايا under_study ───
 -- (إشعارات الإسناد تنطلق من مشغّل trg_notify_*_assign لكل صف جديد)
+
+-- مساعدٌ للحاق: هل انقضى ميعاد المرحلة لهذه القضية أصلاً؟ (بدء المرحلة = أقدم
+-- صفّ إسناد — النظيرُ نفسه المستعمَل في المُقفِل).
+create or replace function public._study_eval_window_expired(_case_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(
+    business_days_between(
+      (select min(t.created_at) from (
+         select s.created_at from studies s where s.case_id = _case_id
+         union all
+         select a.created_at from assessments a where a.case_id = _case_id) t),
+      now()) >= public.study_eval_deadline_days(), false);
+$$;
+revoke execute on function public._study_eval_window_expired(uuid) from public, anon, authenticated;
+
 insert into studies (case_id, studier_id)
 select c.id, ur.user_id
 from protection_cases c
 cross join user_roles ur
 where c.status = 'under_study' and ur.role = 'studier'
+  and not public._study_eval_window_expired(c.id)
 on conflict (case_id, studier_id) do nothing;
 
 insert into assessments (case_id, evaluator_id)
@@ -177,4 +196,12 @@ select c.id, ur.user_id
 from protection_cases c
 cross join user_roles ur
 where c.status = 'under_study' and ur.role = 'evaluator'
+  and not public._study_eval_window_expired(c.id)
 on conflict (case_id, evaluator_id) do nothing;
+
+-- ─── 5) تثبيت مفتاح الحارس: مع البثّ يصير المُقفِل طريقَ التقدّم الوحيد ───
+-- _auto_send_to_decision (20260727000006) يشترط _pending = 0 — أي تقديمَ كلِّ
+-- الطاقم المبثوث له، وهو ما لا يقع عملياً. فلو كان المفتاح مطفأً بقيت كل
+-- القضايا معلّقة في under_study بلا حدّ. التأكيد idempotent كما في 20260727000007.
+insert into app_settings (key, value) values ('watchdog', 'on')
+on conflict (key) do update set value = 'on';

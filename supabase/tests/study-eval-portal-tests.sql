@@ -221,8 +221,12 @@ begin
 
   -- غير مُسنَد على c1: مع البثّ للجميع لا مؤلّف «لم يُختَر» — نمثّله بمقيّمةٍ
   -- سُحب اطّلاعها بوسم إقفال الميعاد (المسار الفعلي لفقد الإسناد بعد 20260810000004)
+  -- الهدف: صفٌّ لم يُقدَّم بعد — سحب الاطّلاع عن مُقدِّمٍ يخلق صفاً
+  -- (submitted + superseded) تنكره حزمة الصمود (اختبار 3د)، ويُطلق مشغّل
+  -- التقدّم فيبدّل حالة c1 وسط الحزمة.
   select evaluator_id into _out from assessments
-   where case_id = c.c1 and superseded_at is null limit 1;
+   where case_id = c.c1 and superseded_at is null and submitted_at is null limit 1;
+  if _out is null then raise exception 'تجهيز 5ج: لا صفّ تقييمٍ غير مُقدَّمٍ على c1'; end if;
   update assessments set superseded_at = now(),
     superseded_reason = 'انقضى الميعاد النظامي (م10)'
    where case_id = c.c1 and evaluator_id = _out;
