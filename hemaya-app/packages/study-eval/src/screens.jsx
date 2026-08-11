@@ -4,7 +4,7 @@
 // السرّي · طبقة هوية النيابة) وموصولة بالبيانات الحيّة تحت RLS.
 import React, { useEffect, useState } from "react";
 import { Card, Tag, InlineAlert, DeadlineTimer, SecretCode, I, NotifItem, fmtWhen } from "@hemaya/ui";
-import { STAGE_FLOW, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
+import { STAGE_FLOW, TRIAGE_CHECK_ITEMS, normalizeFactors9 } from "@hemaya/domain";
 import { PROTECTION_TYPES, REJECT_REASONS, DURATIONS } from "./lookups";
 
 const TRACK = {
@@ -279,14 +279,13 @@ export function SeekerReq({ task, detail, viewer, onOpenDoc }) {
             </div>
           </div>
           <div style={{ marginTop: 6 }}>
-            {R("صفة مقدّم الطلب", dd.role || "—")}
+            {R("صفة مقدّم الطلب", req?.applicant_role || "—")}
             {R("دور طالب الحماية في القضية", task.cat, "info")}
-            {R("نوع الجريمة محل القضية", dd.crime || dd.waqia || "—")}
+            {R("نوع الجريمة محل القضية", dd.crime || "—")}
             {dd.entity && R("الجهة المختصة (بحسب الطلب)", dd.entity)}
             {R("هل سبق التقديم للجهة المختصة؟",
-              dd.prior_submit === true ? "نعم — " + (dd.prior_entity || "الجهة المختصة")
+              dd.prior_submit === true ? "نعم — " + (dd.entity || "الجهة المختصة")
               : dd.prior_submit === false ? "لا" : "—")}
-            {dd.extends && R("امتداد الخطر إلى الغير — بحسب الطالب (م5/4)", dd.extends, "error")}
             {R("جهة اتصال الطوارئ", "مُسجّلة (محجوبة — تُكشف للتنفيذ فقط)")}
           </div>
           <div className="fld" style={{ marginTop: 8, marginBottom: 8 }}>
@@ -338,12 +337,13 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
   const [open, setOpen] = useState(false);
   const [doc, setDoc] = useState(null);
   const rec = detail?.recommendation || null;
-  const rd = rec?.details || {};
+  // العوامل من factors9 عبر موحِّد اللهجتين — recommendations.details بلا كاتب فلا يُقرأ
+  const f = normalizeFactors9(rec?.factors9);
   const dd = detail?.request?.details || {};
   const secret = task.secret;
   const types = Array.isArray(rec?.proposed_type) ? rec.proposed_type.join(" · ") : null;
-  const atts = Array.isArray(rd.attachments) ? rd.attachments : [];
-  const factors = rec?.factors9 && typeof rec.factors9 === "object" ? Object.entries(rec.factors9) : [];
+  const atts = f ? f.attachments : [];
+  const withNote = (v, note) => (v ? v + (note ? " — " + note : "") : "—");
   const openAtt = (name) => {
     setDoc(name);
     onOpenDoc && onOpenDoc(task, name);
@@ -379,53 +379,51 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
 
           <Grp n="١" title="الجهة صاحبة التوصية">
             {R("الجهة المختصة", rec?.source_body || "—")}
-            {R("ضابط الاتصال المعتمد", rd.officer || "—")}
-            {R("مرجع التوصية", rd.rec_ref || "—")}
+            {R("قناة الورود", rec?.channel === "paper" ? "خطاب ورقي" : rec?.channel === "electronic" ? "إلكترونية — بوابة الجهة" : rec?.channel || "—")}
             {R("تاريخ الرفع", rec?.received_at ? fmtWhen(rec.received_at) + " — ضمن مهلة 5 أيام العمل" : "—", "success")}
-            {R("اعتمدها", rd.approved_by || "—")}
           </Grp>
 
           <Grp n="٢" title="بيانات مقدّم الطلب (محجوبة الهوية)">
             {R("صفة مقدّم الطلب", task.cat)}
-            {R("الحالة الصحية", rd.health || "—")}
-            {R("التاريخ الجنائي", rd.criminal || "—")}
-            {R("التاريخ النفسي", rd.psych || "—")}
-            {R("رغبة الكشف عن الهوية", rd.reveal || "—", rd.reveal ? "warning" : undefined)}
+            {R("الحالة الصحية", withNote(f?.health, f?.healthNote))}
+            {R("التاريخ الجنائي", withNote(f?.criminal, f?.criminalNote))}
+            {R("التاريخ النفسي", withNote(f?.psych, f?.psychHistory))}
+            {R("رغبة الكشف عن الهوية", f?.reveal || "—", f?.reveal ? "warning" : undefined)}
           </Grp>
 
           <Grp n="٣" title="تفاصيل وأسباب طلب الحماية">
-            {Block("التفاصيل والأسباب", rd.req_details || dd.reason || "—")}
+            {Block("التفاصيل والأسباب", dd.reason || "—")}
           </Grp>
 
           <Grp n="٤" title="ملخّص القضية ودور مقدّم الطلب">
             {R("رقم القضية", dd.case_no || "—")}
-            {R("المرحلة الحالية", rd.stage || "—")}
-            {Block("ملخّص القضية", rd.case_summary || "—")}
-            {Block("دور مقدّم الطلب وأهمية معلوماته", rd.role_desc || "—")}
+            {R("المرحلة الحالية", f?.caseStage || "—")}
+            {Block("ملخّص القضية", f?.caseSummary || "—")}
+            {Block("دور مقدّم الطلب وأهمية معلوماته", f?.roleDesc || "—")}
           </Grp>
 
           <Grp n="٥" title="مسوّغات توفير الحماية">
-            {R("هل تم التواصل مع مقدّم الطلب؟", rd.contacted || "—")}
-            {R("نوع الجريمة", rd.crime_class || "—", rd.crime_class ? "error" : undefined)}
-            {dd.waqia && R("الواقعة", dd.waqia)}
-            {Block("الوصف الإجرامي", rd.crime_desc || dd.crime || "—")}
-            {R("إخفاء البيانات (م2 من النظام)", rd.hide_identity || "—")}
-            {R("وجود خطر يهدّد طالب الحماية", rd.threat_exists || (rd.threat_type ? "يوجد" : "—"), rd.threat_exists === "يوجد" || rd.threat_type ? "error" : undefined)}
-            {rd.threat_type && R("نوع الخطر", rd.threat_type)}
-            {R("مستوى الخطر", dd.threat || "—", dd.threat ? "error" : undefined)}
-            {rd.harm_type && R("نوع الضرر", rd.harm_type)}
-            {R("امتداد الخطر إلى الغير (م5/4)", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "نعم" : "لا", rd.extends_who && rd.extends_who !== "لا يمتدّ" ? "error" : undefined)}
-            {rd.extends_who && rd.extends_who !== "لا يمتدّ" && R("إلى من يمتدّ", rd.extends_who)}
-            {factors.map(([k, v]) => (
-              <React.Fragment key={k}>{R(k, String(v))}</React.Fragment>
-            ))}
+            {R("هل تم التواصل مع مقدّم الطلب؟", withNote(f?.contacted, f?.contactKind))}
+            {R("نوع الجريمة", f?.crimeType || "—", f?.crimeType ? "error" : undefined)}
+            {f?.waqia?.length > 0 && R("الواقعة", f.waqia.join(" · "))}
+            {Block("الوصف الإجرامي", f?.crimeDesc || dd.crime || "—")}
+            {R("إخفاء البيانات (م2 من النظام)", f?.hideIdentity || "—")}
+            {R("وجود خطر يهدّد طالب الحماية", f?.threatExists || (f?.threatType ? "يوجد" : "—"), f?.threatExists === "يوجد" || f?.threatType ? "error" : undefined)}
+            {f?.threatType && R("نوع الخطر", f.threatType)}
+            {R("مستوى الخطر", f?.riskLevel || "—", f?.riskLevel ? "error" : undefined)}
+            {f?.harmExists && R("وجود ضرر واقع", f.harmExists)}
+            {f?.harmType && R("نوع الضرر", f.harmType)}
+            {R("امتداد الخطر إلى الغير (م5/4)", f?.extendsWho && f.extendsWho !== "لا يمتدّ" ? "نعم" : "لا", f?.extendsWho && f.extendsWho !== "لا يمتدّ" ? "error" : undefined)}
+            {f?.extendsWho && f.extendsWho !== "لا يمتدّ" && R("إلى من يمتدّ", f.extendsWho)}
+            {f?.adapt && R("انطباق شرط التكيّف (م9)", f.adapt)}
+            {f?.reasons?.length > 0 && Block("أسباب التوصية — كما عدّدتها الجهة", f.reasons.join(" · "))}
             {R("توصية الجهة", rec?.decision === "توفير" ? "توفير الحماية" : rec?.decision || "—", "success")}
             {Block("أسباب التوصية", rec?.notes || "—")}
           </Grp>
 
           <Grp n="٦" title="أنواع الحماية المقترحة من الجهة">
             {Block("الأنواع المقترحة", types || "—")}
-            {R("الحلول البديلة", rd.alt_solutions || "لا توجد")}
+            {R("الحلول البديلة", f?.alternatives || "لا توجد")}
           </Grp>
 
           <Grp n="٧" title="مدة الحماية المقترحة">
@@ -452,7 +450,6 @@ export function AuthRec({ task, detail, viewer, onOpenDoc }) {
             <span className="row" style={{ gap: 8 }}>
               <I name="account_balance" size={17} color="var(--color-primary)" />
               <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-strong)" }}>{rec?.source_body || "—"}</span>
-              <span className="muted">{rd.approved_by ? "· اعتمدها " + rd.approved_by : ""}</span>
             </span>
             <Tag tone="neutral" size="sm" iconLeft={<I name="lock_clock" size={13} />}>موقّعة رقمياً</Tag>
           </div>
@@ -560,16 +557,18 @@ export function UnifiedForm({ cfg, me, task, detail, back, onSubmit, onReveal, o
   );
   const accept = f.rec === "قبول كلي" || f.rec === "قبول جزئي";
   const dd = detail?.request?.details || {};
-  const rd = detail?.recommendation?.details || {};
+  const rf = normalizeFactors9(detail?.recommendation?.factors9);
   const fmtDate = (ts) => (ts ? fmtWhen(ts).split(" ")[0] : "—");
-  // بيانات الورود والإحالة — بلا تكرار مع المستندين المطويين أدناه
+  // بيانات الورود والإحالة — بلا تكرار مع المستندين المطويين أدناه.
+  // رقم الوارد من قيد الورود (reg_no) الذي يكتبه الإدخال اليدوي؛ مرحلة القضية
+  // ومستوى الخطر من عوامل توصية الجهة — لا قيم مصطنعة توهم بمصدر غير موجود.
   const CASE = [
     ["الرمز السري", task.secret, "tag"],
-    ["رقم الوارد", dd.incoming_no || "—"],
+    ["رقم الوارد", dd.reg_no || "—"],
     ["تاريخ الوارد", fmtDate(detail?.request?.submitted_at)],
     ["قناة الورود", "إحالة من الفرز المبدئي"],
-    ["مرحلة القضية", rd.stage || "التحقيق"],
-    ["تصنيف الخطر المبدئي (من الفرز)", dd.threat || "مرتفع", "risk"],
+    ["مرحلة القضية", rf?.caseStage || "—"],
+    ["مستوى الخطر — بحسب توصية الجهة", rf?.riskLevel || "—", "risk"],
   ];
   return (
     <div>

@@ -2110,6 +2110,11 @@ export type Database = {
         Args: { _case_id: string; _ec: Json }
         Returns: undefined
       }
+      _store_subject: {
+        Args: { _case_id: string; _identity: Json; _nafath_flag: string }
+        Returns: undefined
+      }
+      _subject_identity_key: { Args: never; Returns: string }
       admin_add_branch_unit: {
         Args: { _city: string; _name?: string; _parent: string }
         Returns: string
@@ -3134,3 +3139,4 @@ export const Constants = {
     },
   },
 } as const
+
