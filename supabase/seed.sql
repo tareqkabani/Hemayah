@@ -82,6 +82,30 @@ begin
   end loop;
 end $$;
 
+-- ── 1-ب) ربط مستخدم الجهة المختصّة بفرعه ──
+--   سياسة rec_branch_rw تشترط branch_id (uuid من branches) وlevel ∈ {clerk,head}
+--   في سمات competent_body — وبدونهما تُرجع cb_branch()‏ NULL فلا يمرّ أي صف.
+--   مهاجرة 20260706000009 كانت تمنحهما، لكنها تسبق البذورَ في `db reset` فلا
+--   تجد المستخدمَ بعد (وupsert القسم (1) صار يدمج السمات لا يستبدلها منذ #97،
+--   لكنه لا يخترع ما ليس في البذرة) — فالمنح هنا، بعد الإدراج، هو الفعّال.
+--   فالمنح هنا — بعد الإدراج — هو الفعّال. (branch_id يُخزَّن نصاً داخل jsonb.)
+do $$
+declare _b uuid; _u uuid;
+begin
+  select id into _b from branches
+   where entity = 'prosecution' and region = 'RUH' and kind = 'region' limit 1;
+  select id into _u from auth.users where email = '3000000001@nafath.local';
+  if _b is not null and _u is not null then
+    update user_roles
+       -- الافتراضات أولاً والموجود يسود: حسابٌ مضبوطٌ مسبقاً (clerk مثلاً في
+       -- فصل الأدوار لسلسلة الاعتماد) لا يُرقَّى قسراً إلى head — الترقية تمنح
+       -- صلاحية اعتمادٍ لم يقصدها أحد، وتهدم قاعدة «الموظف لا يعتمد عملَ نفسه».
+       set attributes = jsonb_build_object('level', 'head', 'branch_id', _b::text, 'entity', 'prosecution')
+        || coalesce(attributes, '{}'::jsonb)
+     where role = 'competent_body' and user_id = _u;
+  end if;
+end $$;
+
 -- ── 2) قضيتان في مرحلة القرار لتجربة المسار المختصر فوراً ──
 --   أ) REF-2026-9001: council_decisions=preparing → يدخل المعدّ (2000000005) ويرسلها للتصويت مباشرةً.
 --   ب) REF-2026-9002: council_decisions=voting     → يصوّت الأعضاء (2000000006/61..64 + النائب/الرئيس) فوراً.
@@ -714,4 +738,45 @@ begin
            details = null
      where case_id = cid;
   end loop;
+end $$;
+
+-- ── 5) إسناد التوصيات المبذورة لفروعها ──
+--   الأقسام أعلاه تُدرج التوصيات بلا branch_id، وسياسة rec_branch_rw موجَّهة
+--   بالفرع — فلا تظهر أيٌّ منها في بوابة الجهات المختصة. الإسناد هنا حتميٌّ من
+--   نصوص البذور نفسها (لا تخمين مناطق): الأسماء المنسوبة لمنطقةٍ إلى نيابتها،
+--   والنزاهة (جهة مركزية) إلى مركزها الرئيسي، و«النيابة العامة» المطلقة في
+--   رحلات التظلّم (§4) إلى نيابة الرياض — فرع العرض الافتراضي — حصراً بمراجعها.
+--   يُستكمل أيضاً branch_id على القضية نفسها (سياسة case_branch_read بالفرع؛
+--   بدونه يعود تضمين protection_cases فارغاً فتظهر البطاقة بلا رمز ولا مرجع).
+--   يبقى هذا القسم آخرَ الملف كي يلحق كلَّ ما بُذر قبله. idempotent.
+do $$
+declare _ruh uuid; _med uuid; _asr uuid; _nzh uuid;
+begin
+  select id into _ruh from branches where entity = 'prosecution' and region = 'RUH' and kind = 'region' limit 1;
+  select id into _med from branches where entity = 'prosecution' and region = 'MED' and kind = 'region' limit 1;
+  select id into _asr from branches where entity = 'prosecution' and region = 'ASR' and kind = 'region' limit 1;
+  select id into _nzh from branches where entity = 'nazaha' and is_hq limit 1;
+
+  update recommendations set branch_id = _ruh
+   where branch_id is null and _ruh is not null
+     and source_body in ('النيابة العامة بمنطقة الرياض', 'النيابة العامة بالرياض');
+  update recommendations set branch_id = _med
+   where branch_id is null and _med is not null
+     and source_body = 'النيابة العامة بالمدينة المنورة';
+  update recommendations set branch_id = _asr
+   where branch_id is null and _asr is not null
+     and source_body = 'النيابة العامة بعسير';
+  update recommendations set branch_id = _nzh
+   where branch_id is null and _nzh is not null
+     and source_body like 'هيئة الرقابة ومكافحة الفساد%';
+  update recommendations r set branch_id = _ruh
+    from protection_cases pc
+   where pc.id = r.case_id and r.branch_id is null and _ruh is not null
+     and r.source_body = 'النيابة العامة'
+     and pc.ref_no in ('REF-2026-4820', 'REF-2026-4790');
+
+  -- ظلّ الفرع على القضية (توصية كل قضية واحدة — لا لبس في المصدر)
+  update protection_cases pc set branch_id = r.branch_id
+    from recommendations r
+   where r.case_id = pc.id and pc.branch_id is null and r.branch_id is not null;
 end $$;
