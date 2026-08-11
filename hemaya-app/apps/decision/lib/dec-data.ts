@@ -36,10 +36,10 @@ export async function getDecisionData() {
     .select(`id, ref_no, secret_code, category, status, classification, source, created_at,
       council_decisions(status, preparer_id, types, duration, reasoning, scope, scope_note, submitted_at, deputy_approved_at, chair_approved_at,
         voting_started_at, deadline_closed, rejections, issued_type, issued_reason, issued_at, updated_at),
-      protection_requests(details, channel, submitted_at),
+      protection_requests(details, channel, applicant_role, submitted_at),
       studies(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
       assessments(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
-      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes, details)`)
+      recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes)`)
     // تشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
     .in("status", ["in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
     .order("created_at", { ascending: false })
