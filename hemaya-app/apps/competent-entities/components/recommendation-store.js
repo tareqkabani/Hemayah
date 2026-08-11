@@ -13,6 +13,8 @@ import { createClient } from "@hemaya/supabase/src/browser";
 
 const DAY = 86400000;
 const CAT = { witness: "شاهد", reporter: "مبلّغ", expert: "خبير", victim: "ضحية", related: "ذو صلة" };
+// تواريخ العرض بعُرف البوابة نفسها (staff-feeds.jsx) — الجداول تعرض النصّ كما هو.
+const fmtDate = (ts) => { if (!ts) return "—"; try { return new Date(ts).toLocaleDateString("ar-SA", { dateStyle: "medium" }); } catch (e) { return "—"; } };
 
 const norm = (r) => {
   const pc = r.protection_cases || {};
@@ -25,7 +27,9 @@ const norm = (r) => {
     id: r.id, caseId: r.case_id, secret: pc.secret_code || "—", cat: CAT[pc.category] || pc.category || "—",
     caseNo: pc.ref_no || "—", entity: br.entity || "prosecution", region: br.region || "RUH",
     days, status, decision: r.decision || "", outcome: r.decision || "",
-    linked: true, _real: true, sentAt: r.received_at || r.raised_at,
+    linked: true, _real: true,
+    referred: fmtDate(r.raised_at),                    // عمود «أُحيل» في الواردة ولوحة المعلومات
+    sentAt: fmtDate(r.received_at || r.raised_at),     // «تاريخ الرفع» في ردودنا — الورود الفعلي إن سُجّل
   };
 };
 
