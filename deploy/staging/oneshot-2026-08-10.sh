@@ -8,7 +8,13 @@
 #  تشفير جهة الطوارئ #94)، ثم الفحوص وتسجيل النسخ وحزم الاختبار.
 #
 #  آخر ما طُبّق على التجريبية (نشرة 2026-07-30): 20260727000008 —
-#  فالقائمة أدناه هي كامل الفجوة حتى main ‏81eb688.
+#  فالقائمة أدناه هي كامل الفجوة حتى main ‏e58e3ff (محدَّثة 2026-08-11).
+#
+#  ⚠️ القائمة صريحةٌ لا glob: كل مهاجرةٍ تُدمج في main يجب أن تُضاف هنا
+#  يدويّاً وإلا لم تبلغ التجريبيةَ أبداً. (فجوةُ ٤ مهاجرات — #99 و#100
+#  و#102 و#103 — بقيت خارج القائمة حتى فحص 2026-08-11.) للتحقق:
+#    diff <(ls supabase/migrations | awk '$0>"20260727000008"') \
+#         <(grep -oE '2026[0-9]{10}_[^"]+\.sql' deploy/staging/oneshot-2026-08-10.sh | sort)
 #
 #  ⚠️ إعادة تطبيق مهاجرةٍ قديمة فوق قاعدةٍ أحدث ليست آمنة دائماً
 #  (مثال مُجرَّب: 20260806000001 تفترض قيد branches(entity,region)
@@ -81,7 +87,18 @@ MIGRATIONS=(
   "20260810000002_emergency_contact_encryption.sql"
   # ملحق #96: تعبئة subjects من مسارَي التقديم (مفتاح Vault + اعتراض + backfill)
   "20260810000003_subject_intake_sync.sql"
-  # دفعة 11 أغسطس: سلسلة اعتماد رئيس الفرع (#105) — القائمة صريحة لا glob،
+  # #99: البثّ لكل الطاقم + مُقفِل ميعاد م10 بدل الانتقاء بالعبء
+  "20260810000004_broadcast_study_eval_deadline_close.sql"
+  # #100 (أمنيّ): الموظف الموسوم صفُّه لا يفتح خيط مراسلة قيادة
+  "20260810000005_leader_message_superseded_guard.sql"
+  # دفعة 11 أغسطس
+  # ⚠️ #102 شرطٌ لِما بعده: بلا ربط حساب الجهة وتوصياتها بالفروع تُرجع
+  #    cb_branch()‏ NULL فتحجب rec_branch_rw كلَّ صف — بوابة الجهات تظهر
+  #    فارغةً، وسلسلةُ الاعتماد (#105) لا تجد فرعاً فترفض الرفع أصلاً.
+  "20260811000001_competent_branch_reseed.sql"
+  # #103: مزامنة protection_cases.branch_id مع فرع التوصية
+  "20260811000002_case_branch_sync.sql"
+  # سلسلة اعتماد رئيس الفرع (#105) — القائمة صريحة لا glob،
   # فما لا يُدرج هنا لا يصل التجريبية إطلاقاً (نُقل الإدراج من #104).
   "20260811000003_recommendation_approval_chain.sql"
   # إنهاء مفتاح الخدمة من عرض حزمة القرار (دالّتا قراءةٍ مقيَّدتان)
@@ -128,6 +145,32 @@ chk "select count(*) from pg_proc where proname in ('submit_recommendation_for_a
 chk "select count(*) from approval_chains where step_no=1 and approver='branch_head' and active" 5 "درجة الاعتماد الأولى لكل جهة (#105)"
 chk "select count(*) from pg_proc where proname in ('decision_case_parties','council_seat_map')" 2 "دالّتا حزمة القرار بلا مفتاح خدمة"
 
+# ── فاعلُ السلسلة: بلا حسابٍ بمستوى head تصير السلسلة مصيدة ──
+# بعد #105 لا تصل التوصية الإلكترونية المركزَ إلا باعتماد رئيس الفرع، وشرطُ
+# decide_recommendation_approval هو cb_level()='head'. فإن لم يوجد على
+# التجريبية حسابٌ بهذا المستوى في فرعٍ فيه موظف، رفَع الموظفُ توصيتَه ولم
+# يستطع أحدٌ اعتمادَها — تبقى pending_head والقضية referred بلا مخرج.
+# الحسابان مضافان لخريطة DEMO في جسر نفاذ، والجسر يُنشئ الحساب عند أول دخول.
+HEADS=$(q "select count(*) from user_roles where role='competent_body' and attributes->>'level'='head' and attributes ? 'branch_id'")
+CLERKS=$(q "select count(*) from user_roles where role='competent_body' and coalesce(attributes->>'level','clerk')='clerk' and attributes ? 'branch_id'")
+if [ "$HEADS" = "0" ] && [ "$CLERKS" != "0" ]; then
+  echo "   ✗ لا حساب بمستوى head على التجريبية بينما يوجد $CLERKS موظف فرع." >&2
+  echo "     سلسلة الاعتماد ستحتجز كل توصيةٍ إلكترونية بلا معتمِد." >&2
+  echo "     العلاج (دقيقة واحدة، قبل التسليم): افتح بوابة الدخول الموحّدة وسجّل" >&2
+  echo "     دخولاً واحداً بالهوية 3000000006 (رئيس الفرع) — ينشئ الجسرُ الحساب" >&2
+  echo "     بسمة level=head ويحلّ فرعه؛ وكذلك 3000000007 للمقر إن أردت شاشاته." >&2
+  exit 1
+fi
+if [ "$HEADS" = "0" ]; then
+  # لا موظفَ ولا رئيس بعد (لم يدخل أحدٌ بحساب جهةٍ مختصة على هذه القاعدة):
+  # لا مصيدةَ الآن، لكنها تنشأ لحظة أول دخولٍ لموظف. تنبيهٌ لا إيقاف.
+  echo "   ℹ لا حسابات جهةٍ مختصة على هذه القاعدة بعد — سجّل دخولاً واحداً بـ"
+  echo "     3000000006 (رئيس الفرع) قبل أو مع أول دخولٍ لـ3000000001 (الموظف)،"
+  echo "     وإلا احتُجزت أول توصيةٍ إلكترونية بلا معتمِد."
+else
+  echo "   ✓ فاعل سلسلة الاعتماد موجود ($HEADS رئيس فرع · $CLERKS موظف)"
+fi
+
 # ── تسجيل النسخ (يمنع انحراف «الكائن موجود دون نسخته») ──
 echo "── تسجيل النسخ في schema_migrations"
 VALS=$(printf "('%s')," "${MIGRATIONS[@]%%_*}"); VALS=${VALS%,}
@@ -135,7 +178,10 @@ psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "insert into supabase_migrations.schema_
 
 # ── حزم الاختبار على التجريبية نفسها ──
 echo "── حزم الاختبار (كلٌّ في معاملة تُدحرج — لا أثر يبقى)"
-for t in triage-portal-tests study-eval-request-redaction-tests decision-approval-ring-tests emergency-contact-encryption-tests subject-intake-tests approval-chain-tests; do
+for t in triage-portal-tests study-eval-request-redaction-tests study-eval-portal-tests \
+         study-eval-resilience-tests decision-approval-ring-tests leader-message-superseded-tests \
+         competent-branch-visibility-test emergency-contact-encryption-tests subject-intake-tests \
+         approval-chain-tests; do
   echo "   ── $t"
   psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$TESTS/$t.sql" || exit 1
 done
