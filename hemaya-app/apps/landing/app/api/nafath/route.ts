@@ -52,6 +52,10 @@ const DEMO: Record<string, Spec> = {
   // سمات الجهة يقرؤها RLS: entity لدوال cb_entity، وlevel لسياسات clerk/head/hq —
   // وbranch_id يُحلّ عند الدخول من جدول branches (انظر ensureCompetentBranch أدناه)
   "3000000001": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة", attrs: { authority: "competent", entity: "prosecution", level: "clerk" } },
+  // رئيس الفرع: هويةٌ مستقلّة لأن الاعتماد صلاحيةٌ لا عرضاً — decide_recommendation_approval
+  // تشترط cb_level()='head'، وسلسلةُ الاعتماد بلا فاعلٍ ثانٍ تبقى حبراً.
+  "3000000006": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة — رئيس الفرع", attrs: { authority: "competent", entity: "prosecution", level: "head" } },
+  "3000000007": { role: "competent_body", portal: ORIGIN.competent, label: "الجهات المختصة — المقر", attrs: { authority: "competent", entity: "prosecution", level: "hq" } },
   "3000000002": { role: "moh_specialist", portal: ORIGIN.health, label: "وزارة الصحة", attrs: { authority: "health" } },
   "3000000003": { role: "hr_specialist", portal: ORIGIN.hr, label: "الموارد البشرية", attrs: { authority: "hr" } },
   "3000000004": { role: "security_manager", portal: ORIGIN.security, label: "الإدارة الأمنية", attrs: { authority: "security" } },
@@ -97,6 +101,9 @@ async function ensureCompetentBranch(admin: ReturnType<typeof createServiceClien
     .maybeSingle();
   const attrs = ((roleRow as { attributes?: Record<string, unknown> } | null)?.attributes ?? {}) as Record<string, unknown>;
   if (attrs.branch_id) return;
+  // المقر لا يُنسَب لفرع: إشرافه يمرّ من cb_entity_branches لا cb_branch،
+  // ونسبتُه لفرعٍ تجعله يبدو منسوباً إليه في شاشات العزل.
+  if (attrs.level === "hq") return;
   const entity = (attrs.entity as string) || "prosecution";
   const { data: branches } = await admin
     .from("branches").select("id, region")

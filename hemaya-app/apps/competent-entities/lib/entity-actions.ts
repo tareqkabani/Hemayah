@@ -26,14 +26,14 @@ export type LinkedRecommendationInput = {
 };
 
 // طلبٌ مُحالٌ من المركز (م5/4): التوصية تُقيَّد على التوصية المعلّقة للطلب نفسه
-// عبر record_recommendation — لا يُنشأ سجل قضية مكرر (فجوة الربط).
-export async function recordLinkedRecommendation(input: LinkedRecommendationInput) {
+// وتُرفَع لاعتماد رئيس الفرع — الدرجة الأولى الإلزامية في سلسلة الاعتماد.
+// لا تصل المركزَ هنا: الحالة تبقى referred حتى يعتمد الرئيس.
+export async function submitForApproval(input: LinkedRecommendationInput) {
   if (!input.caseId) return { ok: false as const, error: "لا طلب مرتبط." };
   const supabase = createServerClient();
-  const { data, error } = await supabase.rpc("record_recommendation", {
+  const { data, error } = await supabase.rpc("submit_recommendation_for_approval", {
     _case_id: input.caseId,
     _decision: input.provide ? "توفير" : "عدم توفير",
-    _channel: "electronic",
     _factors9: (input.factors9 || {}) as Json,
     _proposed_type: (input.types || []) as unknown as Json,
     _proposed_duration: input.durationDays ? `${input.durationDays} days` : undefined,
@@ -41,7 +41,25 @@ export async function recordLinkedRecommendation(input: LinkedRecommendationInpu
   });
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
-  return { ok: true as const, status: (row as { status?: string } | undefined)?.status };
+  const r = row as { recommendation_id?: string; step_due_at?: string } | undefined;
+  return { ok: true as const, recommendationId: r?.recommendation_id, stepDueAt: r?.step_due_at };
+}
+
+// بتّ رئيس الفرع: الاعتماد يرفع التوصية للمركز فعليّاً (received_at + عودة
+// الملف للفرز)، والإعادة تردّها للموظف بملاحظةٍ إلزامية. الصلاحية محروسة
+// في القاعدة بـcb_level()='head' — لا بالواجهة.
+export async function decideApproval(recommendationId: string, decision: "approved" | "returned", note?: string) {
+  if (!recommendationId) return { ok: false as const, error: "لا توصية محدّدة." };
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("decide_recommendation_approval", {
+    _recommendation_id: recommendationId,
+    _decision: decision,
+    _note: (note?.trim() || null) as string,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  const row = Array.isArray(data) ? data[0] : data;
+  const r = row as { new_approval_status?: string; new_case_status?: string } | undefined;
+  return { ok: true as const, approvalStatus: r?.new_approval_status, caseStatus: r?.new_case_status };
 }
 
 export async function submitRecommendation(input: RecommendationInput) {

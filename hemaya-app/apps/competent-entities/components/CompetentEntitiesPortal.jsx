@@ -8,8 +8,8 @@ import { StaffNotifications } from "./staff-feeds";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, RiskLevel } from "@hemaya/ui";
 import { RecommendationForm, UrgentForm } from "./RecommendationForm";
 import { HemayaBranch } from "./branch-roles";
-import { useRecommendations } from "./recommendation-store";
-import { submitRecommendation, recordLinkedRecommendation } from "@/lib/entity-actions";
+import { useRecommendations, daysLeft } from "./recommendation-store";
+import { submitRecommendation, submitForApproval, decideApproval } from "@/lib/entity-actions";
 import { durationDays, isCustomDuration } from "@hemaya/domain";
 import "./entities.css";
 
@@ -20,6 +20,7 @@ const ST = {
   awaiting: { t: 'بانتظار توصيتنا', tone: ['var(--warning-10)','var(--warning-70)'], icon: 'assignment_late' },
   draft:    { t: 'مسوّدة', tone: ['var(--info-10)','var(--info-70)'], icon: 'edit_note' },
   pending:  { t: 'بانتظار اعتماد الرئيس', tone: ['var(--green-10)','var(--green-80)'], icon: 'hourglass_top' },
+  returned: { t: 'مُعادة بملاحظة الرئيس', tone: ['var(--warning-10)','var(--warning-70)'], icon: 'undo' },
   sent:     { t: 'مرفوعة للمركز', tone: ['var(--success-10)','var(--success-70)'], icon: 'task_alt' },
 };
 // ===== مصادر البيانات موسومة بالجهة (entity) — تُرشَّح بالجهة الحالية في كل شاشة (عزل بمبدأ الحاجة إلى المعرفة) =====
@@ -27,8 +28,7 @@ const byEnt = (rows, ent) => rows.filter((r) => r.entity === ent);
 const byScope = (rows, ent, br) => rows.filter((r) => r.entity === ent && (!br || (r.region || 'RUH') === br));
 const stamp = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 
-const INCOMING = []; // لا بيانات مُلفّقة — تُربَط بجدول recommendations الحقيقيّ لاحقاً
-const SENT = []; // لا بيانات مُلفّقة — تُربَط بجدول recommendations الحقيقيّ لاحقاً
+// (INCOMING/SENT أُسقطا: الوارِدة والمُرسَلة والطابور كلّها من recommendations الحقيقيّ.)
 
 function Stat({ icon, v, l, bg, fg }) {
   return <Card className="card stat"><div className="stat-ico" style={{ background: bg, color: fg }}><I name={icon} size={22} fill /></div><div><div className="stat-v">{v}</div><div className="stat-l">{l}</div></div></Card>;
@@ -39,7 +39,7 @@ function Pill({ status }) { const s = ST[status]; return <span className="pill" 
 function Dashboard({ go, openRec, ent, br, recIn = [], recSent = [] }) {
   const incoming = byScope(recIn, ent, br);
   const sent = byScope(recSent, ent, br);
-  const awaiting = incoming.filter((r) => r.status === 'awaiting').length;
+  const awaiting = incoming.filter((r) => r.status === 'awaiting' || r.status === 'returned').length;
   const overdue = incoming.filter((r) => r.days >= 4).length;
   return (
     <div>
@@ -82,7 +82,9 @@ function Dashboard({ go, openRec, ent, br, recIn = [], recSent = [] }) {
 function Incoming({ openRec, ent, br, recIn = [] }) {
   const [filter, setFilter] = useState('all');
   const all = byScope(recIn, ent, br);
-  const rows = all.filter((r) => filter === 'all' || (filter === 'awaiting' && r.status === 'awaiting') || (filter === 'progress' && (r.status === 'draft' || r.status === 'pending')));
+  const rows = all.filter((r) => filter === 'all'
+    || (filter === 'awaiting' && (r.status === 'awaiting' || r.status === 'returned'))
+    || (filter === 'progress' && (r.status === 'draft' || r.status === 'pending')));
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -107,8 +109,9 @@ function Incoming({ openRec, ent, br, recIn = [] }) {
                   <td><Tag tone="info" size="sm">{r.cat}</Tag></td>
                   <td className="mono">{r.caseNo}</td>
                   <td className="muted">{r.referred}</td>
-                  <td><Pill status={r.status} /></td>
-                  <td><span className="link">فتح <I name="chevron_left" size={16} /></span></td>
+                  <td><Pill status={r.status} />{r.status === 'returned' && r.lastNote
+                    ? <div className="muted" style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{r.lastNote}</div> : null}</td>
+                  <td><span className="link">{r.status === 'pending' ? 'متابعة' : 'فتح'} <I name="chevron_left" size={16} /></span></td>
                 </tr>
               ))}
             </tbody>
@@ -360,10 +363,17 @@ const ENT_ORDER = ['prosecution', 'state_security', 'moi', 'nazaha', 'moj'];
 const ENT_OFFICERS = { prosecution: 'المحقق/ سعد المطيري', state_security: 'العميد/ فهد القحطاني', moi: 'المقدّم/ ناصر الشهري', nazaha: 'المستشار/ خالد العنزي', moj: 'المستشار/ عبدالله الدوسري' };
 const ENT_ROLE = { prosecution: 'عضو النيابة — ضابط الاتصال', state_security: 'ضابط الاتصال المعتمد', moi: 'ضابط الاتصال المعتمد', nazaha: 'المستشار المختص — ضابط الاتصال', moj: 'المستشار المختص — ضابط الاتصال' };
 
-function App() {
-  const { incoming: recIn, sent: recSent } = useRecommendations();
-  const [role, setRole] = useState('clerk');
-  const [active, setActive] = useState('dashboard');
+// مستوى الحساب الفعليّ (cb_level) يحدّد الأدوار المتاحة — لا مبدّل عرضٍ حرّ.
+// القاعدة تحرس الاعتماد بـcb_level()='head' على أي حال؛ وإتاحة شاشات رئيس
+// الفرع لموظفٍ لا يملكها كانت ستُنتج زرَّ اعتمادٍ يفشل عند الضغط.
+const LEVEL_ROLES = { clerk: ['clerk'], head: ['head', 'clerk'], hq: ['hq'] };
+
+function App({ level }) {
+  const myLevel = LEVEL_ROLES[level] ? level : 'clerk';
+  const allowedRoles = LEVEL_ROLES[myLevel];
+  const { incoming: recIn, sent: recSent, queue: recQueue, refresh } = useRecommendations();
+  const [role, setRole] = useState(myLevel === 'hq' ? 'hq' : myLevel);
+  const [active, setActive] = useState(myLevel === 'hq' ? 'hq-home' : myLevel === 'head' ? 'head-home' : 'dashboard');
   const [currentEnt, setCurrentEnt] = useState('prosecution');
   const [currentBranch, setCurrentBranch] = useState('RUH');
   const [open, setOpen] = useState(false);
@@ -372,9 +382,7 @@ function App() {
   const [urgent, setUrgent] = useState(null);
   const [headItem, setHeadItem] = useState(null);
   const [toast, setToast] = useState('');
-  const [pendingExtra, setPendingExtra] = useState([]);
-  const [decided, setDecided] = useState({});
-  const [raised, setRaised] = useState([]);
+  const [busy, setBusy] = useState(false);
   const [audit, setAudit] = useState(() => [{ ent: 'prosecution', region: 'RUH', role: 'clerk', ev: 'دخول بوابة الجهة', t: stamp() }]);
   const [auditOpen, setAuditOpen] = useState(false);
   const [entOpen, setEntOpen] = useState(false);
@@ -396,10 +404,11 @@ function App() {
     if (rec && rec.linked === false) { setRec(null); setGuard(true); (typeof window!=='undefined' && window.scrollTo(0,0)); return; }
     const r = rec;
     const fd = f || {};
-    // طلبٌ مُحالٌ من المركز: التوصية تُقيَّد على الطلب نفسه عبر record_recommendation
-    // فيعود للفرز لقرارٍ ثانٍ — لا سجل قضية مكرر (فجوة الربط م5/4).
+    // طلبٌ مُحالٌ من المركز: التوصية تُقيَّد على الطلب نفسه وتُرفَع لاعتماد
+    // رئيس الفرع (الدرجة الأولى الإلزامية) — لا تصل المركزَ قبل اعتماده،
+    // ولا سجل قضية مكرر (فجوة الربط م5/4).
     if (r && r._real && r.linked && r.caseId) {
-      const res = await recordLinkedRecommendation({
+      const res = await submitForApproval({
         caseId: r.caseId,
         provide: fd.provide ? fd.provide === 'توفير' : true,
         factors9: {
@@ -416,9 +425,10 @@ function App() {
                 fd.caseSummary, fd.duration ? 'المدة المقترحة: ' + (isCustomDuration(fd.duration) ? (fd.durationNote || fd.duration) : fd.duration) : '']
           .filter(Boolean).join(' — '),
       });
-      if (!res.ok) { showToast('تعذّر تسجيل التوصية: ' + res.error); return; }
+      if (!res.ok) { showToast('تعذّر رفع التوصية للاعتماد: ' + res.error); return; }
+      await refresh();
       setRec(null); setActive('incoming');
-      showToast('سُجِّلت التوصية على الطلب ' + r.secret + ' وعاد للفرز لاستكمال قراره.');
+      showToast('رُفِعت توصية الطلب ' + r.secret + ' لاعتماد رئيس الفرع — لا تصل المركز قبل اعتماده.');
       return;
     }
     // رفعٌ حقيقيّ للقاعدة: قضيةٌ بمصدر «جهة» تدخل طابور الفرز (RPC مقيّد بـ competent_body).
@@ -436,45 +446,55 @@ function App() {
       },
     });
     if (!res.ok) { showToast('تعذّر رفع التوصية: ' + res.error); return; }
-    if (r && r.secret && r.secret.charAt(0) === 'C') {
-      setPendingExtra((p) => [{ entity: currentEnt, region: currentBranch, secret: r.secret, cat: r.cat || '—', caseNo: r.caseNo || '—', outcome: 'توفير', preparedBy: 'ضابط الاتصال (أنت)' }, ...p]);
-    }
+    await refresh();
     setRec(null); setActive('incoming'); showToast('رُفِعت التوصية للمركز — الرمز ' + res.secret + ' (دخلت طابور الفرز).');
   };
   const guardDone = () => { setGuard(null); setActive('incoming'); showToast('عولِج الطلب الابتدائي عبر الحارس الآلي.'); };
 
-  const headQueue = (() => {
-    const map = {};
-    byScope(recIn, currentEnt, currentBranch).filter((r) => r.status === 'pending' && !decided[r.secret]).forEach((r) => {
-      map[r.secret] = { secret: r.secret, cat: r.cat, caseNo: r.caseNo, outcome: r.recOutcome || 'توفير', preparedBy: r.preparedBy || 'الموظف المختص', deadlineDays: Math.max(0, 5 - r.days) };
-    });
-    pendingExtra.filter((p) => p.entity === currentEnt && (p.region || 'RUH') === currentBranch && !decided[p.secret]).forEach((p) => {
-      if (!map[p.secret]) map[p.secret] = { secret: p.secret, cat: p.cat, caseNo: p.caseNo, outcome: p.outcome || 'توفير', preparedBy: p.preparedBy || 'ضابط الاتصال', deadlineDays: 5 };
-    });
-    return Object.values(map);
-  })();
-  const headRaised = [
-    ...raised.filter((x) => x.entity === currentEnt && (x.region || 'RUH') === currentBranch),
-    ...byScope(recSent, currentEnt, currentBranch).map((r) => ({ secret: r.secret, cat: r.cat, caseNo: r.caseNo, outcome: r.outcome, at: r.sentAt })),
-  ];
-  const onApproveHead = (item) => { setRaised((a) => [{ entity: currentEnt, region: currentBranch, secret: item.secret, cat: item.cat, caseNo: item.caseNo, outcome: item.outcome, at: 'الآن' }, ...a]); setDecided((d) => ({ ...d, [item.secret]: 'approved' })); setHeadItem(null); logAccess(currentEnt, currentBranch, 'head', 'اعتماد توصية', item.secret); showToast('اعتُمدت التوصية ورُفِعت للمركز.'); (typeof window!=='undefined' && window.scrollTo(0,0)); };
-  const onReturnHead = (item) => { setDecided((d) => ({ ...d, [item.secret]: 'returned' })); setHeadItem(null); logAccess(currentEnt, currentBranch, 'head', 'إعادة توصية للموظف', item.secret); showToast('أُعيدت التوصية للموظف بملاحظة.'); (typeof window!=='undefined' && window.scrollTo(0,0)); };
+  // طابور الاعتماد ولوحاته من القاعدة حصراً — لا حالةً محليّة تُموّه بتّاً لم يقع.
+  const isOverdue = (r) => { const n = daysLeft(r.stepDueAt); return n !== null && n < 0; };
+  const headQueue = byScope(recQueue, currentEnt, currentBranch);
+  const headRaised = byScope(recSent, currentEnt, currentBranch);
+
+  const decideHead = async (item, decision, note) => {
+    if (busy) return;
+    setBusy(true);
+    const res = await decideApproval(item.recId, decision, note);
+    setBusy(false);
+    if (!res.ok) { showToast('تعذّر تنفيذ البتّ: ' + res.error); return; }
+    await refresh();
+    setHeadItem(null);
+    logAccess(currentEnt, currentBranch, 'head', decision === 'approved' ? 'اعتماد توصية' : 'إعادة توصية للموظف', item.secret);
+    showToast(decision === 'approved'
+      ? 'اعتُمدت التوصية ورُفِعت للمركز — عاد الملف للفرز.'
+      : 'أُعيدت التوصية للموظف بملاحظتك.');
+    (typeof window !== 'undefined' && window.scrollTo(0, 0));
+  };
+  const onApproveHead = (item, note) => decideHead(item, 'approved', note);
+  const onReturnHead = (item, note) => decideHead(item, 'returned', note);
 
   const hqStats = ENT_BRANCHES[currentEnt].map((code) => {
     const inc = byScope(recIn, currentEnt, code);
-    const pend = inc.filter((r) => r.status === 'pending' && !decided[r.secret]).length + pendingExtra.filter((p) => p.entity === currentEnt && (p.region || 'RUH') === code && !decided[p.secret]).length;
-    const rz = byScope(recSent, currentEnt, code).length + raised.filter((x) => x.entity === currentEnt && (x.region || 'RUH') === code).length;
-    const od = inc.filter((r) => r.days >= 4).length;
-    return { code, name: branchLabel(currentEnt, code), incoming: inc.length, pending: pend, raised: rz, overdue: od };
+    return {
+      code, name: branchLabel(currentEnt, code), incoming: inc.length,
+      pending: byScope(recQueue, currentEnt, code).length,
+      raised: byScope(recSent, currentEnt, code).length,
+      overdue: byScope(recQueue, currentEnt, code).filter(isOverdue).length,
+    };
   });
-  const hqEsc = byEnt(INCOMING, currentEnt).filter((r) => r.days >= 4).map((r) => ({ secret: r.secret, cat: r.cat, caseNo: r.caseNo, region: r.region || 'RUH', regionName: branchLabel(currentEnt, r.region || 'RUH'), days: r.days }));
+  // تصعيدات المقر: ما تجاوز ميعادَ درجة الاعتماد فعليّاً (لا تقديرٌ من عمر الإحالة).
+  const hqEsc = byEnt(recQueue, currentEnt).filter(isOverdue).map((r) => ({
+    secret: r.secret, cat: r.cat, caseNo: r.caseNo, region: r.region || 'RUH',
+    regionName: branchLabel(currentEnt, r.region || 'RUH'), days: r.days,
+    lateBy: Math.abs(daysLeft(r.stepDueAt) || 0),
+  }));
   const onReassign = (item, toCode) => { logAccess(currentEnt, item.region, 'hq', 'إعادة إسناد → ' + branchLabel(currentEnt, toCode), item.secret); showToast('أُعيد إسناد ' + item.secret + ' إلى ' + branchLabel(currentEnt, toCode) + ' (عرض تجريبي).'); };
 
   const cur = NAV.find((n) => n.id === active) || NAV[0];
   const th = threadsFor(currentEnt, currentBranch);
   const badges = {};
   if (role === 'clerk') {
-    badges.incoming = byScope(recIn, currentEnt, currentBranch).filter((r) => r.status === 'awaiting').length;
+    badges.incoming = byScope(recIn, currentEnt, currentBranch).filter((r) => r.status === 'awaiting' || r.status === 'returned').length;
     badges.notifications = byScope(NOTIFS, currentEnt, currentBranch).filter((n) => n.unread).length;
     badges.messages = ['center', 'applicant'].filter((k) => { const arr = th[k]; return arr.length && arr[arr.length - 1].side === 'in'; }).length;
   } else if (role === 'head') {
@@ -534,9 +554,11 @@ function App() {
               )}
             </div>
             <div className="roleseg">
-              {[['clerk', 'badge', 'موظف الفرع'], ['head', 'approval', 'رئيس الفرع'], ['hq', 'corporate_fare', 'المقر']].map(([id, ic, t]) => (
-                <button key={id} className={role === id ? 'on' : ''} onClick={() => switchRole(id)}><I name={ic} size={15} /> {t}</button>
-              ))}
+              {[['clerk', 'badge', 'موظف الفرع'], ['head', 'approval', 'رئيس الفرع'], ['hq', 'corporate_fare', 'المقر']]
+                .filter(([id]) => allowedRoles.includes(id))
+                .map(([id, ic, t]) => (
+                  <button key={id} className={role === id ? 'on' : ''} onClick={() => switchRole(id)}><I name={ic} size={15} /> {t}</button>
+                ))}
             </div>
             <div className="ent-switch">
               <div className="ent-id"><I name="apartment" size={16} color="var(--color-primary)" fill /><div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}><span>{ENT_NAMES[currentEnt]}</span><span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-secondary)' }}>{branchChip}</span></div></div>
@@ -584,10 +606,10 @@ function App() {
             : rec ? <RecommendationForm rec={rec} onApprove={approve} onBack={() => setRec(null)} />
             : (() => { const C = cur.C; return <C key={currentEnt + currentBranch} go={go} openRec={openRec} ent={currentEnt} br={currentBranch} recIn={recIn} recSent={recSent} />; })()
           ) : role === 'head' ? (
-            headItem ? <HB.HeadReview item={headItem} branchName={branchLabel(currentEnt, currentBranch)} onApprove={onApproveHead} onReturn={onReturnHead} onBack={() => setHeadItem(null)} />
+            headItem ? <HB.HeadReview item={headQueue.find((q) => q.recId === headItem.recId) || headItem} branchName={branchLabel(currentEnt, currentBranch)} busy={busy} onApprove={onApproveHead} onReturn={onReturnHead} onBack={() => setHeadItem(null)} />
             : active === 'head-approvals' ? <HB.HeadApprovals branchName={branchLabel(currentEnt, currentBranch)} queue={headQueue} onOpen={(it) => { setHeadItem(it); (typeof window!=='undefined' && window.scrollTo(0,0)); }} />
             : active === 'head-raised' ? <HB.HeadRaised branchName={branchLabel(currentEnt, currentBranch)} raised={headRaised} />
-            : <HB.HeadHome branchName={branchLabel(currentEnt, currentBranch)} stats={{ pending: headQueue.length, overdue: byScope(recIn, currentEnt, currentBranch).filter((r) => r.days >= 4).length, raised: headRaised.length }} onGo={go} />
+            : <HB.HeadHome branchName={branchLabel(currentEnt, currentBranch)} stats={{ pending: headQueue.length, overdue: headQueue.filter(isOverdue).length, raised: headRaised.length }} onGo={go} />
           ) : (
             active === 'hq-esc' ? <HB.HQEscalations entName={ENT_NAMES[currentEnt]} items={hqEsc} branches={ENT_BRANCHES[currentEnt].map((c) => ({ code: c, name: branchLabel(currentEnt, c) }))} onReassign={onReassign} />
             : <HB.HQHome entName={ENT_NAMES[currentEnt]} stats={hqStats} />
@@ -598,6 +620,6 @@ function App() {
   );
 }
 
-export function CompetentEntitiesPortal() {
-  return <App />;
+export function CompetentEntitiesPortal({ level }) {
+  return <App level={level} />;
 }

@@ -13,6 +13,7 @@ create temp table jr as select
   (select id from auth.users where email='1000000001@nafath.local') as subject,
   (select id from auth.users where email='2000000002@nafath.local') as officer,
   (select id from auth.users where email='3000000001@nafath.local') as clerk,
+  (select id from auth.users where email='3000000006@nafath.local') as branch_head,
   (select id from auth.users where email='2000000003@nafath.local') as studier,
   (select id from auth.users where email='2000000004@nafath.local') as evaluator,
   (select id from auth.users where email='2000000005@nafath.local') as preparer,
@@ -21,6 +22,7 @@ create temp table jr as select
 
 do $$ begin
   if exists (select 1 from jr where subject is null or officer is null or clerk is null
+    or branch_head is null
     or studier is null or evaluator is null or preparer is null or deputy is null or chair is null) then
     raise exception 'هويات البذور ناقصة — شغّل seed.sql أولاً';
   end if;
@@ -81,18 +83,33 @@ do $$ declare j jr; c jc; _st case_status; begin
   raise notice '✓ 2) الإحالة: referred + توصية مستحقّة بوحدة + n_ent_req/n_referred';
 end $$;
 
--- ═══════════ 3) تسجيل توصية الجهة (موظف مختصّ) ═══════════
-do $$ declare j jr; c jc; _st case_status; begin
+-- ═══════════ 3) توصية الجهة عبر سلسلة الاعتماد (موظف الفرع ← رئيسه) ═══════════
+-- القناة الإلكترونية تمرّ بالدرجة الأولى إلزاماً: الموظف يُعِدّ ويرفع للاعتماد
+-- (لا تصل المركز)، ورئيس الفرع يعتمد فترد التوصية ويعود الملف للفرز.
+do $$ declare j jr; c jc; _rid uuid; _st case_status; _as text; begin
   select * into j from jr; select * into c from jc;
+
   perform pg_temp.act(j.clerk); set local role authenticated;
-  select status into _st from record_recommendation(
-    c.case_id, 'توفير', 'electronic',
-    '{"risk":"مرتفع"}'::jsonb, '["الحماية الأمنية"]'::jsonb, null, 'توصية بالتوفير', null, null, null, null, null);
+  select recommendation_id into _rid from submit_recommendation_for_approval(
+    c.case_id, 'توفير', '{"risk":"مرتفع"}'::jsonb, '["الحماية الأمنية"]'::jsonb, null, 'توصية بالتوفير');
   reset role;
-  if _st <> 'triage' then raise exception 'ف3: الحالة % لا triage بعد التوصية', _st; end if;
+  if (select status from protection_cases where id=c.case_id) <> 'referred' then
+    raise exception 'ف3: الرفع للاعتماد نقل الحالة قبل اعتماد الرئيس'; end if;
+  if exists (select 1 from recommendations where id=_rid and received_at is not null) then
+    raise exception 'ف3: التوصية وصلت المركز بلا اعتماد'; end if;
+
+  perform pg_temp.act(j.branch_head); set local role authenticated;
+  select new_approval_status, new_case_status into _as, _st
+    from decide_recommendation_approval(_rid, 'approved', 'مطابقة للسند النظامي');
+  reset role;
+  if _as <> 'approved' then raise exception 'ف3: حالة الاعتماد % لا approved', _as; end if;
+  if _st <> 'triage' then raise exception 'ف3: الحالة % لا triage بعد الاعتماد', _st; end if;
   if not exists (select 1 from recommendations where case_id=c.case_id and received_at is not null and decision='توفير') then
     raise exception 'ف3: التوصية لم تُستلَم'; end if;
-  raise notice '✓ 3) التوصية: مُستلَمة (توفير) والحالة عادت triage للقرار الثاني';
+  if not exists (select 1 from recommendation_approvals
+      where recommendation_id=_rid and decision='approved' and approver_id=j.branch_head and decided_at is not null) then
+    raise exception 'ف3: أثر الاعتماد لم يُقيَّد في recommendation_approvals'; end if;
+  raise notice '✓ 3) التوصية: أعدّها الموظف ← اعتمدها رئيس الفرع ← مُستلَمة (توفير) والحالة عادت triage';
 end $$;
 
 -- ═══════════ 4) القبول للدراسة (موظف الفرز) → إسناد آلي ═══════════
