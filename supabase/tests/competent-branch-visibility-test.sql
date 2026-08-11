@@ -81,4 +81,26 @@ do $$ begin
   raise notice 'CBV PASS: الحجب بلا فرع، والعزل الفرعي للتوصيات والقضايا معاً، سليمان';
 end $$;
 
+-- ── حارس الإصلاح نفسه (لا السياسة فقط): سمات حساب البوابة بعد البذر ──
+--  الحزمة أعلاه تبني مستخدمها وتمنحه السمات يدوياً، فتنجح حتى لو أُلغي
+--  الطلب كلُّه. هذا البند يفحص أثر الإصلاح على الحساب المبذور فعلاً.
+do $$
+declare _a jsonb;
+begin
+  select ur.attributes into _a
+    from user_roles ur join auth.users u on u.id = ur.user_id
+   where u.email = '3000000001@nafath.local' and ur.role = 'competent_body';
+  if _a is null then
+    raise notice 'CBV تخطٍّ: حساب بوابة الجهة غير مبذور في هذه القاعدة';
+  else
+    if nullif(btrim(coalesce(_a->>'branch_id','')), '') is null then
+      raise exception 'CBV FAIL: حساب البوابة بلا branch_id — cb_branch() ترجع NULL فتُحجب كل الصفوف';
+    end if;
+    if coalesce(_a->>'level','') not in ('clerk','head') then
+      raise exception 'CBV FAIL: مستوى حساب البوابة (%) خارج clerk|head فلا يمرّ rec_branch_rw', coalesce(_a->>'level','—');
+    end if;
+    raise notice 'CBV PASS — سمات حساب البوابة: level=% · branch_id مضبوط', _a->>'level';
+  end if;
+end $$;
+
 rollback;

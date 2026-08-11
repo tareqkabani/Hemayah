@@ -83,7 +83,8 @@ end $$;
 --   سياسة rec_branch_rw تشترط branch_id (uuid من branches) وlevel ∈ {clerk,head}
 --   في سمات competent_body — وبدونهما تُرجع cb_branch()‏ NULL فلا يمرّ أي صف.
 --   مهاجرة 20260706000009 كانت تمنحهما، لكنها تسبق البذورَ في `db reset` فلا
---   تجد المستخدمَ بعد، ثم upsert القسم (1) يعيد السمات إلى قيمة البذرة فقط.
+--   تجد المستخدمَ بعد (وupsert القسم (1) صار يدمج السمات لا يستبدلها منذ #97،
+--   لكنه لا يخترع ما ليس في البذرة) — فالمنح هنا، بعد الإدراج، هو الفعّال.
 --   فالمنح هنا — بعد الإدراج — هو الفعّال. (branch_id يُخزَّن نصاً داخل jsonb.)
 do $$
 declare _b uuid; _u uuid;
@@ -93,8 +94,11 @@ begin
   select id into _u from auth.users where email = '3000000001@nafath.local';
   if _b is not null and _u is not null then
     update user_roles
-       set attributes = coalesce(attributes, '{}'::jsonb)
-        || jsonb_build_object('level', 'head', 'branch_id', _b::text, 'entity', 'prosecution')
+       -- الافتراضات أولاً والموجود يسود: حسابٌ مضبوطٌ مسبقاً (clerk مثلاً في
+       -- فصل الأدوار لسلسلة الاعتماد) لا يُرقَّى قسراً إلى head — الترقية تمنح
+       -- صلاحية اعتمادٍ لم يقصدها أحد، وتهدم قاعدة «الموظف لا يعتمد عملَ نفسه».
+       set attributes = jsonb_build_object('level', 'head', 'branch_id', _b::text, 'entity', 'prosecution')
+        || coalesce(attributes, '{}'::jsonb)
      where role = 'competent_body' and user_id = _u;
   end if;
 end $$;

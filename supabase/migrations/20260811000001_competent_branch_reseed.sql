@@ -27,8 +27,11 @@ begin
   select id into _u from auth.users where email = '3000000001@nafath.local';
   if _ruh is not null and _u is not null then
     update user_roles
-       set attributes = coalesce(attributes, '{}'::jsonb)
-        || jsonb_build_object('level', 'head', 'branch_id', _ruh::text, 'entity', 'prosecution')
+       -- الافتراضات أولاً والموجود يسود: حسابٌ مضبوطٌ مسبقاً (clerk مثلاً في
+       -- فصل الأدوار لسلسلة الاعتماد) لا يُرقَّى قسراً إلى head — الترقية تمنح
+       -- صلاحية اعتمادٍ لم يقصدها أحد، وتهدم قاعدة «الموظف لا يعتمد عملَ نفسه».
+       set attributes = jsonb_build_object('level', 'head', 'branch_id', _ruh::text, 'entity', 'prosecution')
+        || coalesce(attributes, '{}'::jsonb)
      where role = 'competent_body' and user_id = _u;
   end if;
 
