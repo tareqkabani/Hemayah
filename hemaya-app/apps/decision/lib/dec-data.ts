@@ -1,4 +1,4 @@
-import { createServerClient, createServiceClient } from "@hemaya/supabase";
+import { createServerClient } from "@hemaya/supabase";
 import { CATEGORY, RISK_LEVEL } from "@hemaya/domain";
 
 // ── تغذية بوابة القرار (CO-3) من الخطّ الحقيقي: protection_cases + council_* ──
@@ -62,27 +62,37 @@ export async function getDecisionData() {
 
   // خريطة voter_id → seat (لا تكشف مضمون الأصوات — تحلّ المعرّفات فقط)
   const idToSeat: Record<string, string> = {};
-  // بيانات طالب الحماية غير المعرِّفة + صلة جهة الطوارئ (حزمة 11): سياسات
-  // subjects/emergency_contacts صمّاء عمداً (sysadmin_no_pii / deny-all)، فتُقرأ
-  // الأعمدة غير المشفّرة حصراً عبر service — لا اسم ولا هوية ولا هاتف هنا.
+  // بيانات طالب الحماية غير المعرِّفة + صلة جهة الطوارئ (حزمة 11).
+  // ⚠️ لا مفتاح خدمة هنا: سياسات subjects/emergency_contacts صمّاء عمداً
+  // (sysadmin_no_pii / deny-all)، وكان تجاوزها بـservice role يجعل الضمانةَ
+  // الوحيدةَ انضباطَ نصّ الاستعلام — فأيّ توسعةٍ سهوية لقائمة الأعمدة تنجح
+  // صامتة. صارت القراءة عبر دالّتين SECURITY DEFINER تفحصان الأهلية ولا
+  // تُخرجان عموداً مشفّراً أصلاً (20260811000004).
   const subjectByCase: Record<string, any> = {};
   const emergencyByCase: Record<string, any> = {};
-  const admin = createServiceClient();
-  try {
-    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    for (const u of list?.users ?? []) { const s = SEAT_BY_EMAIL[u.email || ""]; if (s) idToSeat[u.id] = s; }
-  } catch { /* تحلّ إلى لا شيء — تُعرض المقاعد المعروفة فقط */ }
-  try {
-    if (ids.length) {
-      const { data: subs } = await admin.from("subjects")
-        .select("case_id, subject_type, gender, nationality, birth_date, marital_status, national_address, employer, job_title, education_level, source_flags")
-        .in("case_id", ids).eq("subject_type", "principal");
-      for (const s of (subs as any[]) ?? []) subjectByCase[s.case_id] = s;
-      const { data: ecs } = await admin.from("emergency_contacts")
-        .select("case_id, relationship").in("case_id", ids);
-      for (const e of (ecs as any[]) ?? []) emergencyByCase[e.case_id] = { relationship: e.relationship };
+  {
+    // خريطة المقاعد: أصحاب أدوار المجلس حصراً — بدل listUsers التي كانت
+    // تسحب كل المستخدمين (ومنهم طالبو الحماية) لحاجةٍ لا تتجاوز سبعة مقاعد.
+    const { data: seats } = await (supabase.rpc as any)("council_seat_map");
+    for (const u of (seats as any[]) ?? []) {
+      const s = SEAT_BY_EMAIL[u.email || ""];
+      if (s) idToSeat[u.user_id] = s;
     }
-  } catch { /* تحلّ إلى لا شيء — بطاقة البيانات تعرض حالتها الفارغة */ }
+  }
+  if (ids.length) {
+    const { data: parties } = await (supabase.rpc as any)("decision_case_parties", { _case_ids: ids });
+    for (const p of (parties as any[]) ?? []) {
+      if (p.subject_type) {
+        subjectByCase[p.case_id] = {
+          case_id: p.case_id, subject_type: p.subject_type, gender: p.gender,
+          nationality: p.nationality, birth_date: p.birth_date, marital_status: p.marital_status,
+          national_address: p.national_address, employer: p.employer, job_title: p.job_title,
+          education_level: p.education_level, source_flags: p.source_flags,
+        };
+      }
+      if (p.emergency_registered) emergencyByCase[p.case_id] = { relationship: p.emergency_relationship };
+    }
+  }
 
   // تعقيم details قبل مغادرتها الخادم: مفاتيح الهوية لا تصل حزمة القرار —
   // النيابة عن شخص تُختزل إلى الواقعة والعمر، وجهة الطوارئ إلى «مسجّلة» (م15/16)

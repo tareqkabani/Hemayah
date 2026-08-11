@@ -84,6 +84,8 @@ MIGRATIONS=(
   # دفعة 11 أغسطس: سلسلة اعتماد رئيس الفرع (#105) — القائمة صريحة لا glob،
   # فما لا يُدرج هنا لا يصل التجريبية إطلاقاً (نُقل الإدراج من #104).
   "20260811000003_recommendation_approval_chain.sql"
+  # إنهاء مفتاح الخدمة من عرض حزمة القرار (دالّتا قراءةٍ مقيَّدتان)
+  "20260811000004_decision_parties_no_service_role.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
@@ -124,6 +126,7 @@ chk "select count(*) from vault.secrets where name='subject_identity_key'" 1 "م
 chk "select count(*) from protection_requests where details ? 'identity'" 0 "identity مبتورة إلى subjects (#96)"
 chk "select count(*) from pg_proc where proname in ('submit_recommendation_for_approval','decide_recommendation_approval','branch_approval_queue')" 3 "دوال سلسلة اعتماد رئيس الفرع (#105)"
 chk "select count(*) from approval_chains where step_no=1 and approver='branch_head' and active" 5 "درجة الاعتماد الأولى لكل جهة (#105)"
+chk "select count(*) from pg_proc where proname in ('decision_case_parties','council_seat_map')" 2 "دالّتا حزمة القرار بلا مفتاح خدمة"
 
 # ── تسجيل النسخ (يمنع انحراف «الكائن موجود دون نسخته») ──
 echo "── تسجيل النسخ في schema_migrations"
