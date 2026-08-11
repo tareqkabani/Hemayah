@@ -31,7 +31,13 @@ begin
       ('2000000062','board_member',       '{}'::jsonb,                        'عضو المجلس (الداخلية)'),
       ('2000000063','board_member',       '{}'::jsonb,                        'عضو المجلس (أمن الدولة)'),
       ('2000000064','board_member',       '{}'::jsonb,                        'عضو المجلس (نزاهة)'),
-      ('3000000001','competent_body',     '{"authority":"competent"}'::jsonb, 'الجهة المختصّة'),
+      ('3000000001','competent_body',     '{"authority":"competent","entity":"prosecution","level":"clerk"}'::jsonb, 'موظف الفرع — النيابة'),
+      -- رئيس الفرع: فاعلُ الدرجة الأولى في سلسلة الاعتماد (م7) — بلا حسابٍ
+      -- بمستوى head تبقى decide_recommendation_approval بلا من يستدعيها.
+      ('3000000006','competent_body',     '{"authority":"competent","entity":"prosecution","level":"head"}'::jsonb, 'رئيس الفرع — النيابة'),
+      -- المقر: يشرف على كل فروع جهته ولا يعتمد (rec_hq_read قراءةٌ فقط) —
+      -- وشاشاته صارت مقصورةً على مستواه بعد أن صار مبدّل الدور تابعاً لـcb_level.
+      ('3000000007','competent_body',     '{"authority":"competent","entity":"prosecution","level":"hq"}'::jsonb,   'المقر — النيابة العامة'),
       ('3000000002','moh_specialist',     '{"authority":"health"}'::jsonb,    'أخصائي الصحة'),
       ('3000000003','hr_specialist',      '{"authority":"hr"}'::jsonb,        'أخصائي الموارد البشرية'),
       ('3000000004','security_manager',   '{"authority":"security"}'::jsonb,  'مدير الإدارة الأمنية'),
@@ -88,7 +94,7 @@ end $$;
 --   مهاجرة 20260706000009 كانت تمنحهما، لكنها تسبق البذورَ في `db reset` فلا
 --   تجد المستخدمَ بعد (وupsert القسم (1) صار يدمج السمات لا يستبدلها منذ #97،
 --   لكنه لا يخترع ما ليس في البذرة) — فالمنح هنا، بعد الإدراج، هو الفعّال.
---   فالمنح هنا — بعد الإدراج — هو الفعّال. (branch_id يُخزَّن نصاً داخل jsonb.)
+--   (branch_id يُخزَّن نصاً داخل jsonb.)
 do $$
 declare _b uuid; _u uuid;
 begin
@@ -104,6 +110,22 @@ begin
         || coalesce(attributes, '{}'::jsonb)
      where role = 'competent_body' and user_id = _u;
   end if;
+end $$;
+
+-- ── ١-ب٢) فرعُ حسابات الجهة المختصة (الموظف ورئيسه معاً) ──
+-- كل سياسات RLS على recommendations موجَّهة بالفرع (cb_branch)، وسلسلةُ
+-- الاعتماد تشترط أن يكون الموظفُ ورئيسُه في الفرع نفسه. الجسر يحلّ السمة
+-- عند الدخول، لكن اختبارات القاعدة والانتحال لا تمرّ به — فتُحلّ هنا أيضاً.
+do $$
+declare _ruh uuid;
+begin
+  select id into _ruh from branches where entity = 'prosecution' and region = 'RUH' limit 1;
+  if _ruh is null then return; end if;
+  update user_roles ur
+     set attributes = coalesce(ur.attributes, '{}'::jsonb) || jsonb_build_object('branch_id', _ruh::text)
+    from auth.users u
+   where u.id = ur.user_id and ur.role = 'competent_body'
+     and u.email in ('3000000001@nafath.local', '3000000006@nafath.local');
 end $$;
 
 -- ── 2) قضيتان في مرحلة القرار لتجربة المسار المختصر فوراً ──

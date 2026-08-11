@@ -1580,6 +1580,8 @@ export type Database = {
           factors9: Json | null
           id: string
           notes: string | null
+          prepared_at: string | null
+          prepared_by: string | null
           proposed_duration: string | null
           proposed_type: Json | null
           raised_at: string | null
@@ -1600,6 +1602,8 @@ export type Database = {
           factors9?: Json | null
           id?: string
           notes?: string | null
+          prepared_at?: string | null
+          prepared_by?: string | null
           proposed_duration?: string | null
           proposed_type?: Json | null
           raised_at?: string | null
@@ -1620,6 +1624,8 @@ export type Database = {
           factors9?: Json | null
           id?: string
           notes?: string | null
+          prepared_at?: string | null
+          prepared_by?: string | null
           proposed_duration?: string | null
           proposed_type?: Json | null
           raised_at?: string | null
@@ -2195,6 +2201,30 @@ export type Database = {
         Args: { _case_id: string; _per_role?: number }
         Returns: undefined
       }
+      branch_approval_queue: {
+        Args: never
+        Returns: {
+          approval_status: string
+          branch_id: string
+          case_due_at: string
+          case_id: string
+          category: Database["public"]["Enums"]["app_category"]
+          decision: string
+          entity: Database["public"]["Enums"]["competent_entity"]
+          factors9: Json
+          last_note: string
+          notes: string
+          prepared_at: string
+          prepared_by_name: string
+          proposed_duration: string
+          proposed_type: Json
+          recommendation_id: string
+          ref_no: string
+          region: Database["public"]["Enums"]["region_code"]
+          secret_code: string
+          step_due_at: string
+        }[]
+      }
       branch_subtree: { Args: { _root: string }; Returns: string[] }
       business_days_between: {
         Args: { _from: string; _to: string }
@@ -2321,6 +2351,13 @@ export type Database = {
       }
       council_vote_open: { Args: { _case_id: string }; Returns: boolean }
       current_officer_caseids: { Args: never; Returns: string[] }
+      decide_recommendation_approval: {
+        Args: { _decision: string; _note?: string; _recommendation_id: string }
+        Returns: {
+          new_approval_status: string
+          new_case_status: Database["public"]["Enums"]["case_status"]
+        }[]
+      }
       execution_emergency_contact: {
         Args: { _case_id: string }
         Returns: {
@@ -2732,6 +2769,21 @@ export type Database = {
           case_id: string
           ref_no: string
           secret_code: string
+        }[]
+      }
+      submit_recommendation_for_approval: {
+        Args: {
+          _case_id: string
+          _decision: string
+          _factors9?: Json
+          _notes?: string
+          _proposed_duration?: string
+          _proposed_type?: Json
+        }
+        Returns: {
+          approval_status: string
+          recommendation_id: string
+          step_due_at: string
         }[]
       }
       submit_study: {

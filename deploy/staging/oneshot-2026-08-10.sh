@@ -81,6 +81,9 @@ MIGRATIONS=(
   "20260810000002_emergency_contact_encryption.sql"
   # ملحق #96: تعبئة subjects من مسارَي التقديم (مفتاح Vault + اعتراض + backfill)
   "20260810000003_subject_intake_sync.sql"
+  # دفعة 11 أغسطس: سلسلة اعتماد رئيس الفرع (#105) — القائمة صريحة لا glob،
+  # فما لا يُدرج هنا لا يصل التجريبية إطلاقاً (نُقل الإدراج من #104).
+  "20260811000003_recommendation_approval_chain.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
@@ -119,6 +122,8 @@ chk "select count(*) from pg_proc where proname in ('execution_emergency_contact
 chk "select count(*) from protection_requests where details ? 'emergency_contact'" 0 "details مبتورة بعد الترحيل"
 chk "select count(*) from vault.secrets where name='subject_identity_key'" 1 "مفتاح هوية طالب الحماية في Vault (#96)"
 chk "select count(*) from protection_requests where details ? 'identity'" 0 "identity مبتورة إلى subjects (#96)"
+chk "select count(*) from pg_proc where proname in ('submit_recommendation_for_approval','decide_recommendation_approval','branch_approval_queue')" 3 "دوال سلسلة اعتماد رئيس الفرع (#105)"
+chk "select count(*) from approval_chains where step_no=1 and approver='branch_head' and active" 5 "درجة الاعتماد الأولى لكل جهة (#105)"
 
 # ── تسجيل النسخ (يمنع انحراف «الكائن موجود دون نسخته») ──
 echo "── تسجيل النسخ في schema_migrations"
@@ -127,7 +132,7 @@ psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "insert into supabase_migrations.schema_
 
 # ── حزم الاختبار على التجريبية نفسها ──
 echo "── حزم الاختبار (كلٌّ في معاملة تُدحرج — لا أثر يبقى)"
-for t in triage-portal-tests study-eval-request-redaction-tests decision-approval-ring-tests emergency-contact-encryption-tests subject-intake-tests; do
+for t in triage-portal-tests study-eval-request-redaction-tests decision-approval-ring-tests emergency-contact-encryption-tests subject-intake-tests approval-chain-tests; do
   echo "   ── $t"
   psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$TESTS/$t.sql" || exit 1
 done
