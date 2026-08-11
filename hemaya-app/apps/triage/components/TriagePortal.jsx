@@ -314,7 +314,7 @@ function FormalCheck({ checks, setChecks }) {
       <div style={{ display: 'grid', gap: 8 }}>
         {CHECK_ITEMS.map((it) => (
           <div key={it.id} className="chk-row">
-            <span className="chk-label"><I name={checks[it.id] === 'yes' ? 'check_circle' : checks[it.id] === 'no' ? 'cancel' : 'radio_button_unchecked'} size={18} color={checks[it.id] === 'yes' ? 'var(--color-success)' : checks[it.id] === 'no' ? 'var(--color-error)' : 'var(--text-disabled)'} fill={!!checks[it.id]} /> {it.label} <span className="chk-ref">{it.ref}</span></span>
+            <span className="chk-label"><I name={checks[it.id] === 'yes' ? 'check_circle' : checks[it.id] === 'no' ? 'cancel' : 'radio_button_unchecked'} size={18} color={checks[it.id] === 'yes' ? 'var(--color-success)' : checks[it.id] === 'no' ? 'var(--color-error)' : 'var(--text-disabled)'} fill={!!checks[it.id]} /> {it.label}</span>
             <span className="chk-toggle">
               <button className={'seg' + (checks[it.id] === 'yes' ? ' on' : '')} onClick={() => set(it.id, 'yes')}>نعم</button>
               <button className={'seg danger' + (checks[it.id] === 'no' ? ' on' : '')} onClick={() => set(it.id, 'no')}>لا</button>
@@ -509,7 +509,7 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16, gap: 10 }}>
             <button className="btn btn-ghost" onClick={back}>إلغاء</button>
             <button className="btn btn-primary" disabled={!canSubmit} onClick={() => onResolve(rec, effDecision || decision, decision === 'refer' ? { label: destLabelT(entity, branch), entity, region: isCentralEntity(entity) ? null : branch } : undefined, needsChecks ? checks : undefined, note.trim())}>
-              اعتماد القرار <I name="arrow_back" size={18} />
+              إرسال <I name="arrow_back" size={18} />
             </button>
           </div>
         </Card>
