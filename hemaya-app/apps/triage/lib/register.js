@@ -64,6 +64,11 @@ export function mapCases(rows, now = new Date()) {
       : null;
 
     const closeReview = [...reviews].reverse().find((r) => r.decision === "close");
+    const referReview = [...reviews].reverse().find((r) => r.decision === "refer");
+    // طوابع الوقائع خاماً (لا منسّقة) — الإشعارات تُؤرَّخ بوقت واقعتها لا بوقت
+    // ورود الطلب، وإلا رُتّب «وردت التوصية» بتاريخ ميلاد القضية فبدا قديماً.
+    const referredAt = (rec && rec.raised_at) || (referReview && referReview.created_at) || null;
+    const repliedAt = (rec && rec.received_at) || null;
 
     // الخط الزمني من الوقائع الفعلية (بطوابعها) — لا نصوص مُلفّقة
     const events = [{
@@ -90,6 +95,8 @@ export function mapCases(rows, now = new Date()) {
       clerk: "c1",
       days: daysAgoLabel(c.created_at),
       createdAt: c.created_at,
+      referredAt,
+      repliedAt,
       prior: !!details.prior_submit,
       urgency: "عادي",
       paper: !!isPaper,
