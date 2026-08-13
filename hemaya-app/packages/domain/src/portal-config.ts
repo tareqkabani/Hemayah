@@ -50,6 +50,7 @@ export type PortalScreenId =
   | "dashboard"
   | "tasks"
   | "queue"
+  | "sent"
   | "messages"
   | "notifications"
   | "profile";
@@ -248,7 +249,9 @@ export const EVALUATOR_CONFIG: PortalConfig = {
 
 const TRIAGE_SHARED = {
   defaultScreen: "dashboard" as const,
-  screens: ["dashboard", "queue", "messages", "notifications", "profile"] as PortalScreenId[],
+  // «الطلبات المرسلة» شاشةٌ مستقلّة: ما أُحيل لجهةٍ لطلب توصية بمهلته —
+  // كان يختفي داخل القائمة المشتركة فلا يُرى تجاوز المهلة إلا بالتنقيب.
+  screens: ["dashboard", "queue", "sent", "messages", "notifications", "profile"] as PortalScreenId[],
   emergencyButton: false, // موظف الفرز لا يستقبل بلاغات خطر مباشرة (م8)
   identityMode: "secret-code" as const,
   identityRevealSeconds: 6,
@@ -278,7 +281,10 @@ export const TRIAGE_CONFIG: PortalConfig = {
   roles: ["case_officer"],
   label: "موظف الفرز",
   strings: { brandSub: "بوابة الفرز المبدئي — موظفو المركز" },
-  screenMeta: { queue: { t: "الطلبات الواردة", icon: "inbox" } },
+  screenMeta: {
+    queue: { t: "الطلبات الواردة", icon: "inbox" },
+    sent: { t: "الطلبات المرسلة", icon: "outgoing_mail" },
+  },
   messaging: {
     mode: "initiator", // الموظفون يبدأون — قاعدة «الرد فقط» خاصة ببوابة طالب الحماية
     parties: [
@@ -301,9 +307,13 @@ export const TRIAGE_CONFIG: PortalConfig = {
     if (r.status === "replied") return { t: "وردت توصية الجهة — اتخاذ قرار الفرز (م10)", icon: "gavel" };
     if (r.status === "triage")
       return {
-        t: r.paper
-          ? "ورود ورقيّ (هوية غير موثّقة) — محضر اتصال ثم الفحص الشكلي (م7)"
-          : "محضر اتصال موثّق ثم الفحص الشكلي فقرار الفرز (م7)",
+        // الحضوريّ قُوبل في وحدة الإدخال ومحضر مقابلته مكتوبٌ محضرَ تحقّق —
+        // فلا يُطالَب بمحضر اتصالٍ ثانٍ (قرار ٣ في تسليم الإدخال اليدوي).
+        t: r.inperson
+          ? "قُوبل حضورياً — الفحص الشكليّ ثمّ القرار (إحالة لجهة · حفظ · إغلاق)"
+          : r.paper
+            ? "ورود ورقيّ (هوية غير موثّقة) — محضر اتصال ثم الفحص الشكلي (م7)"
+            : "محضر اتصال موثّق ثم الفحص الشكلي فقرار الفرز (م7)",
         icon: "fact_check",
       };
     return null;
@@ -316,7 +326,10 @@ export const TRIAGE_LEAD_CONFIG: PortalConfig = {
   roles: ["deputy_chair", "board_chair"],
   label: "قيادة المركز",
   strings: { brandSub: "الفرز المبدئي — إشراف القيادة" },
-  screenMeta: { queue: { t: "سجلّ الفرز", icon: "inbox" } },
+  screenMeta: {
+    queue: { t: "سجلّ الفرز", icon: "inbox" },
+    sent: { t: "الطلبات المرسلة", icon: "outgoing_mail" },
+  },
   messaging: {
     mode: "read-only", // القيادة لا تراسل نيابةً عن الموظف
     parties: [

@@ -22,7 +22,8 @@ export type PaperIntakeInput = {
   priorSubmit: boolean;
   caseNo: string;
   receivedDate?: string; // تاريخ الورود الفعلي (ISO) — منه تُحسب المُهل (م10)
-  regNo?: string;        // رقم القيد الإداري / مرجع الموقع القديم
+  regNo?: string;        // رقم القيد الإداري / مرجع الموقع الإلكتروني
+  inboxId?: string;      // صفّ الواردة الذي يُفرَّغ (إن فُتح النموذج منها)
   details?: Record<string, unknown>;
 };
 
@@ -43,10 +44,12 @@ export async function submitPaperIntake(input: PaperIntakeInput) {
     _details: (input.details || {}) as Json,
     _received_date: (input.receivedDate || null) as string,
     _reg_no: (input.regNo || null) as string,
+    _inbox_id: (input.inboxId || null) as string,
   });
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
   revalidatePath("/triage");
+  revalidatePath("/paper-intake");
   return { ok: true as const, ref: row?.ref_no as string, secret: row?.secret_code as string, caseId: row?.case_id as string };
 }
 
@@ -96,6 +99,7 @@ export type PaperRecommendationInput = {
   letterNo?: string;       // رقم خطاب الجهة
   letterDate?: string;     // تاريخ الخطاب
   letterBy?: string;       // مُعِدّ التوصية في الجهة
+  inboxId?: string;        // صفّ الواردة الذي يُفرَّغ
 };
 
 // توصية ورقية على طلبٍ مُحال: تُقيَّد على التوصية المعلّقة للطلب نفسه عبر
@@ -116,9 +120,126 @@ export async function submitPaperRecommendation(input: PaperRecommendationInput)
     _letter_no: (input.letterNo || null) as string,
     _letter_date: (input.letterDate || null) as string,
     _letter_by: (input.letterBy || null) as string,
+    _inbox_id: (input.inboxId || null) as string,
   });
   if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
   revalidatePath("/triage");
+  revalidatePath("/paper-intake");
   return { ok: true as const, status: (row as { status?: string } | undefined)?.status };
+}
+
+// ════════════════ سِجلّ الوحدة — الواردة والمرسلة والمسوّدات ════════════════
+// كلّ ما تحته يمرّ بدوالّ SECURITY DEFINER تحرس الدور (is_intake_staff)
+// وتكتب في التدقيق باسم الفاعل — لا كتابة مباشرة على الجدولين.
+
+export type InboxRow = {
+  id: string;
+  channel: "legacy" | "inperson" | "mail";
+  docKind: "req" | "rec";
+  regNo: string;
+  arrivedOn: string;      // ISO date — منه تُحسب المُهل (م10)
+  claimedBy: string | null;
+  claimedName: string;
+};
+
+export async function listInbox() {
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("intake_inbox_list");
+  if (error) return { ok: false as const, error: error.message, rows: [] as InboxRow[] };
+  const rows: InboxRow[] = (data || []).map((r) => ({
+    id: r.id as string,
+    channel: r.channel as InboxRow["channel"],
+    docKind: r.doc_kind as InboxRow["docKind"],
+    regNo: r.reg_no as string,
+    arrivedOn: String(r.arrived_on),
+    claimedBy: (r.claimed_by as string) || null,
+    claimedName: (r.claimed_name as string) || "",
+  }));
+  return { ok: true as const, rows };
+}
+
+export type SentRow = {
+  id: string;
+  secret: string;
+  channel: "legacy" | "inperson" | "mail";
+  docKind: "req" | "rec";
+  regNo: string;
+  arrivedOn: string;
+  entity: string;
+  byName: string;
+  byRole: string;
+  at: string;
+  verified: boolean;
+  status: string;
+};
+
+export async function listSent() {
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("intake_sent_list");
+  if (error) return { ok: false as const, error: error.message, rows: [] as SentRow[] };
+  const rows: SentRow[] = (data || []).map((r) => ({
+    id: r.id as string,
+    secret: r.secret_code as string,
+    channel: r.channel as SentRow["channel"],
+    docKind: r.doc_kind as SentRow["docKind"],
+    regNo: (r.reg_no as string) || "",
+    arrivedOn: String(r.arrived_on),
+    entity: (r.entity as string) || "",
+    byName: (r.entered_by_name as string) || "",
+    byRole: (r.entered_by_role as string) || "",
+    at: String(r.entered_at || ""),
+    verified: !!r.identity_verified,
+    status: (r.case_status as string) || "",
+  }));
+  return { ok: true as const, rows };
+}
+
+export async function registerInbox(input: {
+  channel: string; docKind: string; regNo: string; arrivedOn: string;
+}) {
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("intake_inbox_register", {
+    _channel: input.channel,
+    _doc_kind: input.docKind || "req",
+    _reg_no: input.regNo,
+    _arrived_on: input.arrivedOn,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/paper-intake");
+  return { ok: true as const, id: data as unknown as string };
+}
+
+export async function claimInbox(id: string) {
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("intake_inbox_claim", { _id: id });
+  if (error) return { ok: false as const, error: error.message };
+  const row = Array.isArray(data) ? data[0] : data;
+  revalidatePath("/paper-intake");
+  return { ok: true as const, name: (row as { claimed_by_name?: string } | undefined)?.claimed_by_name || "" };
+}
+
+// المسوّدة على الخادم (فجوة الإنتاج ٢): لكل قيدٍ ومُدخِل، ولا يقرؤها زميل.
+export async function saveDraft(regNo: string, payload: Record<string, unknown>) {
+  if (!regNo?.trim()) return { ok: true as const };
+  const supabase = createServerClient();
+  const { error } = await supabase.rpc("intake_draft_save", {
+    _reg_no: regNo, _payload: payload as Json,
+  });
+  return error ? { ok: false as const, error: error.message } : { ok: true as const };
+}
+
+export async function loadDraft(regNo: string) {
+  if (!regNo?.trim()) return { ok: true as const, payload: null };
+  const supabase = createServerClient();
+  const { data, error } = await supabase.rpc("intake_draft_load", { _reg_no: regNo });
+  if (error) return { ok: false as const, error: error.message, payload: null };
+  return { ok: true as const, payload: (data as Record<string, unknown> | null) ?? null };
+}
+
+export async function clearDraft(regNo: string) {
+  if (!regNo?.trim()) return { ok: true as const };
+  const supabase = createServerClient();
+  const { error } = await supabase.rpc("intake_draft_clear", { _reg_no: regNo });
+  return error ? { ok: false as const, error: error.message } : { ok: true as const };
 }
