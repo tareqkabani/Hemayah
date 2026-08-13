@@ -12,7 +12,9 @@ const SECTIONS: { t: string; href?: string; external?: boolean }[] = [
   { t: "التنفيذ والتجديد — دورة حياة المشمولين", href: "/execution" },
   { t: "قيادة المركز — رئيس المركز (إشراف)", href: "/oversight" },
   { t: "قيادة المركز — نائب رئيس المركز", href: "/oversight-deputy" },
-  { t: `${PAPER_INTAKE_LABEL} (وحدة مؤقّتة)`, href: "/paper-intake" },
+  // «وحدة مؤقّتة» أُسقطت من كل الواجهات بقرار المستخدم (تسليم 13 أغسطس 2026):
+  // الوحدة تبقى قابلةً للعزل، لكنها لم تعد مؤقّتة في التسمية.
+  { t: PAPER_INTAKE_LABEL, href: "/paper-intake" },
 ];
 
 export default function Page() {
