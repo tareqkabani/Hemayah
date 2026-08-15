@@ -91,7 +91,7 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
         <ContentScreen lists={lists} itemsByList={itemsByList} templates={templates}
           sysMessages={sysMessages} legalTexts={legalTexts} say={say} noPii={sysMsgOf("s_sysadmin")} />
       )}
-      {active === "users" && <UsersScreen staff={staff} me={me} say={say} />}
+      {active === "users" && <UsersScreen staff={staff} me={me} say={say} org={org} />}
       {active === "roles" && <RolesScreen staff={staff} />}
       {active === "entities" && <EntitiesScreen org={org} say={say} />}
       {active === "settings" && <SettingsScreen settings={settings} say={say} />}
@@ -582,19 +582,53 @@ function TextDetail({ m, kind, back, say }) {
 /* ═══════════ المستخدمون والأدوار ═══════════ */
 const GRANTABLE_ROLES = Object.keys(ROLE_LABEL).filter((r) => r !== "subject");
 
-function UsersScreen({ staff, me, say }) {
+// أدوار سلطتها ثابتة تُشتقّ آلياً (لا يُدخلها الأدمن) — بلا authority لا يرون إحالاتهم
+const ROLE_FIXED_AUTHORITY = {
+  moh_specialist: "health", moh_manager: "health",
+  hr_specialist: "hr", hr_manager: "hr",
+  security_officer: "security", security_manager: "security",
+  moi_officer: "moi",
+};
+const ENTITY_OPTS = [["prosecution", "النيابة العامة"], ["state_security", "رئاسة أمن الدولة"], ["moi", "وزارة الداخلية"], ["nazaha", "هيئة الرقابة ومكافحة الفساد"], ["moj", "وزارة العدل"]];
+const LEVEL_OPTS = [["clerk", "موظف وحدة"], ["head", "رئيس وحدة"], ["hq", "المقر"]];
+
+function UsersScreen({ staff, me, say, org }) {
   const [rows, setRows] = useState(staff);
   const [q, setQ] = useState("");
-  const [granting, setGranting] = useState(null); // {userId, role}
+  const [granting, setGranting] = useState(null); // {userId, role, entity, level, branchId}
+  const [busy, setBusy] = useState(false);
   const list = rows.filter((u) => hit(q, u.name, u.email, (u.roles || []).map((r) => ROLE_LABEL[r.role] || r.role).join(" ")));
+
+  // وحدات جهةٍ مختصة (لاختيار فرع المنسوب) من بيانات admin_list_org
+  const unitsOf = (entity) => ((org || []).find((e) => e.entity === entity)?.units || []);
+
+  // بناء السمات المطلوبة، والتحقق من اكتمالها قبل المنح
+  const buildAttrs = () => {
+    const { role, entity, level, branchId } = granting;
+    if (role in ROLE_FIXED_AUTHORITY) return { attrs: { authority: ROLE_FIXED_AUTHORITY[role] }, ok: true };
+    if (role === "competent_body") {
+      if (!entity || !level) return { ok: false, msg: "اختر الجهة والمستوى." };
+      const a = { authority: "competent", entity, level };
+      if (level !== "hq") {
+        if (!branchId) return { ok: false, msg: "اختر الوحدة/الفرع الذي ينتمي إليه المنسوب." };
+        a.branch_id = branchId;
+      }
+      return { attrs: a, ok: true };
+    }
+    return { attrs: null, ok: true };
+  };
 
   const doGrant = async () => {
     const { userId, role } = granting;
     if (!role) return;
-    const r = await grantRole(userId, role);
+    const built = buildAttrs();
+    if (!built.ok) return say("⚠ " + built.msg);
+    setBusy(true);
+    const r = await grantRole(userId, role, built.attrs || undefined);
+    setBusy(false);
     if (!r.ok) return say("⚠ " + r.error);
     setRows((xs) => xs.map((u) => u.user_id === userId
-      ? { ...u, roles: (u.roles || []).some((x) => x.role === role) ? u.roles : [...(u.roles || []), { role, attributes: {} }] } : u));
+      ? { ...u, roles: (u.roles || []).some((x) => x.role === role) ? u.roles : [...(u.roles || []), { role, attributes: built.attrs || {} }] } : u));
     setGranting(null);
     say("مُنح الدور «" + (ROLE_LABEL[role] || role) + "» — مُسجَّل في التدقيق");
   };
@@ -630,16 +664,44 @@ function UsersScreen({ staff, me, say }) {
                 <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.created_at ? new Date(u.created_at).toLocaleDateString("ar-SA") : "—"}</td>
                 <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("ar-SA") : "—"}</td>
                 <td>{!self && (granting?.userId === u.user_id ? (
-                  <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                    <select className="ad-input" style={{ width: "auto", padding: "5px 8px", fontSize: 12 }} value={granting.role}
-                      onChange={(e) => setGranting({ userId: u.user_id, role: e.target.value })}>
-                      <option value="">اختر دوراً…</option>
-                      {GRANTABLE_ROLES.filter((r) => !(u.roles || []).some((x) => x.role === r)).map((r) => (
-                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>))}
-                    </select>
-                    <button className="ad-ibtn" title="منح" onClick={doGrant}><I name="check" size={18} color="var(--color-primary)" /></button>
-                    <button className="ad-ibtn" title="إلغاء" onClick={() => setGranting(null)}><I name="close" size={18} /></button>
-                  </span>
+                  <div style={{ display: "grid", gap: 6, minWidth: 200 }}>
+                    <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                      <select className="ad-input" style={{ width: "auto", padding: "5px 8px", fontSize: 12, flex: 1 }} value={granting.role}
+                        onChange={(e) => setGranting({ userId: u.user_id, role: e.target.value })}>
+                        <option value="">اختر دوراً…</option>
+                        {GRANTABLE_ROLES.filter((r) => !(u.roles || []).some((x) => x.role === r)).map((r) => (
+                          <option key={r} value={r}>{ROLE_LABEL[r]}</option>))}
+                      </select>
+                      <button className="ad-ibtn" title="منح" disabled={busy || !granting.role} onClick={doGrant}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setGranting(null)}><I name="close" size={18} /></button>
+                    </span>
+                    {/* سمات المنسوب المطلوبة — بلا هذه لا يرى الممنوح شيئاً تحت RLS */}
+                    {granting.role === "competent_body" && (
+                      <div style={{ display: "grid", gap: 5, background: "var(--surface-subtle)", padding: 8, borderRadius: "var(--radius-md)" }}>
+                        <span className="muted" style={{ fontSize: 11 }}>سمات المنسوب (لازمة ليرى قضاياه):</span>
+                        <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.entity || ""}
+                          onChange={(e) => setGranting({ ...granting, entity: e.target.value, branchId: "" })}>
+                          <option value="">الجهة المختصة…</option>
+                          {ENTITY_OPTS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                        </select>
+                        <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.level || ""}
+                          onChange={(e) => setGranting({ ...granting, level: e.target.value })}>
+                          <option value="">المستوى…</option>
+                          {LEVEL_OPTS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                        </select>
+                        {granting.entity && granting.level && granting.level !== "hq" && (
+                          <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.branchId || ""}
+                            onChange={(e) => setGranting({ ...granting, branchId: e.target.value })}>
+                            <option value="">الوحدة/الفرع…</option>
+                            {unitsOf(granting.entity).filter((un) => un.kind !== "hq").map((un) => <option key={un.id} value={un.id}>{un.name}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                    {granting.role in ROLE_FIXED_AUTHORITY && (
+                      <span className="muted" style={{ fontSize: 11 }}><I name="check_circle" size={12} color="var(--color-primary)" /> السلطة «{ROLE_FIXED_AUTHORITY[granting.role]}» تُضبط آلياً</span>
+                    )}
+                  </div>
                 ) : (
                   <button className="ad-ibtn" title="منح دوراً" onClick={() => setGranting({ userId: u.user_id, role: "" })}><I name="person_add" size={18} /></button>
                 ))}</td>
