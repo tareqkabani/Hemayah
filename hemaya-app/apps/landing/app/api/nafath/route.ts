@@ -45,6 +45,11 @@ const DEMO: Record<string, Spec> = {
   "2000000007": { role: "case_officer", portal: ORIGIN.center + "/execution", label: "التنفيذ والتجديد" },
   "2000000008": { role: "board_chair", portal: ORIGIN.center + "/oversight", label: "قيادة المركز — الرئيس" },
   "2000000009": { role: "deputy_chair", portal: ORIGIN.center + "/oversight-deputy", label: "قيادة المركز — النائب" },
+  // منسوبو وحدة الإدخال اليدوي — «لكل منسوب حسابه» (قرار ٤ في تسليم الوحدة)
+  "2000000010": { role: "intake_clerk", portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL, attrs: { unit: "intake" } },
+  "2000000011": { role: "intake_clerk", portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL, attrs: { unit: "intake" } },
+  "2000000012": { role: "intake_clerk", portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL, attrs: { unit: "intake" } },
+  "2000000013": { role: "intake_clerk", portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL, attrs: { unit: "intake", level: "supervisor" } },
   "2000000061": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "2000000062": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
   "2000000063": { role: "board_member", portal: ORIGIN.decision + "/decision-vote", label: "أعضاء المجلس" },
@@ -74,6 +79,7 @@ const DEFAULT: Spec = { role: "subject", portal: ORIGIN.seeker, label: "طالب
 const ROLE_PORTAL: Record<string, Omit<Spec, "role">> = {
   subject: { portal: ORIGIN.seeker, label: "طالب الحماية" },
   hotline_operator: { portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL },
+  intake_clerk: { portal: ORIGIN.center + "/paper-intake", label: PAPER_INTAKE_LABEL },
   case_officer: { portal: ORIGIN.triage, label: "موظف المركز" },
   studier: { portal: ORIGIN.studier, label: "الدراسة — الدارس" },
   evaluator: { portal: ORIGIN.evaluator, label: "التقييم — المقيّم" },

@@ -91,7 +91,7 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
         <ContentScreen lists={lists} itemsByList={itemsByList} templates={templates}
           sysMessages={sysMessages} legalTexts={legalTexts} say={say} noPii={sysMsgOf("s_sysadmin")} />
       )}
-      {active === "users" && <UsersScreen staff={staff} me={me} say={say} />}
+      {active === "users" && <UsersScreen staff={staff} me={me} say={say} org={org} />}
       {active === "roles" && <RolesScreen staff={staff} />}
       {active === "entities" && <EntitiesScreen org={org} say={say} />}
       {active === "settings" && <SettingsScreen settings={settings} say={say} />}
@@ -582,19 +582,53 @@ function TextDetail({ m, kind, back, say }) {
 /* ═══════════ المستخدمون والأدوار ═══════════ */
 const GRANTABLE_ROLES = Object.keys(ROLE_LABEL).filter((r) => r !== "subject");
 
-function UsersScreen({ staff, me, say }) {
+// أدوار سلطتها ثابتة تُشتقّ آلياً (لا يُدخلها الأدمن) — بلا authority لا يرون إحالاتهم
+const ROLE_FIXED_AUTHORITY = {
+  moh_specialist: "health", moh_manager: "health",
+  hr_specialist: "hr", hr_manager: "hr",
+  security_officer: "security", security_manager: "security",
+  moi_officer: "moi",
+};
+const ENTITY_OPTS = [["prosecution", "النيابة العامة"], ["state_security", "رئاسة أمن الدولة"], ["moi", "وزارة الداخلية"], ["nazaha", "هيئة الرقابة ومكافحة الفساد"], ["moj", "وزارة العدل"]];
+const LEVEL_OPTS = [["clerk", "موظف وحدة"], ["head", "رئيس وحدة"], ["hq", "المقر"]];
+
+function UsersScreen({ staff, me, say, org }) {
   const [rows, setRows] = useState(staff);
   const [q, setQ] = useState("");
-  const [granting, setGranting] = useState(null); // {userId, role}
+  const [granting, setGranting] = useState(null); // {userId, role, entity, level, branchId}
+  const [busy, setBusy] = useState(false);
   const list = rows.filter((u) => hit(q, u.name, u.email, (u.roles || []).map((r) => ROLE_LABEL[r.role] || r.role).join(" ")));
+
+  // وحدات جهةٍ مختصة (لاختيار فرع المنسوب) من بيانات admin_list_org
+  const unitsOf = (entity) => ((org || []).find((e) => e.entity === entity)?.units || []);
+
+  // بناء السمات المطلوبة، والتحقق من اكتمالها قبل المنح
+  const buildAttrs = () => {
+    const { role, entity, level, branchId } = granting;
+    if (role in ROLE_FIXED_AUTHORITY) return { attrs: { authority: ROLE_FIXED_AUTHORITY[role] }, ok: true };
+    if (role === "competent_body") {
+      if (!entity || !level) return { ok: false, msg: "اختر الجهة والمستوى." };
+      const a = { authority: "competent", entity, level };
+      if (level !== "hq") {
+        if (!branchId) return { ok: false, msg: "اختر الوحدة/الفرع الذي ينتمي إليه المنسوب." };
+        a.branch_id = branchId;
+      }
+      return { attrs: a, ok: true };
+    }
+    return { attrs: null, ok: true };
+  };
 
   const doGrant = async () => {
     const { userId, role } = granting;
     if (!role) return;
-    const r = await grantRole(userId, role);
+    const built = buildAttrs();
+    if (!built.ok) return say("⚠ " + built.msg);
+    setBusy(true);
+    const r = await grantRole(userId, role, built.attrs || undefined);
+    setBusy(false);
     if (!r.ok) return say("⚠ " + r.error);
     setRows((xs) => xs.map((u) => u.user_id === userId
-      ? { ...u, roles: (u.roles || []).some((x) => x.role === role) ? u.roles : [...(u.roles || []), { role, attributes: {} }] } : u));
+      ? { ...u, roles: (u.roles || []).some((x) => x.role === role) ? u.roles : [...(u.roles || []), { role, attributes: built.attrs || {} }] } : u));
     setGranting(null);
     say("مُنح الدور «" + (ROLE_LABEL[role] || role) + "» — مُسجَّل في التدقيق");
   };
@@ -630,16 +664,44 @@ function UsersScreen({ staff, me, say }) {
                 <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.created_at ? new Date(u.created_at).toLocaleDateString("ar-SA") : "—"}</td>
                 <td className="mono" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("ar-SA") : "—"}</td>
                 <td>{!self && (granting?.userId === u.user_id ? (
-                  <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                    <select className="ad-input" style={{ width: "auto", padding: "5px 8px", fontSize: 12 }} value={granting.role}
-                      onChange={(e) => setGranting({ userId: u.user_id, role: e.target.value })}>
-                      <option value="">اختر دوراً…</option>
-                      {GRANTABLE_ROLES.filter((r) => !(u.roles || []).some((x) => x.role === r)).map((r) => (
-                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>))}
-                    </select>
-                    <button className="ad-ibtn" title="منح" onClick={doGrant}><I name="check" size={18} color="var(--color-primary)" /></button>
-                    <button className="ad-ibtn" title="إلغاء" onClick={() => setGranting(null)}><I name="close" size={18} /></button>
-                  </span>
+                  <div style={{ display: "grid", gap: 6, minWidth: 200 }}>
+                    <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                      <select className="ad-input" style={{ width: "auto", padding: "5px 8px", fontSize: 12, flex: 1 }} value={granting.role}
+                        onChange={(e) => setGranting({ userId: u.user_id, role: e.target.value })}>
+                        <option value="">اختر دوراً…</option>
+                        {GRANTABLE_ROLES.filter((r) => !(u.roles || []).some((x) => x.role === r)).map((r) => (
+                          <option key={r} value={r}>{ROLE_LABEL[r]}</option>))}
+                      </select>
+                      <button className="ad-ibtn" title="منح" disabled={busy || !granting.role} onClick={doGrant}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setGranting(null)}><I name="close" size={18} /></button>
+                    </span>
+                    {/* سمات المنسوب المطلوبة — بلا هذه لا يرى الممنوح شيئاً تحت RLS */}
+                    {granting.role === "competent_body" && (
+                      <div style={{ display: "grid", gap: 5, background: "var(--surface-subtle)", padding: 8, borderRadius: "var(--radius-md)" }}>
+                        <span className="muted" style={{ fontSize: 11 }}>سمات المنسوب (لازمة ليرى قضاياه):</span>
+                        <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.entity || ""}
+                          onChange={(e) => setGranting({ ...granting, entity: e.target.value, branchId: "" })}>
+                          <option value="">الجهة المختصة…</option>
+                          {ENTITY_OPTS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                        </select>
+                        <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.level || ""}
+                          onChange={(e) => setGranting({ ...granting, level: e.target.value })}>
+                          <option value="">المستوى…</option>
+                          {LEVEL_OPTS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                        </select>
+                        {granting.entity && granting.level && granting.level !== "hq" && (
+                          <select className="ad-input" style={{ padding: "5px 8px", fontSize: 12 }} value={granting.branchId || ""}
+                            onChange={(e) => setGranting({ ...granting, branchId: e.target.value })}>
+                            <option value="">الوحدة/الفرع…</option>
+                            {unitsOf(granting.entity).filter((un) => un.kind !== "hq").map((un) => <option key={un.id} value={un.id}>{un.name}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                    {granting.role in ROLE_FIXED_AUTHORITY && (
+                      <span className="muted" style={{ fontSize: 11 }}><I name="check_circle" size={12} color="var(--color-primary)" /> السلطة «{ROLE_FIXED_AUTHORITY[granting.role]}» تُضبط آلياً</span>
+                    )}
+                  </div>
                 ) : (
                   <button className="ad-ibtn" title="منح دوراً" onClick={() => setGranting({ userId: u.user_id, role: "" })}><I name="person_add" size={18} /></button>
                 ))}</td>
@@ -782,53 +844,113 @@ function EntitiesScreen({ org, say }) {
 }
 
 /* ═══════════ الإعدادات والمدد + أعلام الميزات ═══════════ */
+// أعلام on/off — تُدار في «أعلام الميزات» حصراً، وتُستبعَد من قائمة الإعدادات الخام
 const KNOWN_FLAGS = {
   watchdog: { t: "المراقبات الآلية (المهل والتصعيد)", d: "مراقبا الدراسة/التقييم ومهلة توصية الجهة — كل 30 دقيقة. الإيقاف يجمّد التذكير والتصعيد الآليين." },
 };
+// إعدادات تشغيلية معروفة — تُعرَض بمسمّاها ووحدتها ونوعها (لا مفاتيح خام)
+const KNOWN_SETTINGS = {
+  study_eval_deadline_days: {
+    t: "ميعاد مخرَج الدراسة والتقييم", unit: "يوم عمل", type: "int", min: 0,
+    d: "بعد هذه المدة من بدء المرحلة يُوسم من لم يقدّم «انقضى الميعاد» وتتقدّم القضية إن اكتمل النصاب (م10). 0 = العرض التجريبي (إغلاق فوري).",
+  },
+};
+const FLAG_KEYS = new Set(Object.keys(KNOWN_FLAGS));
 
 function SettingsScreen({ settings, say }) {
   const [rows, setRows] = useState(settings);
   const [edit, setEdit] = useState(null); // {key, v}
-  const [addK, setAddK] = useState(""); const [addV, setAddV] = useState("");
+  const [busy, setBusy] = useState(false);
+  const valOf = (k) => rows.find((x) => x.key === k)?.value ?? "";
+
   const save = async (key, value) => {
-    const r = await setSetting(key, value);
+    // تحقّق نوعي للإعدادات المعروفة قبل الإرسال
+    const spec = KNOWN_SETTINGS[key];
+    if (spec?.type === "int") {
+      if (!/^\d+$/.test(String(value).trim())) return say("⚠ القيمة يجب أن تكون عدداً صحيحاً (بالأيام).");
+      if (spec.min != null && Number(value) < spec.min) return say(`⚠ القيمة لا تقلّ عن ${spec.min}.`);
+    }
+    setBusy(true);
+    const r = await setSetting(key, String(value).trim());
+    setBusy(false);
     if (!r.ok) return say("⚠ " + r.error);
-    setRows((xs) => xs.some((x) => x.key === key) ? xs.map((x) => (x.key === key ? { ...x, value } : x)) : xs.concat({ key, value }));
+    setRows((xs) => xs.some((x) => x.key === key) ? xs.map((x) => (x.key === key ? { ...x, value: String(value).trim() } : x)) : xs.concat({ key, value: String(value).trim() }));
     setEdit(null);
-    say("حُفظ الإعداد «" + key + "» — مُسجَّل في التدقيق");
+    say("حُفظ الإعداد — مُسجَّل في التدقيق");
   };
+
+  // مفاتيح غير معروفة وليست أعلاماً — تُعرَض في قسم «متقدّم» بشفافية
+  const otherKeys = rows.filter((s) => !KNOWN_SETTINGS[s.key] && !FLAG_KEYS.has(s.key));
+
   return (
     <div>
       <h2 className="h2">الإعدادات والمدد</h2>
-      <p className="lede">مفاتيح التشغيل العامة (app_settings) — تقرؤها دوال القاعدة المحروسة، وكل تغيير مُسجَّل في التدقيق باسمك.</p>
-      <InlineAlert kind="info" title="المدد النظامية ليست هنا" style={{ marginBottom: 14 }}>
-        مهل المواد (5 أيام توصية الجهة، 10 أيام التظلّم، 3 أيام الإشعار…) ثوابت نظامية في مصفوفة SLA — تغييرها قرار تشريعي لا إعداد تشغيلي.
+      <p className="lede">المدد التشغيلية القابلة للضبط ومفاتيح النظام العامة — تقرؤها دوال القاعدة المحروسة، وكل تغيير مُسجَّل في التدقيق باسمك.</p>
+      <InlineAlert kind="info" title="المدد النظامية ثوابت لا إعدادات" style={{ marginBottom: 14 }}>
+        مهل المواد (5 أيام توصية الجهة، 10 أيام التظلّم، 3 أيام الإشعار…) ثوابت في مصفوفة SLA — تغييرها قرار تشريعي. ما هنا مدد تشغيلية داخلية فقط.
       </InlineAlert>
-      <Card className="card pad">
-        <div className="ad-sec-h"><I name="tune" size={18} color="var(--color-primary)" /> المفاتيح<span className="spacer" /><span className="muted mono" style={{ fontSize: 11.5 }}>key · value</span></div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {rows.map((s) => (
-            <div className="ad-item" key={s.key}>
-              <span className="mono ad-key">{s.key}</span>
-              {edit?.key === s.key
-                ? <input className="ad-input" style={{ flex: 1 }} value={edit.v} onChange={(e) => setEdit({ key: s.key, v: e.target.value })} autoFocus
-                    onKeyDown={(e) => { if (e.key === "Enter") save(s.key, edit.v); }} dir="auto" />
-                : <span style={{ flex: 1 }} className="mono">{s.value}</span>}
-              {edit?.key === s.key
-                ? <span style={{ display: "flex", gap: 6 }}>
-                    <button className="ad-ibtn" title="حفظ" onClick={() => save(s.key, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
-                    <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button></span>
-                : <button className="ad-ibtn" title="تحرير القيمة" onClick={() => setEdit({ key: s.key, v: s.value })}><I name="edit" size={17} /></button>}
-            </div>
-          ))}
-          {!rows.length && <div className="muted">لا مفاتيح بعد.</div>}
-        </div>
-        <div className="row" style={{ marginTop: 14, gap: 8 }}>
-          <input className="ad-input" style={{ maxWidth: 220, direction: "ltr" }} placeholder="key" value={addK} onChange={(e) => setAddK(e.target.value)} />
-          <input className="ad-input" style={{ flex: 1 }} placeholder="القيمة" value={addV} onChange={(e) => setAddV(e.target.value)} dir="auto" />
-          <button className="btn btn-ghost" disabled={!addK.trim()} onClick={() => { save(addK.trim(), addV); setAddK(""); setAddV(""); }}>إضافة</button>
-        </div>
-      </Card>
+
+      {/* الإعدادات المعروفة — بمسمّى ووصف وحقلٍ منمَّط */}
+      <div style={{ display: "grid", gap: 12, maxWidth: 760, marginBottom: 18 }}>
+        {Object.entries(KNOWN_SETTINGS).map(([k, spec]) => {
+          const editing = edit?.key === k;
+          return (
+            <Card className="card pad" key={k}>
+              <div className="row" style={{ justifyContent: "space-between", rowGap: 10, alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <b style={{ color: "var(--text-strong)" }}>{spec.t}</b>
+                  <div className="muted mono" style={{ fontSize: 11, margin: "2px 0 6px", direction: "ltr", textAlign: "end" }}>{k}</div>
+                  <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.7 }}>{spec.d}</div>
+                </div>
+                <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                  {editing ? (
+                    <>
+                      <input className="ad-input" style={{ width: 90, textAlign: "center" }} type={spec.type === "int" ? "number" : "text"} min={spec.min}
+                        value={edit.v} onChange={(e) => setEdit({ key: k, v: e.target.value })} autoFocus
+                        onKeyDown={(e) => { if (e.key === "Enter") save(k, edit.v); }} />
+                      {spec.unit && <span className="muted" style={{ fontSize: 12 }}>{spec.unit}</span>}
+                      <button className="ad-ibtn" title="حفظ" disabled={busy} onClick={() => save(k, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button>
+                    </>
+                  ) : (
+                    <>
+                      <b style={{ fontSize: 18, color: "var(--color-primary)" }}>{valOf(k) || "—"}</b>
+                      {spec.unit && <span className="muted" style={{ fontSize: 12 }}>{spec.unit}</span>}
+                      <button className="ad-ibtn" title="تحرير" onClick={() => setEdit({ key: k, v: valOf(k) })}><I name="edit" size={17} /></button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* مفاتيح متقدّمة غير مصنّفة — للشفافية فقط (الأعلام تُدار في شاشتها) */}
+      {otherKeys.length > 0 && (
+        <Card className="card pad">
+          <div className="ad-sec-h"><I name="tune" size={18} color="var(--color-primary)" /> مفاتيح متقدّمة أخرى<span className="spacer" /><span className="muted mono" style={{ fontSize: 11.5 }}>key · value</span></div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {otherKeys.map((s) => (
+              <div className="ad-item" key={s.key}>
+                <span className="mono ad-key">{s.key}</span>
+                {edit?.key === s.key
+                  ? <input className="ad-input" style={{ flex: 1 }} value={edit.v} onChange={(e) => setEdit({ key: s.key, v: e.target.value })} autoFocus
+                      onKeyDown={(e) => { if (e.key === "Enter") save(s.key, edit.v); }} dir="auto" />
+                  : <span style={{ flex: 1 }} className="mono">{s.value}</span>}
+                {edit?.key === s.key
+                  ? <span style={{ display: "flex", gap: 6 }}>
+                      <button className="ad-ibtn" title="حفظ" disabled={busy} onClick={() => save(s.key, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button></span>
+                  : <button className="ad-ibtn" title="تحرير القيمة" onClick={() => setEdit({ key: s.key, v: s.value })}><I name="edit" size={17} /></button>}
+              </div>
+            ))}
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            <I name="info" size={13} /> أعلام التشغيل/الإيقاف (مثل «المراقبات الآلية») تُدار في شاشة «أعلام الميزات».
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

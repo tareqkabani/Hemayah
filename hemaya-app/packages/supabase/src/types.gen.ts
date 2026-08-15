@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       _asr: {
@@ -182,6 +207,7 @@ export type Database = {
           {
             foreignKeyName: "assessments_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -264,6 +290,7 @@ export type Database = {
           {
             foreignKeyName: "board_decisions_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -316,6 +343,7 @@ export type Database = {
           {
             foreignKeyName: "branches_parent_id_fkey"
             columns: ["parent_id"]
+            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
@@ -377,6 +405,7 @@ export type Database = {
           {
             foreignKeyName: "consultation_sessions_referral_id_fkey"
             columns: ["referral_id"]
+            isOneToOne: false
             referencedRelation: "referrals"
             referencedColumns: ["id"]
           },
@@ -414,6 +443,7 @@ export type Database = {
           {
             foreignKeyName: "contact_logs_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -523,6 +553,7 @@ export type Database = {
           {
             foreignKeyName: "council_attachments_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -602,6 +633,7 @@ export type Database = {
           {
             foreignKeyName: "council_decisions_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: true
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -642,6 +674,7 @@ export type Database = {
           {
             foreignKeyName: "council_messages_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -676,6 +709,7 @@ export type Database = {
           {
             foreignKeyName: "council_votes_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -713,6 +747,7 @@ export type Database = {
           {
             foreignKeyName: "disclosure_events_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -819,6 +854,7 @@ export type Database = {
           {
             foreignKeyName: "emergency_contacts_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -850,6 +886,7 @@ export type Database = {
           {
             foreignKeyName: "emergency_reports_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -923,6 +960,7 @@ export type Database = {
           {
             foreignKeyName: "execution_handoffs_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -990,6 +1028,7 @@ export type Database = {
           {
             foreignKeyName: "foreign_requests_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1057,6 +1096,7 @@ export type Database = {
           {
             foreignKeyName: "grievances_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1091,6 +1131,93 @@ export type Database = {
           {
             foreignKeyName: "imminent_protections_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "protection_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intake_drafts: {
+        Row: {
+          clerk_id: string
+          id: string
+          payload: Json
+          reg_no: string
+          updated_at: string
+        }
+        Insert: {
+          clerk_id: string
+          id?: string
+          payload: Json
+          reg_no: string
+          updated_at?: string
+        }
+        Update: {
+          clerk_id?: string
+          id?: string
+          payload?: Json
+          reg_no?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      intake_inbox: {
+        Row: {
+          arrived_on: string
+          channel: Database["public"]["Enums"]["intake_channel"]
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          doc_kind: Database["public"]["Enums"]["intake_doc_kind"]
+          entered_at: string | null
+          entered_by: string | null
+          entered_by_name: string | null
+          entered_by_role: string | null
+          entered_case_id: string | null
+          entity: string | null
+          id: string
+          reg_no: string
+          registered_by: string | null
+        }
+        Insert: {
+          arrived_on: string
+          channel: Database["public"]["Enums"]["intake_channel"]
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          doc_kind?: Database["public"]["Enums"]["intake_doc_kind"]
+          entered_at?: string | null
+          entered_by?: string | null
+          entered_by_name?: string | null
+          entered_by_role?: string | null
+          entered_case_id?: string | null
+          entity?: string | null
+          id?: string
+          reg_no: string
+          registered_by?: string | null
+        }
+        Update: {
+          arrived_on?: string
+          channel?: Database["public"]["Enums"]["intake_channel"]
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          doc_kind?: Database["public"]["Enums"]["intake_doc_kind"]
+          entered_at?: string | null
+          entered_by?: string | null
+          entered_by_name?: string | null
+          entered_by_role?: string | null
+          entered_case_id?: string | null
+          entity?: string | null
+          id?: string
+          reg_no?: string
+          registered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_inbox_entered_case_id_fkey"
+            columns: ["entered_case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1134,6 +1261,7 @@ export type Database = {
           {
             foreignKeyName: "leadership_messages_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1210,6 +1338,7 @@ export type Database = {
           {
             foreignKeyName: "lifecycle_reviews_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1247,6 +1376,7 @@ export type Database = {
           {
             foreignKeyName: "measures_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1284,6 +1414,7 @@ export type Database = {
           {
             foreignKeyName: "messages_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1411,6 +1542,7 @@ export type Database = {
           {
             foreignKeyName: "notifications_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1439,6 +1571,7 @@ export type Database = {
           {
             foreignKeyName: "obligations_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1476,6 +1609,7 @@ export type Database = {
           {
             foreignKeyName: "office_messages_grievance_id_fkey"
             columns: ["grievance_id"]
+            isOneToOne: false
             referencedRelation: "grievances"
             referencedColumns: ["id"]
           },
@@ -1516,6 +1650,7 @@ export type Database = {
           {
             foreignKeyName: "periodic_reviews_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1528,7 +1663,10 @@ export type Database = {
           category: Database["public"]["Enums"]["app_category"]
           classification: Database["public"]["Enums"]["risk_level"] | null
           created_at: string | null
+          entered_at: string | null
+          entered_by: string | null
           id: string
+          identity_verified: boolean
           officer_id: string | null
           ref_no: string
           secret_code: string
@@ -1543,7 +1681,10 @@ export type Database = {
           category: Database["public"]["Enums"]["app_category"]
           classification?: Database["public"]["Enums"]["risk_level"] | null
           created_at?: string | null
+          entered_at?: string | null
+          entered_by?: string | null
           id?: string
+          identity_verified?: boolean
           officer_id?: string | null
           ref_no: string
           secret_code: string
@@ -1558,7 +1699,10 @@ export type Database = {
           category?: Database["public"]["Enums"]["app_category"]
           classification?: Database["public"]["Enums"]["risk_level"] | null
           created_at?: string | null
+          entered_at?: string | null
+          entered_by?: string | null
           id?: string
+          identity_verified?: boolean
           officer_id?: string | null
           ref_no?: string
           secret_code?: string
@@ -1571,6 +1715,7 @@ export type Database = {
           {
             foreignKeyName: "protection_cases_branch_id_fkey"
             columns: ["branch_id"]
+            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
@@ -1605,6 +1750,7 @@ export type Database = {
           {
             foreignKeyName: "protection_documents_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1639,6 +1785,7 @@ export type Database = {
           {
             foreignKeyName: "protection_requests_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1688,12 +1835,14 @@ export type Database = {
           {
             foreignKeyName: "recommendation_approvals_branch_id_fkey"
             columns: ["branch_id"]
+            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recommendation_approvals_recommendation_id_fkey"
             columns: ["recommendation_id"]
+            isOneToOne: false
             referencedRelation: "recommendations"
             referencedColumns: ["id"]
           },
@@ -1770,12 +1919,14 @@ export type Database = {
           {
             foreignKeyName: "recommendations_branch_id_fkey"
             columns: ["branch_id"]
+            isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recommendations_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1816,6 +1967,7 @@ export type Database = {
           {
             foreignKeyName: "reference_items_list_key_fkey"
             columns: ["list_key"]
+            isOneToOne: false
             referencedRelation: "reference_lists"
             referencedColumns: ["list_key"]
           },
@@ -1907,6 +2059,7 @@ export type Database = {
           {
             foreignKeyName: "referrals_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1938,6 +2091,7 @@ export type Database = {
           {
             foreignKeyName: "related_persons_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -1975,6 +2129,7 @@ export type Database = {
           {
             foreignKeyName: "risk_classifications_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -2108,6 +2263,7 @@ export type Database = {
           {
             foreignKeyName: "studies_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -2172,6 +2328,7 @@ export type Database = {
           {
             foreignKeyName: "subjects_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -2245,6 +2402,7 @@ export type Database = {
           {
             foreignKeyName: "triage_reviews_case_id_fkey"
             columns: ["case_id"]
+            isOneToOne: false
             referencedRelation: "protection_cases"
             referencedColumns: ["id"]
           },
@@ -2299,6 +2457,26 @@ export type Database = {
     Functions: {
       _actor_name: { Args: { _uid: string }; Returns: string }
       _emergency_contact_key: { Args: never; Returns: string }
+      _intake_actor: {
+        Args: { _user: string }
+        Returns: {
+          actor_name: string
+          actor_role: string
+        }[]
+      }
+      _intake_stamp: {
+        Args: {
+          _arrived_on: string
+          _case_id: string
+          _channel: string
+          _doc_kind: string
+          _entity: string
+          _inbox_id: string
+          _reg_no: string
+          _uid: string
+        }
+        Returns: undefined
+      }
       _next_decision_ref: { Args: never; Returns: string }
       _next_grv_ref: { Args: never; Returns: string }
       _notify_deputies: {
@@ -2605,11 +2783,64 @@ export type Database = {
         Args: { _role: Database["public"]["Enums"]["app_role"]; _user: string }
         Returns: boolean
       }
+      intake_draft_clear: { Args: { _reg_no: string }; Returns: undefined }
+      intake_draft_load: { Args: { _reg_no: string }; Returns: Json }
+      intake_draft_save: {
+        Args: { _payload: Json; _reg_no: string }
+        Returns: undefined
+      }
+      intake_inbox_claim: {
+        Args: { _id: string }
+        Returns: {
+          claimed_by: string
+          claimed_by_name: string
+        }[]
+      }
+      intake_inbox_list: {
+        Args: never
+        Returns: {
+          arrived_on: string
+          channel: string
+          claimed_by: string
+          claimed_name: string
+          created_at: string
+          doc_kind: string
+          id: string
+          reg_no: string
+        }[]
+      }
+      intake_inbox_register: {
+        Args: {
+          _arrived_on: string
+          _channel: string
+          _doc_kind: string
+          _reg_no: string
+        }
+        Returns: string
+      }
+      intake_sent_list: {
+        Args: never
+        Returns: {
+          arrived_on: string
+          case_status: string
+          channel: string
+          doc_kind: string
+          entered_at: string
+          entered_by_name: string
+          entered_by_role: string
+          entity: string
+          id: string
+          identity_verified: boolean
+          reg_no: string
+          secret_code: string
+        }[]
+      }
       is_assigned_assessment: { Args: { _case_id: string }; Returns: boolean }
       is_assigned_grievance: { Args: { _case_id: string }; Returns: boolean }
       is_assigned_study: { Args: { _case_id: string }; Returns: boolean }
       is_center_leader: { Args: never; Returns: boolean }
       is_council: { Args: { _uid: string }; Returns: boolean }
+      is_intake_staff: { Args: { _user: string }; Returns: boolean }
       list_referred_for_entity: {
         Args: { _entity: string }
         Returns: {
@@ -2751,6 +2982,7 @@ export type Database = {
           _channel: string
           _decision: string
           _factors9?: Json
+          _inbox_id?: string
           _letter_by?: string
           _letter_date?: string
           _letter_no?: string
@@ -2971,6 +3203,7 @@ export type Database = {
           _crime: string
           _details?: Json
           _entity: string
+          _inbox_id?: string
           _prior_submit: boolean
           _reason: string
           _received_date?: string
@@ -3081,6 +3314,7 @@ export type Database = {
         | "hr_specialist"
         | "hr_manager"
         | "subject"
+        | "intake_clerk"
       case_source: "local" | "foreign" | "urgent"
       case_status:
         | "submitted"
@@ -3109,6 +3343,8 @@ export type Database = {
         | "pg_decision"
         | "upheld"
         | "dismissed"
+      intake_channel: "legacy" | "inperson" | "mail"
+      intake_doc_kind: "req" | "rec"
       msg_dir: "in" | "out" | "note"
       msg_thread: "center" | "body" | "coord"
       referral_authority:
@@ -3270,6 +3506,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_category: ["reporter", "witness", "expert", "victim", "related"],
@@ -3295,6 +3534,7 @@ export const Constants = {
         "hr_specialist",
         "hr_manager",
         "subject",
+        "intake_clerk",
       ],
       case_source: ["local", "foreign", "urgent"],
       case_status: [
@@ -3327,6 +3567,8 @@ export const Constants = {
         "upheld",
         "dismissed",
       ],
+      intake_channel: ["legacy", "inperson", "mail"],
+      intake_doc_kind: ["req", "rec"],
       msg_dir: ["in", "out", "note"],
       msg_thread: ["center", "body", "coord"],
       referral_authority: [
