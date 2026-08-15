@@ -2907,7 +2907,12 @@ export type Database = {
         Returns: string
       }
       intake_sent_list: {
-        Args: never
+        Args: {
+          _q?: string
+          _dest?: string
+          _limit?: number
+          _offset?: number
+        }
         Returns: {
           arrived_on: string
           case_status: string
@@ -2921,6 +2926,7 @@ export type Database = {
           identity_verified: boolean
           reg_no: string
           secret_code: string
+          total_count: number
         }[]
       }
       is_assigned_assessment: { Args: { _case_id: string }; Returns: boolean }

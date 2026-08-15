@@ -60,6 +60,7 @@ export default async function Page() {
       lists={lists}
       inbox={inbox.rows}
       sent={sent.rows}
+      sentTotal={sent.ok ? sent.total : 0}
       awaiting={referred}
       holidays={holidays}
     />
