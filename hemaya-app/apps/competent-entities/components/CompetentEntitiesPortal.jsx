@@ -1,12 +1,14 @@
 'use client';
 /* ============================================================
    بوابة الجهات المختصة — منقولة من «بوابة الجهات المختصة/البوابة.html»
-   window/HP → @hemaya/ui. النموذج والعاجل من ./RecommendationForm.
+   window/HP → @hemaya/ui. نموذج التوصية من @hemaya/recommendation
+   (مصدرٌ واحد مع وحدة الإدخال اليدوي)، والبلاغ العاجل من ./RecommendationForm.
    ============================================================ */
 import React, { useState } from "react";
 import { StaffNotifications } from "./staff-feeds";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, RiskLevel } from "@hemaya/ui";
-import { RecommendationForm, UrgentForm } from "./RecommendationForm";
+import { UrgentForm } from "./RecommendationForm";
+import { RecommendationForm } from "@hemaya/recommendation";
 import { HemayaBranch } from "./branch-roles";
 import { useRecommendations, daysLeft } from "./recommendation-store";
 import { submitRecommendation, submitForApproval, decideApproval } from "@/lib/entity-actions";
@@ -368,7 +370,7 @@ const ENT_ROLE = { prosecution: 'عضو النيابة — ضابط الاتصا
 // الفرع لموظفٍ لا يملكها كانت ستُنتج زرَّ اعتمادٍ يفشل عند الضغط.
 const LEVEL_ROLES = { clerk: ['clerk'], head: ['head', 'clerk'], hq: ['hq'] };
 
-function App({ level }) {
+function App({ level, lists }) {
   const myLevel = LEVEL_ROLES[level] ? level : 'clerk';
   const allowedRoles = LEVEL_ROLES[myLevel];
   const { incoming: recIn, sent: recSent, queue: recQueue, refresh } = useRecommendations();
@@ -605,7 +607,7 @@ function App({ level }) {
           {role === 'clerk' ? (
             urgent ? <UrgentForm rec={urgent} onBack={() => setUrgent(null)} />
             : guard ? <GuardReview onBack={() => { setGuard(null); setActive('incoming'); }} onDone={guardDone} />
-            : rec ? <RecommendationForm rec={rec} onApprove={approve} onBack={() => setRec(null)} />
+            : rec ? <RecommendationForm variant="electronic" rec={rec} lists={lists} onApprove={approve} onBack={() => setRec(null)} />
             : (() => { const C = cur.C; return <C key={currentEnt + currentBranch} go={go} openRec={openRec} ent={currentEnt} br={currentBranch} recIn={recIn} recSent={recSent} />; })()
           ) : role === 'head' ? (
             headItem ? <HB.HeadReview item={headQueue.find((q) => q.recId === headItem.recId) || headItem} branchName={branchLabel(currentEnt, currentBranch)} busy={busy} onApprove={onApproveHead} onReturn={onReturnHead} onBack={() => setHeadItem(null)} />
@@ -622,6 +624,6 @@ function App({ level }) {
   );
 }
 
-export function CompetentEntitiesPortal({ level }) {
-  return <App level={level} />;
+export function CompetentEntitiesPortal({ level, lists = {} }) {
+  return <App level={level} lists={lists} />;
 }

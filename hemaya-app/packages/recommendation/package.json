@@ -1,0 +1,14 @@
+{
+  "name": "@hemaya/recommendation",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.js",
+  "dependencies": {
+    "@hemaya/domain": "workspace:*",
+    "@hemaya/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  }
+}

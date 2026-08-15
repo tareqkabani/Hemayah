@@ -146,6 +146,9 @@ importers:
       '@hemaya/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@hemaya/recommendation':
+        specifier: workspace:*
+        version: link:../../packages/recommendation
       '@hemaya/supabase':
         specifier: workspace:*
         version: link:../../packages/supabase
@@ -183,6 +186,9 @@ importers:
       '@hemaya/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@hemaya/recommendation':
+        specifier: workspace:*
+        version: link:../../packages/recommendation
       '@hemaya/supabase':
         specifier: workspace:*
         version: link:../../packages/supabase
@@ -655,6 +661,21 @@ importers:
       vitest:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)
+
+  packages/recommendation:
+    dependencies:
+      '@hemaya/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@hemaya/ui':
+        specifier: workspace:*
+        version: link:../ui
+      react:
+        specifier: ^18
+        version: 18.3.1
+      react-dom:
+        specifier: ^18
+        version: 18.3.1(react@18.3.1)
 
   packages/study-eval:
     dependencies:

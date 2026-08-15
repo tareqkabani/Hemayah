@@ -10,7 +10,7 @@ import React, { useEffect, useState } from "react";
 import { InlineAlert } from "@hemaya/ui";
 import { REGION_LABEL } from "@hemaya/domain";
 import { I, Field, Stepper, LockedCtx, PaperMeta, ENTS, entName, fmtD, todayISO, bizDaysSince } from "./parts";
-import { RecommendationForm } from "./RecommendationForm";
+import { RecommendationForm } from "@hemaya/recommendation";
 import { listReferredForEntity } from "@/lib/paper-intake-actions";
 
 const REC_DEADLINE_DAYS = 5;
@@ -134,6 +134,7 @@ export function EntityIntake({
 
       {step === last && (
         <RecommendationForm
+          variant="paper"
           key={entity + mode + (linkSel ? linkSel.caseId : "")}
           rec={{
             entity, linked: isRec, letterBy: letter.by,
