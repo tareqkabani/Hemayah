@@ -8,7 +8,7 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
+import { setHolidays, PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
 import { caseAttachments, attachmentUrl } from "@/lib/attachments";
@@ -1027,6 +1027,9 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   );
 }
 
-export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [], registerTotal, registerTruncated = false }) {
+export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [], registerTotal, registerTruncated = false, holidays = [] }) {
+  // التقويم الرسميّ يُحقن قبل أوّل حساب مهلة — لا في useEffect: الحساب يجري
+  // أثناء الرسم الأوّل، فحقنٌ بعده يُظهر «متجاوزة» ثمّ يصحّحها أمام الموظف.
+  setHolidays(holidays);
   return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} initialReadKeys={initialReadKeys} initialMessages={initialMessages} registerTotal={registerTotal} registerTruncated={registerTruncated} />;
 }

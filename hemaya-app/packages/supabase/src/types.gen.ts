@@ -1137,6 +1137,30 @@ export type Database = {
           },
         ]
       }
+      holidays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          day: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          day: string
+          kind?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          day?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: []
+      }
       intake_attachments: {
         Row: {
           case_id: string | null
@@ -2820,6 +2844,12 @@ export type Database = {
         Returns: boolean
       }
       intake_draft_clear: { Args: { _reg_no: string }; Returns: undefined }
+      holiday_remove: { Args: { _day: string }; Returns: undefined }
+      holiday_upsert: {
+        Args: { _day: string; _kind?: string; _name: string }
+        Returns: undefined
+      }
+      is_business_day: { Args: { _d: string }; Returns: boolean }
       intake_attach_record: {
         Args: {
           _file_name: string

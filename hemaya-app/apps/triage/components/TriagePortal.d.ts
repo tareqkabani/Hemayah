@@ -10,4 +10,6 @@ export declare function TriagePortal(props: {
   /** إجمالي المطابق في القاعدة — يُعلَن حين يتجاوز المعروض */
   registerTotal?: number;
   registerTruncated?: boolean;
+  /** العطل الرسمية (YYYY-MM-DD) — تُحقن في حاسبة أيام العمل */
+  holidays?: string[];
 }): JSX.Element;
