@@ -1137,6 +1137,42 @@ export type Database = {
           },
         ]
       }
+      intake_attachments: {
+        Row: {
+          case_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          mime: string | null
+          path: string
+          reg_no: string | null
+          size_bytes: number | null
+          uploaded_by: string
+        }
+        Insert: {
+          case_id?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          mime?: string | null
+          path: string
+          reg_no?: string | null
+          size_bytes?: number | null
+          uploaded_by: string
+        }
+        Update: {
+          case_id?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime?: string | null
+          path?: string
+          reg_no?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       intake_drafts: {
         Row: {
           clerk_id: string
@@ -2784,6 +2820,28 @@ export type Database = {
         Returns: boolean
       }
       intake_draft_clear: { Args: { _reg_no: string }; Returns: undefined }
+      intake_attach_record: {
+        Args: {
+          _file_name: string
+          _mime: string
+          _path: string
+          _reg_no: string
+          _size: number
+        }
+        Returns: string
+      }
+      intake_attach_remove: { Args: { _id: string }; Returns: string }
+      intake_case_attachments: {
+        Args: { _case_id: string }
+        Returns: {
+          created_at: string
+          file_name: string
+          id: string
+          mime: string
+          path: string
+          size_bytes: number
+        }[]
+      }
       intake_draft_load: { Args: { _reg_no: string }; Returns: Json }
       intake_draft_save: {
         Args: { _payload: Json; _reg_no: string }
