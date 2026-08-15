@@ -26,11 +26,10 @@ insert into storage.buckets (id, name, public)
 values ('intake-docs', 'intake-docs', false)
 on conflict (id) do nothing;
 
--- ── 2) سياسات التخزين ──
+-- ── 2) سياسات التخزين (الكتابة) ──
 -- المسار: <uploader_uuid>/<random>.<ext> — أوّل مقطعٍ هو صاحب الملف،
--- فالكتابة والحذف محصورتان بمجلّد الرافع. والقراءة لمنسوبي الوحدة
--- ولموظف الفرز (يفحص المستند قبل قراره) — أمّا الدارس والمقيّم فيقرآن
--- عبر الرابط الموقَّع الذي تُصدره الدالّة المقيَّدة بالإسناد، لا مباشرةً.
+-- فالكتابة والحذف محصورتان بمجلّد الرافع. وسياسة القراءة تأتي بعد الجدول
+-- في القسم ٣ لأنّها تستعلمه.
 drop policy if exists intakedocs_write  on storage.objects;
 drop policy if exists intakedocs_update on storage.objects;
 drop policy if exists intakedocs_delete on storage.objects;
@@ -54,11 +53,6 @@ create policy intakedocs_delete on storage.objects for delete to authenticated
     and is_intake_staff(auth.uid())
     and (storage.foldername(name))[1] = auth.uid()::text);
 
-create policy intakedocs_read on storage.objects for select to authenticated
-  using (
-    bucket_id = 'intake-docs'
-    and (is_intake_staff(auth.uid()) or has_role(auth.uid(), 'case_officer')));
-
 -- ── 3) سجلّ المرفقات ──
 create table if not exists intake_attachments (
   id          uuid primary key default gen_random_uuid(),
@@ -81,6 +75,38 @@ drop policy if exists intake_att_read on intake_attachments;
 create policy intake_att_read on intake_attachments for select
   using (is_intake_staff(auth.uid()));
 grant select on intake_attachments to authenticated;
+
+-- سياسة قراءة الكائنات — بعد الجدول لأنّها تستعلمه.
+-- منسوب الوحدة وموظف الفرز مطلقاً (طابور مشترك)، والدارس والمقيّم بالإسناد
+-- وحده — والربط عبر سجلّ المرفق لأنّ المسار لا يحمل رقم القضية (المرفق
+-- يُرفع قبل وجودها). بهذا يُوقَّع الرابط بجلسة المستخدم نفسه ولا يُستدعى
+-- مفتاح الخدمة إطلاقاً.
+--
+-- ⚠️ الفحص في دالّة SECURITY DEFINER لا في جسم السياسة مباشرةً: استعلامُ
+-- السياسة يجري بصلاحية المستدعي، وسياسةُ intake_attachments مقصورةٌ على
+-- منسوبي الوحدة — فيرجع الاستعلام فارغاً للدارس المُسنَد فيُحجب عنه ملفُّه.
+-- (كشفه الفحص الحيّ: rows_from_rpc=1 بينما objects_visible=0.)
+-- وauth.uid() داخل الدالّة يبقى هوية المستدعي، فالإسناد يُفحص له لا لمالكها.
+create or replace function public._intake_path_readable(_name text)
+returns boolean
+language sql stable security definer set search_path = public, extensions as $$
+  select exists (
+    select 1 from intake_attachments a
+     where a.path = _name
+       and a.case_id is not null
+       and (public.is_assigned_study(a.case_id) or public.is_assigned_assessment(a.case_id)));
+$$;
+revoke all on function public._intake_path_readable(text) from public, anon;
+grant execute on function public._intake_path_readable(text) to authenticated;
+
+create policy intakedocs_read on storage.objects for select to authenticated
+  using (
+    bucket_id = 'intake-docs'
+    and (
+      is_intake_staff(auth.uid())
+      or has_role(auth.uid(), 'case_officer')
+      or public._intake_path_readable(name)
+    ));
 
 -- ── 4) تقييد المرفوع ──
 create or replace function public.intake_attach_record(
