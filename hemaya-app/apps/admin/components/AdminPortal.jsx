@@ -782,53 +782,113 @@ function EntitiesScreen({ org, say }) {
 }
 
 /* ═══════════ الإعدادات والمدد + أعلام الميزات ═══════════ */
+// أعلام on/off — تُدار في «أعلام الميزات» حصراً، وتُستبعَد من قائمة الإعدادات الخام
 const KNOWN_FLAGS = {
   watchdog: { t: "المراقبات الآلية (المهل والتصعيد)", d: "مراقبا الدراسة/التقييم ومهلة توصية الجهة — كل 30 دقيقة. الإيقاف يجمّد التذكير والتصعيد الآليين." },
 };
+// إعدادات تشغيلية معروفة — تُعرَض بمسمّاها ووحدتها ونوعها (لا مفاتيح خام)
+const KNOWN_SETTINGS = {
+  study_eval_deadline_days: {
+    t: "ميعاد مخرَج الدراسة والتقييم", unit: "يوم عمل", type: "int", min: 0,
+    d: "بعد هذه المدة من بدء المرحلة يُوسم من لم يقدّم «انقضى الميعاد» وتتقدّم القضية إن اكتمل النصاب (م10). 0 = العرض التجريبي (إغلاق فوري).",
+  },
+};
+const FLAG_KEYS = new Set(Object.keys(KNOWN_FLAGS));
 
 function SettingsScreen({ settings, say }) {
   const [rows, setRows] = useState(settings);
   const [edit, setEdit] = useState(null); // {key, v}
-  const [addK, setAddK] = useState(""); const [addV, setAddV] = useState("");
+  const [busy, setBusy] = useState(false);
+  const valOf = (k) => rows.find((x) => x.key === k)?.value ?? "";
+
   const save = async (key, value) => {
-    const r = await setSetting(key, value);
+    // تحقّق نوعي للإعدادات المعروفة قبل الإرسال
+    const spec = KNOWN_SETTINGS[key];
+    if (spec?.type === "int") {
+      if (!/^\d+$/.test(String(value).trim())) return say("⚠ القيمة يجب أن تكون عدداً صحيحاً (بالأيام).");
+      if (spec.min != null && Number(value) < spec.min) return say(`⚠ القيمة لا تقلّ عن ${spec.min}.`);
+    }
+    setBusy(true);
+    const r = await setSetting(key, String(value).trim());
+    setBusy(false);
     if (!r.ok) return say("⚠ " + r.error);
-    setRows((xs) => xs.some((x) => x.key === key) ? xs.map((x) => (x.key === key ? { ...x, value } : x)) : xs.concat({ key, value }));
+    setRows((xs) => xs.some((x) => x.key === key) ? xs.map((x) => (x.key === key ? { ...x, value: String(value).trim() } : x)) : xs.concat({ key, value: String(value).trim() }));
     setEdit(null);
-    say("حُفظ الإعداد «" + key + "» — مُسجَّل في التدقيق");
+    say("حُفظ الإعداد — مُسجَّل في التدقيق");
   };
+
+  // مفاتيح غير معروفة وليست أعلاماً — تُعرَض في قسم «متقدّم» بشفافية
+  const otherKeys = rows.filter((s) => !KNOWN_SETTINGS[s.key] && !FLAG_KEYS.has(s.key));
+
   return (
     <div>
       <h2 className="h2">الإعدادات والمدد</h2>
-      <p className="lede">مفاتيح التشغيل العامة (app_settings) — تقرؤها دوال القاعدة المحروسة، وكل تغيير مُسجَّل في التدقيق باسمك.</p>
-      <InlineAlert kind="info" title="المدد النظامية ليست هنا" style={{ marginBottom: 14 }}>
-        مهل المواد (5 أيام توصية الجهة، 10 أيام التظلّم، 3 أيام الإشعار…) ثوابت نظامية في مصفوفة SLA — تغييرها قرار تشريعي لا إعداد تشغيلي.
+      <p className="lede">المدد التشغيلية القابلة للضبط ومفاتيح النظام العامة — تقرؤها دوال القاعدة المحروسة، وكل تغيير مُسجَّل في التدقيق باسمك.</p>
+      <InlineAlert kind="info" title="المدد النظامية ثوابت لا إعدادات" style={{ marginBottom: 14 }}>
+        مهل المواد (5 أيام توصية الجهة، 10 أيام التظلّم، 3 أيام الإشعار…) ثوابت في مصفوفة SLA — تغييرها قرار تشريعي. ما هنا مدد تشغيلية داخلية فقط.
       </InlineAlert>
-      <Card className="card pad">
-        <div className="ad-sec-h"><I name="tune" size={18} color="var(--color-primary)" /> المفاتيح<span className="spacer" /><span className="muted mono" style={{ fontSize: 11.5 }}>key · value</span></div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {rows.map((s) => (
-            <div className="ad-item" key={s.key}>
-              <span className="mono ad-key">{s.key}</span>
-              {edit?.key === s.key
-                ? <input className="ad-input" style={{ flex: 1 }} value={edit.v} onChange={(e) => setEdit({ key: s.key, v: e.target.value })} autoFocus
-                    onKeyDown={(e) => { if (e.key === "Enter") save(s.key, edit.v); }} dir="auto" />
-                : <span style={{ flex: 1 }} className="mono">{s.value}</span>}
-              {edit?.key === s.key
-                ? <span style={{ display: "flex", gap: 6 }}>
-                    <button className="ad-ibtn" title="حفظ" onClick={() => save(s.key, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
-                    <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button></span>
-                : <button className="ad-ibtn" title="تحرير القيمة" onClick={() => setEdit({ key: s.key, v: s.value })}><I name="edit" size={17} /></button>}
-            </div>
-          ))}
-          {!rows.length && <div className="muted">لا مفاتيح بعد.</div>}
-        </div>
-        <div className="row" style={{ marginTop: 14, gap: 8 }}>
-          <input className="ad-input" style={{ maxWidth: 220, direction: "ltr" }} placeholder="key" value={addK} onChange={(e) => setAddK(e.target.value)} />
-          <input className="ad-input" style={{ flex: 1 }} placeholder="القيمة" value={addV} onChange={(e) => setAddV(e.target.value)} dir="auto" />
-          <button className="btn btn-ghost" disabled={!addK.trim()} onClick={() => { save(addK.trim(), addV); setAddK(""); setAddV(""); }}>إضافة</button>
-        </div>
-      </Card>
+
+      {/* الإعدادات المعروفة — بمسمّى ووصف وحقلٍ منمَّط */}
+      <div style={{ display: "grid", gap: 12, maxWidth: 760, marginBottom: 18 }}>
+        {Object.entries(KNOWN_SETTINGS).map(([k, spec]) => {
+          const editing = edit?.key === k;
+          return (
+            <Card className="card pad" key={k}>
+              <div className="row" style={{ justifyContent: "space-between", rowGap: 10, alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <b style={{ color: "var(--text-strong)" }}>{spec.t}</b>
+                  <div className="muted mono" style={{ fontSize: 11, margin: "2px 0 6px", direction: "ltr", textAlign: "end" }}>{k}</div>
+                  <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.7 }}>{spec.d}</div>
+                </div>
+                <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                  {editing ? (
+                    <>
+                      <input className="ad-input" style={{ width: 90, textAlign: "center" }} type={spec.type === "int" ? "number" : "text"} min={spec.min}
+                        value={edit.v} onChange={(e) => setEdit({ key: k, v: e.target.value })} autoFocus
+                        onKeyDown={(e) => { if (e.key === "Enter") save(k, edit.v); }} />
+                      {spec.unit && <span className="muted" style={{ fontSize: 12 }}>{spec.unit}</span>}
+                      <button className="ad-ibtn" title="حفظ" disabled={busy} onClick={() => save(k, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button>
+                    </>
+                  ) : (
+                    <>
+                      <b style={{ fontSize: 18, color: "var(--color-primary)" }}>{valOf(k) || "—"}</b>
+                      {spec.unit && <span className="muted" style={{ fontSize: 12 }}>{spec.unit}</span>}
+                      <button className="ad-ibtn" title="تحرير" onClick={() => setEdit({ key: k, v: valOf(k) })}><I name="edit" size={17} /></button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* مفاتيح متقدّمة غير مصنّفة — للشفافية فقط (الأعلام تُدار في شاشتها) */}
+      {otherKeys.length > 0 && (
+        <Card className="card pad">
+          <div className="ad-sec-h"><I name="tune" size={18} color="var(--color-primary)" /> مفاتيح متقدّمة أخرى<span className="spacer" /><span className="muted mono" style={{ fontSize: 11.5 }}>key · value</span></div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {otherKeys.map((s) => (
+              <div className="ad-item" key={s.key}>
+                <span className="mono ad-key">{s.key}</span>
+                {edit?.key === s.key
+                  ? <input className="ad-input" style={{ flex: 1 }} value={edit.v} onChange={(e) => setEdit({ key: s.key, v: e.target.value })} autoFocus
+                      onKeyDown={(e) => { if (e.key === "Enter") save(s.key, edit.v); }} dir="auto" />
+                  : <span style={{ flex: 1 }} className="mono">{s.value}</span>}
+                {edit?.key === s.key
+                  ? <span style={{ display: "flex", gap: 6 }}>
+                      <button className="ad-ibtn" title="حفظ" disabled={busy} onClick={() => save(s.key, edit.v)}><I name="check" size={18} color="var(--color-primary)" /></button>
+                      <button className="ad-ibtn" title="إلغاء" onClick={() => setEdit(null)}><I name="close" size={18} /></button></span>
+                  : <button className="ad-ibtn" title="تحرير القيمة" onClick={() => setEdit({ key: s.key, v: s.value })}><I name="edit" size={17} /></button>}
+              </div>
+            ))}
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            <I name="info" size={13} /> أعلام التشغيل/الإيقاف (مثل «المراقبات الآلية») تُدار في شاشة «أعلام الميزات».
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

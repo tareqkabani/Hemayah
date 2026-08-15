@@ -4,6 +4,10 @@ import { businessDaysBetween } from "@hemaya/domain";
 
 export const REGISTER_STATUSES = ["triage", "referred", "under_study", "closed"];
 
+/** قنوات محضر التحقّق المعروفة — مطابقة لقائمة call_channel في طبقة المحتوى.
+ *  ما عداها يُعرض «رسائل المنصة» بدل أن يُسقَط بلا أثر. */
+const KNOWN_CALL_CHANNELS = new Set(["phone", "platform", "inperson"]);
+
 export const CASE_SELECT = `id, ref_no, secret_code, category, status, source, created_at,
   protection_requests(channel, details, submitted_at),
   recommendations(source_body, decision, received_at, channel, notes, raised_at, due_at),
@@ -104,9 +108,12 @@ export function mapCases(rows, now = new Date()) {
       reply,
       closeReason: closeReview ? closeReview.reason : undefined,
       actions: events.map((e) => ({ icon: e.icon, t: e.t, m: e.m, when: fmtDate(e.ts), who: e.who })),
+      // محضر المقابلة الحضورية يأتي بقناة inperson من وحدة الإدخال اليدوي —
+      // وكان يُعرض «رسائل المنصة» لأنّ الخريطة كانت ثنائيّةً تسقط ما عداها.
+      inperson: logs.some((l) => l.channel === "inperson"),
       calls: logs.map((l) => ({
         date: fmtDate(l.created_at),
-        channel: l.channel === "phone" ? "phone" : "platform",
+        channel: KNOWN_CALL_CHANNELS.has(l.channel) ? l.channel : "platform",
         result: l.result || "answered",
         note: l.summary === "—" ? "" : l.summary,
         by: "موظف الفرز",

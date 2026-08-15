@@ -17,6 +17,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   advisor: "مستشار المكتب الفني",
   tech_manager: "مدير المكتب الفني",
   hotline_operator: "مشغّل الخط الساخن",
+  intake_clerk: "منسوب وحدة الإدخال اليدوي",
   ciso: "مسؤول أمن المعلومات",
   sysadmin: "مدير النظام",
   competent_body: "منسوب جهة مختصة",
@@ -41,7 +42,7 @@ export interface Portal {
 export const PORTALS: Portal[] = [
   { app: "landing", title: "الشاشة الموحّدة (بوابة الدخول)", port: 3000, roles: [] },
   { app: "center-officer", title: "موظف المركز (فرز · دراسة · قرار)", port: 3002,
-    roles: ["case_officer", "studier", "evaluator", "board_member", "board_chair", "deputy_chair", "hotline_operator"] },
+    roles: ["case_officer", "studier", "evaluator", "board_member", "board_chair", "deputy_chair", "hotline_operator", "intake_clerk"] },
   { app: "competent-entities", title: "الجهات المختصة", port: 3006, roles: ["competent_body"] },
   { app: "attorney-general", title: "بوابة النائب العام", port: 3007, roles: ["prosecutor_general"] },
   { app: "technical-office", title: "المكتب الفني (التظلّمات)", port: 3008, roles: ["advisor", "tech_manager"] },

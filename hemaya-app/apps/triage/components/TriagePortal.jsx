@@ -114,6 +114,63 @@ function Queue({ rows, open, viewOnly, acct, regInfo }) {
   );
 }
 
+// ===== الطلبات المرسلة — ما أُحيل لجهةٍ مختصّة لطلب توصية =====
+// كان يذوب في القائمة المشتركة، فلا يُرى تجاوز مهلة الجهة إلا بالتنقيب.
+function SentQueue({ rows, open, viewOnly }) {
+  const [filter, setFilter] = useState('all');
+  const sent = rows.filter((r) => r.status === 'pending' || r.status === 'replied');
+  const overdue = (r) => r.status === 'pending' && r.sla && r.sla.daysElapsed >= r.sla.totalDays;
+  const shown = sent.filter((r) => filter === 'all'
+    || (filter === 'pending' && r.status === 'pending')
+    || (filter === 'replied' && r.status === 'replied')
+    || (filter === 'over' && overdue(r)));
+  return (
+    <div>
+      <h2 className="h2">الطلبات المرسلة — إلى الجهات المختصّة</h2>
+      <p className="lede">ما أُحيل من طلبات لطلب توصية الجهة المختصّة — مهلة <b>5 أيام عمل</b> (م5/4)؛ وعند تجاوزها يبقى الطلب منتظراً ويُصعَّد للقيادة، ولا حفظ تلقائي. ومتى وردت التوصية عاد الطلب لقرار الفرز (م10).</p>
+      <div className="chips" style={{ marginBottom: 16 }}>
+        <button className={'chip' + (filter === 'all' ? ' on' : '')} onClick={() => setFilter('all')}>الكل ({sent.length})</button>
+        <button className={'chip' + (filter === 'pending' ? ' on' : '')} onClick={() => setFilter('pending')}>بانتظار التوصية ({sent.filter((r) => r.status === 'pending').length})</button>
+        <button className={'chip' + (filter === 'over' ? ' on' : '')} onClick={() => setFilter('over')}>متجاوزة المهلة ({sent.filter(overdue).length})</button>
+        <button className={'chip' + (filter === 'replied' ? ' on' : '')} onClick={() => setFilter('replied')}>وردت التوصية ({sent.filter((r) => r.status === 'replied').length})</button>
+      </div>
+      <Card className="card">
+        <div className="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>الرمز السري</th><th>الفئة</th><th>الجهة المُحال إليها</th>{viewOnly && <th>موظف الفرز</th>}<th>الحالة</th><th>المهلة</th><th></th>
+            </tr></thead>
+            <tbody>
+              {shown.map((r, i) => {
+                const left = r.sla ? r.sla.totalDays - r.sla.daysElapsed : null;
+                return (
+                  <tr key={i} onClick={() => open(r)}>
+                    <td><span className="mono" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{r.secret}</span></td>
+                    <td>{r.cat}</td>
+                    <td style={{ fontSize: 12.5 }}>{r.entity || '—'}</td>
+                    {viewOnly && <td style={{ fontSize: 12.5 }}>{CLERKS[r.clerk] ? CLERKS[r.clerk].short : '—'}</td>}
+                    <td><Pill status={r.status} /></td>
+                    <td>{r.status === 'replied'
+                      ? <span className="muted">انتهت — وردت التوصية</span>
+                      : left === null ? <span className="muted">—</span>
+                        : <span className="pill" style={left <= 0
+                            ? { background: 'var(--error-10)', color: 'var(--color-error)' }
+                            : { background: 'var(--green-10)', color: 'var(--color-primary)' }}>
+                            {left <= 0 ? 'متجاوزة — مُصَعّدة للقيادة' : 'متبقٍّ ' + left + ' أيام عمل'}
+                          </span>}</td>
+                    <td><span className="link">{r.status === 'replied' && !viewOnly ? 'اتخاذ قرار' : 'عرض'} <I name="chevron_left" size={16} /></span></td>
+                  </tr>
+                );
+              })}
+              {shown.length === 0 && <tr><td colSpan={viewOnly ? 7 : 6} className="muted" style={{ textAlign: 'center', padding: 28 }}>لا طلبات في هذا التصنيف.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ===== بطاقة ملخّص الطلب =====
 function SummaryCard({ rec }) {
   const [full, setFull] = useState(false);
@@ -185,7 +242,11 @@ const CALL_RESULTS = {
 const CALL_CHANNELS = {
   phone:    { t: 'الهاتف', icon: 'call' },
   platform: { t: 'رسائل المنصة', icon: 'chat' },
+  // محضر المقابلة الحضورية — تكتبه وحدة الإدخال اليدوي عند التقديم الحضوري،
+  // ولا يُنشئه موظف الفرز؛ فهو معروضٌ هنا ومستبعَدٌ من قائمة الإضافة أدناه.
+  inperson: { t: 'حضوري — مقابلة', icon: 'record_voice_over' },
 };
+const ADDABLE_CALL_CHANNELS = ['phone', 'platform'];
 const RESPONSE_OPTIONS = [
   'تم إغلاق الطلب لعدم الرد على التواصل الهاتفي والمراسلات.',
   'تم إغلاق الطلب لوجود طلب سابق.',
@@ -245,7 +306,7 @@ function CallLogs({ rec, actor, viewOnly, isDone, logs, setLogs, onAdd }) {
             <div className="fld" style={{ margin: 0 }}>
               <span className="fld-label">قناة التواصل</span>
               <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-                {Object.entries(CALL_CHANNELS).map(([k, v]) => <option key={k} value={k}>{v.t}</option>)}
+                {ADDABLE_CALL_CHANNELS.map((k) => <option key={k} value={k}>{CALL_CHANNELS[k].t}</option>)}
               </select>
             </div>
           </div>
@@ -350,7 +411,10 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
   const urgent = false;                                              // العاجل/الطارئ خارج الفرز — مسار خاص (م8)
 
   // قواعد التحقق عبر المحاضر
-  const hasCall = logs.length > 0;                                   // محضر واحد على الأقل قبل أي قرار
+  // محضر واحد على الأقل قبل أي قرار. الحضوريّ مستوفٍ بذاته لأنّ محضر مقابلته
+  // مُقيَّدٌ فعلاً في contact_logs بقناة inperson — لا استثناءً في الواجهة:
+  // شرطُ triage_decide على الخادم هو نفسه، فلا يُفتح زرٌّ يرفضه الخادم.
+  const hasCall = logs.length > 0;
   const noAnswerDays = new Set(logs.filter((l) => l.result === 'noanswer').map((l) => (l.date || '').split(' ')[0])).size;
   const noReplyOk = noAnswerDays >= 3;                               // 3 محاولات موثّقة على أيام مختلفة
 
@@ -386,6 +450,11 @@ function CaseDetail({ rec, back, viewOnly, actor, onResolve, onReveal, onAddLog 
         </div>
         <Pill status={rec.status} />
       </div>
+
+      {rec.inperson &&
+        <InlineAlert kind="success" title="تقديم حضوري — لا يُطلب محضر اتصال" style={{ marginBottom: 14 }}>
+          حضر طالب الحماية بذاته وقُوبل في وحدة {PAPER_INTAKE_LABEL}، ومحضر المقابلة <b>مُقيَّدٌ أدناه بقناة «حضوري — مقابلة»</b> ويقوم مقام محضر الاتصال للتحقّق (م7) — ولك إضافة محاضر تواصلٍ لاحقة إن احتجت.
+        </InlineAlert>}
 
       {rec.paper &&
         <InlineAlert kind="warning" title="ورودٌ ورقيّ — هوية غير موثّقة" style={{ marginBottom: 14 }}>
@@ -822,6 +891,8 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
 
   const openCase = (r) => { setActive('queue'); setSel(r); };
   const needCount = rows.filter((r) => cfg.nextAction(r)).length;
+  // شارة «المرسلة» = ما تجاوز مهلة الجهة (الرقم الذي يستوجب تصعيداً لا العدّ الكلّي)
+  const overdueSent = rows.filter((r) => r.status === 'pending' && r.sla && r.sla.daysElapsed >= r.sla.totalDays).length;
 
   const startThread = (caseId, partyId) => {
     const key = caseId + ':' + partyId;
@@ -857,6 +928,9 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   if (active === 'queue') body = sel
     ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} onReveal={revealAudit} onAddLog={onAddLog} />
     : <Queue rows={rows} open={setSel} viewOnly={viewOnly} acct={acct} regInfo={regInfo} />;
+  else if (active === 'sent') body = sel
+    ? <CaseDetail rec={sel} back={() => setSel(null)} viewOnly={viewOnly} actor={acct} onResolve={onResolve} onReveal={revealAudit} onAddLog={onAddLog} />
+    : <SentQueue rows={rows} open={setSel} viewOnly={viewOnly} />;
   else if (active === 'dashboard') body = <Dashboard cfg={cfg} rows={rows} viewOnly={viewOnly} openCase={openCase} go={goNav} notifs={notifs} onOpenNotif={openNotif} />;
   else if (active === 'profile') body = <Profile actor={acct} viewOnly={viewOnly} />;
   else if (active === 'notifications') body = <NotificationsScreen config={cfg} items={notifs} onOpen={openNotif} onMarkAllRead={markAllRead} />;
@@ -884,7 +958,7 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
       user={{ name: me.name }}
       active={active}
       onNavigate={goNav}
-      counters={{ queue: needCount, messages: unreadMsgs, notifications: unreadNotifs }}
+      counters={{ queue: needCount, sent: overdueSent, messages: unreadMsgs, notifications: unreadNotifs }}
       secret={sel ? sel.secret : null}
       onRevealSecret={() => revealAudit(sel)}
       roleTag={viewOnly ? 'اطّلاع وإشراف' : 'سري للغاية'}

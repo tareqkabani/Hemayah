@@ -26,6 +26,15 @@ begin
       ('2000000007','case_officer',       '{}'::jsonb,                        'موظف التنفيذ'),
       ('2000000008','board_chair',        '{}'::jsonb,                        'رئيس المركز'),
       ('2000000009','deputy_chair',       '{}'::jsonb,                        'نائب رئيس المركز'),
+      -- منسوبو وحدة الإدخال اليدوي: «لكل منسوب حسابه» (قرار ٤ في تسليم الوحدة).
+      -- صلاحيتهم تفريغ الوارد وإحالته للفرز — لا قرار ولا تقييم؛ ومشرفة الوحدة
+      -- تقرأ ما يقرؤونه وتظهر بصفتها في سند التدقيق.
+      ('2000000010','intake_clerk',       '{"unit":"intake"}'::jsonb,                        'أ. سلطان العتيبي'),
+      ('2000000011','intake_clerk',       '{"unit":"intake"}'::jsonb,                        'أ. منار القحطاني'),
+      ('2000000012','intake_clerk',       '{"unit":"intake"}'::jsonb,                        'أ. فهد الحربي'),
+      ('2000000013','intake_clerk',       '{"unit":"intake","level":"supervisor"}'::jsonb,   'أ. ريم الشهري'),
+      -- مشغّل الخط الساخن كان صاحب الشاشة قبل استقلال الدور — يبقى له الدخول
+      -- إليها (بطاقة البوابة الموحّدة تقصده) بمنح intake_clerk أدناه.
       -- أعضاء مجلس إضافيون لاكتمال 7 مقاعد مصوّتة (5 أعضاء + نائب + رئيس)
       ('2000000061','board_member',       '{}'::jsonb,                        'عضو المجلس (نيابة 2)'),
       ('2000000062','board_member',       '{}'::jsonb,                        'عضو المجلس (الداخلية)'),
@@ -86,6 +95,21 @@ begin
     on conflict (user_id, role) do update
       set attributes = coalesce(user_roles.attributes,'{}'::jsonb) || excluded.attributes;
   end loop;
+end $$;
+
+-- ── ١-أ٢) مشغّل الخط الساخن ينضمّ لوحدة الإدخال اليدوي ──
+--   الشاشة كانت متاحةً له بدوره القديم؛ وبعد استقلال intake_clerk صار الحارس
+--   is_intake_staff هو المرجع — فيُمنح الدور صراحةً كي لا تنقطع بطاقته في
+--   البوابة الموحّدة (2000000001 ← /paper-intake).
+do $$
+declare _u uuid;
+begin
+  select id into _u from auth.users where email = '2000000001@nafath.local';
+  if _u is not null then
+    insert into user_roles (user_id, role, attributes)
+    values (_u, 'intake_clerk'::app_role, '{"unit":"intake"}'::jsonb)
+    on conflict (user_id, role) do nothing;
+  end if;
 end $$;
 
 -- ── 1-ب) ربط مستخدم الجهة المختصّة بفرعه ──
