@@ -19,7 +19,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { InlineAlert, PortalShell } from "@hemaya/ui";
-import { PAPER_INTAKE_LABEL, buildFactors9 } from "@hemaya/domain";
+import { PAPER_INTAKE_LABEL, buildFactors9, setHolidays } from "@hemaya/domain";
 import {
   submitPaperIntake, submitPaperRecommendation,
   registerInbox, claimInbox,
@@ -51,7 +51,9 @@ const SOURCES = [
     d: "خطاب رسمي تنشئ به الجهة طلباً ابتدائياً نيابةً عن الشخص (لا طلب قائم). الهوية تُدخَل يدوياً — غير موثّقة." },
 ];
 
-export function PaperIntakePortal({ me, lists, inbox, sent, awaiting }) {
+export function PaperIntakePortal({ me, lists, inbox, sent, awaiting, holidays }) {
+  // التقويم الرسميّ يُحقن قبل أوّل حساب مهلة (انظر نظيرتها في بوابة الفرز).
+  setHolidays(holidays || []);
   const router = useRouter();
   const [active, setActive] = useState("inbox");
   const [collapsed, setCollapsed] = useState(false);
