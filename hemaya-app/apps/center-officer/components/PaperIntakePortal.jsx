@@ -24,7 +24,7 @@ import {
   submitPaperIntake, submitPaperRecommendation,
   registerInbox, claimInbox,
 } from "@/lib/paper-intake-actions";
-import { I, todayISO, fmtD, chLabel } from "./intake/parts";
+import { I, todayISO, fmtD, chLabel, keyOf } from "./intake/parts";
 import { Inbox } from "./intake/Inbox";
 import { SentList } from "./intake/SentList";
 import { ClerkProfile } from "./intake/ClerkProfile";
@@ -147,7 +147,8 @@ export function PaperIntakePortal({ me, lists, inbox, sent, awaiting }) {
     const res = await submitPaperIntake({
       source: "seeker",
       applicantRole: d.role || "",
-      category: d.category || "شاهد",
+      // المخزَّن مفتاحُ البند لا تسميتُه — «ذو صلة» كانت تُخزَّن شاهداً بصمت
+      category: keyOf(lists.app_category, d.category) || "witness",
       entity: d.entity || "",
       crime: d.crime || "",
       reason: d.reason || "",
@@ -244,7 +245,7 @@ export function PaperIntakePortal({ me, lists, inbox, sent, awaiting }) {
     const res = await submitPaperIntake({
       source: "entity",
       applicantRole: "جهة مختصّة",
-      category: d.role || "شاهد",
+      category: keyOf(lists.app_category, d.role) || "witness",
       entity: entityLabel,
       crime: d.crimeDesc || d.reasons || d.caseSummary || "خطاب جهة (ورقيّ)",
       reason: [d.why1, d.why2, d.why3].filter(Boolean).join(" · ") || d.reasons || "مسوّغات الخطاب الوارد",

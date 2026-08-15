@@ -3,14 +3,30 @@ import { revalidatePath } from "next/cache";
 import { createServerClient } from "@hemaya/supabase";
 import type { AppCategory, Json } from "@hemaya/supabase";
 
-// خريطة الفئة العربية → enum app_category.
-const CAT: Record<string, AppCategory> = {
+// فئة الحماية: القيمة المعتمدة هي مفتاح البند في طبقة المحتوى (item_key)،
+// وهو عين قيمة enum app_category — فلا خريطةَ ترجمةٍ ولا تخمين.
+//
+// ⚠️ الخريطة العربية أدناه للتوافق الخلفي وحدها (نداءٌ قديم يمرّر التسمية).
+// وكان الحلّ قبل اليوم ينتهي بـ«|| witness»: أيّ تسميةٍ خارجها تُخزَّن
+// **شاهداً بصمت**. وصارت «ذو صلة» قابلةً للاختيار حين رُبط النموذج بطبقة
+// المحتوى وليست في الخريطة — فكان اختيارها يُخزَّن شاهداً. الآن يُرفض
+// المجهول صراحةً بدل أن يُملأ حقلٌ نظاميّ بقيمةٍ لم يخترها أحد.
+const VALID_CAT = new Set<AppCategory>(["reporter", "witness", "expert", "victim", "related"]);
+const LEGACY_CAT: Record<string, AppCategory> = {
   "شاهد": "witness",
   "مبلّغ": "reporter",
   "مُبلِّغ": "reporter",
   "خبير": "expert",
   "ضحية": "victim",
+  "ذو صلة": "related",
 };
+function toCategory(v: string): AppCategory {
+  const s = (v || "").trim();
+  if (VALID_CAT.has(s as AppCategory)) return s as AppCategory;
+  const legacy = LEGACY_CAT[s];
+  if (legacy) return legacy;
+  throw new Error(`فئة حماية غير معروفة: «${s}» — راجع قائمة app_category في طبقة المحتوى.`);
+}
 
 export type PaperIntakeInput = {
   source: "seeker" | "entity";
@@ -31,11 +47,17 @@ export async function submitPaperIntake(input: PaperIntakeInput) {
   if (!input.crime?.trim() || !input.reason?.trim()) {
     return { ok: false as const, error: "الجريمة والمسوّغات مطلوبة." };
   }
+  let category: AppCategory;
+  try {
+    category = toCategory(input.category);
+  } catch (e) {
+    return { ok: false as const, error: String(e instanceof Error ? e.message : e) };
+  }
   const supabase = createServerClient();
   const { error, data } = await supabase.rpc("submit_paper_intake", {
     _source: input.source,
     _applicant_role: (input.applicantRole || null) as string, // الدالة تقبل NULL فعلياً
-    _category: CAT[input.category?.trim()] || "witness",
+    _category: category,
     _entity: (input.entity || null) as string,
     _crime: input.crime,
     _reason: input.reason,
