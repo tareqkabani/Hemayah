@@ -196,10 +196,18 @@ export type SentRow = {
   status: string;
 };
 
-export async function listSent() {
+export type SentQuery = { q?: string; dest?: "triage" | "study" | null; limit?: number; offset?: number };
+
+/** «المرسلة» ببحثٍ وترقيمٍ على الخادم — لا تُجلب كل الصفوف دفعةً واحدة. */
+export async function listSent(query: SentQuery = {}) {
   const supabase = createServerClient();
-  const { data, error } = await supabase.rpc("intake_sent_list");
-  if (error) return { ok: false as const, error: error.message, rows: [] as SentRow[] };
+  const { data, error } = await supabase.rpc("intake_sent_list", {
+    _q: (query.q?.trim() || null) as string,
+    _dest: (query.dest || null) as string,
+    _limit: query.limit ?? 25,
+    _offset: query.offset ?? 0,
+  });
+  if (error) return { ok: false as const, error: error.message, rows: [] as SentRow[], total: 0 };
   const rows: SentRow[] = (data || []).map((r) => ({
     id: r.id as string,
     secret: r.secret_code as string,
@@ -214,7 +222,8 @@ export async function listSent() {
     verified: !!r.identity_verified,
     status: (r.case_status as string) || "",
   }));
-  return { ok: true as const, rows };
+  const total = Number((data?.[0] as { total_count?: number } | undefined)?.total_count ?? rows.length);
+  return { ok: true as const, rows, total };
 }
 
 export async function registerInbox(input: {
