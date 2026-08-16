@@ -849,7 +849,14 @@ function EntitiesScreen({ org, say }) {
 /* ═══════════ الإعدادات والمدد + أعلام الميزات ═══════════ */
 // أعلام on/off — تُدار في «أعلام الميزات» حصراً، وتُستبعَد من قائمة الإعدادات الخام
 const KNOWN_FLAGS = {
-  watchdog: { t: "المراقبات الآلية (المهل والتصعيد)", d: "مراقبا الدراسة/التقييم ومهلة توصية الجهة — كل 30 دقيقة. الإيقاف يجمّد التذكير والتصعيد الآليين." },
+  // ⚠️ الوصف كان «الإيقاف يجمّد التذكير والتصعيد الآليين» — وصار مضلّلاً بعد
+  // البثّ لكل الطاقم: شرط «تسليم الجميع» لا يقع عملياً، فمُقفِل الميعاد صار
+  // طريقَ القضايا الوحيدَ إلى المجلس. الإيقاف يوقف الخطّ لا التذكيرات.
+  watchdog: {
+    t: "المراقبات الآلية (المهل والتصعيد)",
+    d: "مراقبا الدراسة/التقييم ومهلة توصية الجهة — كل 30 دقيقة.",
+    warn: "الإيقاف لا يجمّد التذكيرات وحدها: مُقفِل الميعاد هو ما ينقل القضايا من الدراسة والتقييم إلى المجلس، فإيقافه يوقف تقدّم القضايا كلّها بلا إنذار. تابع «توقّف الدراسة والتقييم» في صحة النظام — فهو مستقلّ عن هذا المفتاح ويظلّ يعمل حين يُطفأ.",
+  },
 };
 // إعدادات تشغيلية معروفة — تُعرَض بمسمّاها ووحدتها ونوعها (لا مفاتيح خام)
 const KNOWN_SETTINGS = {
@@ -1082,8 +1089,12 @@ function SettingsScreen({ settings, say }) {
 function FlagsScreen({ settings, say }) {
   const [rows, setRows] = useState(settings);
   const val = (k) => rows.find((x) => x.key === k)?.value ?? "off";
+  const [confirming, setConfirming] = useState(null); // مفتاحُ إيقافٍ ذي أثرٍ جسيم ينتظر التأكيد
   const toggle = async (k) => {
     const next = val(k) === "on" ? "off" : "on";
+    // الإيقاف ذو الأثر الجسيم لا يقع بنقرةٍ واحدة — الوصف وحده لا يُقرأ عادةً
+    if (next === "off" && KNOWN_FLAGS[k]?.warn && confirming !== k) { setConfirming(k); return; }
+    setConfirming(null);
     const r = await setSetting(k, next);
     if (!r.ok) return say("⚠ " + r.error);
     setRows((xs) => xs.some((x) => x.key === k) ? xs.map((x) => (x.key === k ? { ...x, value: next } : x)) : xs.concat({ key: k, value: next }));
@@ -1107,6 +1118,14 @@ function FlagsScreen({ settings, say }) {
                 <button className="ad-ibtn" onClick={() => toggle(k)} title={on ? "إيقاف" : "تفعيل"}>
                   <I name={on ? "toggle_on" : "toggle_off"} size={40} color={on ? "var(--color-primary)" : "var(--text-disabled)"} /></button>
               </div>
+              {f.warn && on && confirming !== k && <InlineAlert kind="warning" title="أثر الإيقاف" style={{ marginTop: 12 }}>{f.warn}</InlineAlert>}
+              {confirming === k && <InlineAlert kind="error" title="تأكيد الإيقاف" style={{ marginTop: 12 }}>
+                {f.warn}
+                <div className="row" style={{ gap: 10, marginTop: 12 }}>
+                  <button className="btn btn-ghost" onClick={() => setConfirming(null)}>تراجع</button>
+                  <button className="btn btn-primary" onClick={() => toggle(k)}><I name="power_settings_new" size={17} /> إيقاف رغم ذلك</button>
+                </div>
+              </InlineAlert>}
             </Card>
           );
         })}
@@ -1145,25 +1164,50 @@ function AuditScreen({ rows }) {
 }
 
 function HealthScreen({ health }) {
-  const H = ({ icon, v, l }) => (
+  const H = ({ icon, v, l, tone }) => (
     <Card className="card ad-stat">
-      <span className="ad-stat-ico" style={{ background: "var(--green-10)" }}><I name={icon} size={22} fill color="var(--color-primary)" /></span>
-      <span><b className="ad-stat-v">{v ?? "—"}</b><span className="ad-stat-l">{l}</span></span>
+      <span className="ad-stat-ico" style={{ background: tone ? "var(--" + tone + "-10)" : "var(--green-10)" }}>
+        <I name={icon} size={22} fill color={tone ? "var(--color-" + tone + ")" : "var(--color-primary)"} /></span>
+      <span><b className="ad-stat-v" style={tone ? { color: "var(--color-" + tone + ")" } : undefined}>{v ?? "—"}</b><span className="ad-stat-l">{l}</span></span>
     </Card>
   );
   const jobs = Array.isArray(health.cron_jobs) ? health.cron_jobs : [];
+  // التوقّف: يُقرأ من ops_stall_report المستقلّة عن مفتاح الحارس، فيظلّ
+  // مرئياً حين يُطفأ — وإطفاؤه بعد البثّ يوقف تقدّم القضايا كلّها.
+  const stalled = Number(health.stalled_total ?? 0);
+  const oldest = Number(health.stalled_oldest_days ?? 0);
+  const notClosed = Number(health.stall_quorum_met_not_closed ?? 0);
+  const stallTone = notClosed > 0 || oldest >= 5 ? "error" : stalled > 0 ? "warning" : null;
   return (
     <div>
       <h2 className="h2">صحة النظام</h2>
       <p className="lede">مؤشرات تشغيلية حيّة من القاعدة — بلا أي بيانات مشمولين.</p>
+      {notClosed > 0 && <InlineAlert kind="error" title="مُقفِل الميعاد لا يعمل" style={{ marginBottom: 14 }}>
+        {notClosed} قضية بلغت النصاب الأدنى (دراسة وتقييم) وانقضى ميعادها ولم تتقدّم إلى المجلس. الوضع السليم صفر — راجع مفتاح «المراقبات الآلية» أعلاه وجدول pg_cron أدناه.
+      </InlineAlert>}
+      {health.watchdog !== "on" && <InlineAlert kind="error" title="المراقبات الآلية موقوفة — الخطّ متوقّف" style={{ marginBottom: 14 }}>
+        مُقفِل الميعاد هو ما ينقل القضايا من الدراسة والتقييم إلى المجلس. ما دام المفتاح موقوفاً فلا قضية تتقدّم، ولا يصدر إنذارٌ بذلك من الحارس نفسه — هذا العدّاد وحده هو ما يكشفه.
+      </InlineAlert>}
       <div className="ad-stats">
+        <H icon="hourglass_disabled" v={stalled} l={"قضية موقوفة في الدراسة والتقييم" + (oldest ? " · أقدمها " + oldest + " يوم عمل" : "")} tone={stallTone} />
         <H icon="notifications" v={health.notifications_24h} l="إشعاراً آخر 24 ساعة" />
         <H icon="receipt_long" v={health.audit_rows} l="صفوف سجل التدقيق" />
         <H icon="group" v={health.staff_accounts} l="حساب منسوب فعّال" />
         <H icon="approval" v={health.ccr_pending} l="طلب تعديل معلّق" />
         <H icon="database" v={health.db_size} l="حجم قاعدة البيانات" />
-        <H icon="flag" v={health.watchdog === "on" ? "مفعّلة" : "موقوفة"} l="المراقبات الآلية" />
+        <H icon="flag" v={health.watchdog === "on" ? "مفعّلة" : "موقوفة"} l="المراقبات الآلية" tone={health.watchdog === "on" ? null : "error"} />
       </div>
+      {stalled > 0 && <Card className="card pad" style={{ marginTop: 16 }}>
+        <div className="ad-sec-h"><I name="hourglass_disabled" size={18} color="var(--color-primary)" /> ما الذي ينقص القضايا الموقوفة؟</div>
+        <p className="muted" style={{ margin: "0 0 12px", fontSize: 12.5, lineHeight: 1.7 }}>
+          القضية لا تتقدّم إلى المجلس قبل ورود دراسةٍ <b>وتقييمٍ</b> على الأقل — ولا يملك النظام إنتاجهما. يتصاعد الإنذار على النائب، ثم الرئيس معه بعد ٣ أيام عمل، ثم إنذارٌ حرِج بعد ٥.
+        </p>
+        <div className="ad-stats">
+          <H icon="balance" v={health.stall_missing_study} l="تنتظر دراسة" />
+          <H icon="psychology" v={health.stall_missing_assessment} l="تنتظر تقييماً" />
+          <H icon="do_not_disturb_on" v={health.stall_missing_both} l="بلا دراسة ولا تقييم" />
+        </div>
+      </Card>}
       <Card className="card pad" style={{ marginTop: 16 }}>
         <div className="ad-sec-h"><I name="schedule" size={18} color="var(--color-primary)" /> المهام المجدولة (pg_cron)</div>
         <div className="ad-tblwrap"><table className="ad-tbl">
