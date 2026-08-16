@@ -8,9 +8,10 @@
    ============================================================ */
 import React, { useState, useEffect, useRef } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer, PortalShell, NotificationsScreen, NotifItem, MessagesScreen } from "@hemaya/ui";
-import { PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
+import { setHolidays, PORTAL_CONFIGS, STAGE_FLOW, REGION_LABEL as REGIONS, regionDisp, PAPER_INTAKE_LABEL, COMPETENT_ENTITY_LABELS, entityByLabel, isCentralEntity, TRIAGE_CHECK_ITEMS } from "@hemaya/domain";
 import { createClient } from "@hemaya/supabase/src/browser";
 import { triageDecide, addContactLog } from "@/lib/triage-actions";
+import { caseAttachments, attachmentUrl } from "@/lib/attachments";
 import { fetchRegister } from "@/lib/register";
 import "./triage-screens.css";
 
@@ -207,16 +208,59 @@ function SummaryCard({ rec }) {
             <div className="ro-field"><span className="fld-label">الجهة المرتبطة</span><span style={{ fontWeight: 600 }}>{rec.entity || '—'}</span></div>
             <div className="ro-field"><span className="fld-label">رقم القضية</span><span className="mono" style={{ fontWeight: 700 }}>{rec.caseNo || 'لا يوجد'}</span></div>
           </div>
-          <div className="ro-field" style={{ marginTop: 12 }}>
-            <span className="fld-label">المرفقات المقدّمة</span>
-            <div className="row" style={{ gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              {rec.att && rec.att.length
-                ? rec.att.map((f, i) => <span key={i} className="attf"><I name="description" size={15} /> {f}</span>)
-                : <span className="muted" style={{ fontSize: 12.5 }}>لا مرفقات</span>}
-            </div>
-          </div>
+          <Attachments rec={rec} />
         </div>}
     </Card>
+  );
+}
+
+// ===== المرفقات — تُفتح بمضمونها لا باسمها =====
+// المرفوعة فعلاً تأتي من intake_attachments برابطٍ موقَّت يُطلب عند النقر.
+// وأسماءُ المرفقات القديمة (المُدخَلة قبل المخزن) تبقى معروضةً بلا رابط،
+// موسومةً بأنّها اسمٌ فقط — فلا يظنّ الموظف أنّ ملفاً ضاع.
+function Attachments({ rec }) {
+  const [rows, setRows] = useState(null);   // null = يُحمَّل
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let alive = true;
+    if (!rec.caseId) { setRows([]); return; }
+    caseAttachments(rec.caseId).then((r) => { if (alive) setRows(r.ok ? r.rows : []); });
+    return () => { alive = false; };
+  }, [rec.caseId]);
+
+  const open = async (path) => {
+    setErr('');
+    const r = await attachmentUrl(rec.caseId, path);
+    if (!r.ok) { setErr(r.error); return; }
+    window.open(r.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const stored = rows || [];
+  const storedNames = new Set(stored.map((f) => f.name));
+  // أسماءٌ قديمة لا يقابلها ملفٌ مرفوع
+  const legacy = (rec.att || []).filter((n) => ![...storedNames].some((s2) => String(n).includes(s2)));
+
+  return (
+    <div className="ro-field" style={{ marginTop: 12 }}>
+      <span className="fld-label">المرفقات المقدّمة</span>
+      <div className="row" style={{ gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+        {rows === null && <span className="muted" style={{ fontSize: 12.5 }}>يُحمَّل…</span>}
+        {stored.map((f) => (
+          <button key={f.id} className="attf" style={{ cursor: 'pointer', border: '1px solid var(--border-default)' }}
+            onClick={() => open(f.path)} title="فتح المرفق (رابطٌ موقَّت)">
+            <I name="description" size={15} /> {f.name} <I name="open_in_new" size={13} />
+          </button>
+        ))}
+        {legacy.map((f, i) => (
+          <span key={'l' + i} className="attf" title="اسمٌ مُدخَلٌ قبل تفعيل المخزن — لا ملفَّ له">
+            <I name="description" size={15} /> {f} <span className="muted" style={{ fontSize: 11 }}>(اسم فقط)</span>
+          </span>
+        ))}
+        {rows !== null && !stored.length && !legacy.length &&
+          <span className="muted" style={{ fontSize: 12.5 }}>لا مرفقات</span>}
+      </div>
+      {err && <p className="muted" style={{ marginTop: 6, fontSize: 12, color: 'var(--color-error)' }}>{err}</p>}
+    </div>
   );
 }
 
@@ -983,6 +1027,9 @@ function App({ roleKey, me, initialRows, prefs, basePath, initialReadKeys, initi
   );
 }
 
-export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [], registerTotal, registerTruncated = false }) {
+export function TriagePortal({ roleKey = 'triage', me, initialRows, prefs, basePath = '/triage', initialReadKeys = [], initialMessages = [], registerTotal, registerTruncated = false, holidays = [] }) {
+  // التقويم الرسميّ يُحقن قبل أوّل حساب مهلة — لا في useEffect: الحساب يجري
+  // أثناء الرسم الأوّل، فحقنٌ بعده يُظهر «متجاوزة» ثمّ يصحّحها أمام الموظف.
+  setHolidays(holidays);
   return <App roleKey={roleKey} me={me} initialRows={initialRows} prefs={prefs} basePath={basePath} initialReadKeys={initialReadKeys} initialMessages={initialMessages} registerTotal={registerTotal} registerTruncated={registerTruncated} />;
 }

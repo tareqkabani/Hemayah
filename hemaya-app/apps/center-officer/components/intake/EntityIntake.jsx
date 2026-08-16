@@ -11,6 +11,8 @@ import { InlineAlert } from "@hemaya/ui";
 import { REGION_LABEL } from "@hemaya/domain";
 import { I, Field, Stepper, LockedCtx, PaperMeta, ENTS, entName, fmtD, todayISO, bizDaysSince } from "./parts";
 import { RecommendationForm } from "@hemaya/recommendation";
+import { createClient } from "@hemaya/supabase/src/browser";
+import { recordAttachment, removeAttachment } from "@/lib/intake-attachments";
 import { listReferredForEntity } from "@/lib/paper-intake-actions";
 
 const REC_DEADLINE_DAYS = 5;
@@ -19,6 +21,9 @@ const NOTE = {
   rec: "خطاب توصية وارد بالبريد على طلبٍ مُحال. الربط بطلبٍ قائم إلزاميّ: تُورث هويته الموثّقة ولا تُدخل يدوياً، والجهة صاحبة محتوى التوصية. تُرفق صورة الخطاب ويُسجل الإدخال في التدقيق.",
   onbehalf: "خطاب رسمي وارد بالبريد — نموذج التوصية نفسه؛ المُدخِل موظف المركز نيابةً عن الجهة، والهوية تُدخل يدوياً (غير موثّقة)، وطلب الحماية المسبّب والهوية مرفقان إلزاميّان.",
 };
+
+// عميلٌ واحدٌ للمتصفح — يُنشأ مرّة لا مع كل إعادة رسم
+const browser = typeof window === "undefined" ? null : createClient();
 
 export function EntityIntake({
   mode, meta, setMeta, locked, presetEntity, presetCaseId,
@@ -144,6 +149,10 @@ export function EntityIntake({
           }}
           lists={lists}
           busy={busy}
+          uploader={browser ? {
+            client: browser, regNo: meta.regNo,
+            onRecord: recordAttachment, onRemove: removeAttachment,
+          } : null}
           onApprove={(f) => onSubmit({ mode, entity, entityLabel: entName(entity), letter, linkSel, form: f })}
         />
       )}

@@ -16,10 +16,11 @@
 
    الوحدة قابلة للعزل: مسارها ومكوّناتها وجداولها مستقلّة.
    ============================================================ */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@hemaya/supabase/src/browser";
 import { InlineAlert, PortalShell } from "@hemaya/ui";
-import { PAPER_INTAKE_LABEL, buildFactors9 } from "@hemaya/domain";
+import { PAPER_INTAKE_LABEL, buildFactors9, setHolidays } from "@hemaya/domain";
 import {
   submitPaperIntake, submitPaperRecommendation,
   registerInbox, claimInbox,
@@ -51,8 +52,25 @@ const SOURCES = [
     d: "خطاب رسمي تنشئ به الجهة طلباً ابتدائياً نيابةً عن الشخص (لا طلب قائم). الهوية تُدخَل يدوياً — غير موثّقة." },
 ];
 
-export function PaperIntakePortal({ me, lists, inbox, sent, awaiting }) {
+export function PaperIntakePortal({ me, lists, inbox, sent, sentTotal, awaiting, holidays }) {
+  // التقويم الرسميّ يُحقن قبل أوّل حساب مهلة (انظر نظيرتها في بوابة الفرز).
+  setHolidays(holidays || []);
   const router = useRouter();
+
+  // «الواردة» طابورٌ مشترك: ما يفرّغه زميلٌ يجب أن يختفي عند الجميع فوراً
+  // (معيار القبول في التسليم) — لا عند تحديث الصفحة يدوياً. بلا فلترٍ على
+  // الاشتراك: الفلترة على postgres_changes تُسقط أحداثاً لا تحمل العمود
+  // المفلتَر في حمولتها (درس ناقل الإحالات).
+  useEffect(() => {
+    const sb = createClient();
+    const ch = sb
+      .channel("intake-inbox")
+      .on("postgres_changes", { event: "*", schema: "public", table: "intake_inbox" },
+        () => router.refresh())
+      .subscribe();
+    return () => { sb.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [active, setActive] = useState("inbox");
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
@@ -344,7 +362,7 @@ export function PaperIntakePortal({ me, lists, inbox, sent, awaiting }) {
         <Inbox rows={inbox} awaiting={awaiting} busy={busy} err={err}
           onRegister={onRegister} onClaim={onClaim} onOpen={onOpen} onOpenRec={onOpenRec} onDirect={onDirect} />
       )}
-      {active === "sent" && <SentList rows={sent} />}
+      {active === "sent" && <SentList rows={sent} total={sentTotal} />}
       {active === "profile" && <ClerkProfile me={me} />}
       {active === "intake" && renderIntake()}
     </PortalShell>

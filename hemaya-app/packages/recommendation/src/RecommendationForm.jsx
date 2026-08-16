@@ -20,6 +20,7 @@ import React, { useState } from "react";
 import { Card, Tag, InlineAlert, SecretCode, DeadlineTimer } from "@hemaya/ui";
 import { RISK_LEVEL, PROTECTION_TYPE_LABELS_14, DURATIONS, isCustomDuration } from "@hemaya/domain";
 import { I, Field, Locked, Choice, Multi, Sec, ENTITIES, labelsOf } from "./parts";
+import { AttachmentPicker } from "./AttachmentPicker";
 
 const WAQIA_FALLBACK = [
   "الاعتداء على الأشخاص", "الآداب العامة", "الأموال", "المخدرات", "الجرائم الاقتصادية",
@@ -40,6 +41,9 @@ export function RecommendationForm({
   busy = false,
   onApprove,
   onBack,
+  // رفعٌ حقيقيّ إلى المخزن: { client, regNo, onRecord, onRemove }. بلا هذا
+  // العقد يبقى المُرفِق مُسجِّلَ أسماءٍ كما كان — لا تنكسر بوابةٌ لم تُوصَل بعد.
+  uploader = null,
 }) {
   const paper = variant === "paper";
   const linked = rec.linked !== false;
@@ -55,7 +59,7 @@ export function RecommendationForm({
     contacted: "", contactKind: "", crimeType: "", waqia: [], crimeDesc: "",
     hidden2: "", threatExists: "", threatType: "", riskLevel: "", harmExists: "", harmType: "",
     extends: "", extendsWho: "", adapt: "", provide: "", why1: "", why2: "", why3: "",
-    types: [], alternatives: "", duration: "", durationNote: "", attachFiles: [],
+    types: [], alternatives: "", duration: "", durationNote: "", attachFiles: [], attachRows: [],
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const [ack, setAck] = useState(false);
@@ -260,21 +264,37 @@ export function RecommendationForm({
       <Sec n="" title="المستندات المطلوبة (مرفقات)" sub={paper && linked
         ? "PDF — أرفق صورة خطاب الجهة الوارد وما ورد معه دفعةً واحدة."
         : "PDF — أرفق المستندات الداعمة دفعةً واحدة (الهوية · بيانات القضية · تقييم المخاطر · التقارير والمسوّغات)."}>
-        <div className="rf-attach-grid">
-          <label className="rf-attach" style={{ cursor: "pointer", alignItems: "flex-start" }}>
-            <input type="file" accept="application/pdf,image/*" multiple style={{ display: "none" }}
-              onChange={(e) => { const xs = Array.from(e.target.files || []); if (xs.length) set("attachFiles", [...(f.attachFiles || []), ...xs.map((x) => x.name)]); e.target.value = ""; }} />
-            <I name={attachOk ? "check_circle" : "upload_file"} size={16} color={attachOk ? "var(--color-primary)" : "var(--text-secondary)"} fill={attachOk} />
-            <span>إرفاق المستندات (يمكن اختيار أكثر من ملف)</span>
-          </label>
-          {(f.attachFiles || []).map((fn, i) => (
-            <label key={fn + i} className="rf-attach" style={{ alignItems: "flex-start" }}>
-              <I name="check_circle" size={16} color="var(--color-primary)" fill />
-              <span>{fn}</span>
-              <button className="link" style={{ marginInlineStart: "auto", fontSize: 12 }} onClick={(e) => { e.preventDefault(); set("attachFiles", (f.attachFiles || []).filter((_, j) => j !== i)); }}><I name="close" size={15} /></button>
+        {uploader ? (
+          <AttachmentPicker
+            regNo={uploader.regNo}
+            client={uploader.client}
+            onRecord={uploader.onRecord}
+            onRemove={uploader.onRemove}
+            files={f.attachRows || []}
+            setFiles={(rows) => setF((s2) => ({
+              ...s2,
+              attachRows: typeof rows === "function" ? rows(s2.attachRows || []) : rows,
+              // الأسماء تبقى للعرض في سجلّ الفرز وشاشة النجاح
+              attachFiles: (typeof rows === "function" ? rows(s2.attachRows || []) : rows).map((x) => x.name),
+            }))}
+          />
+        ) : (
+          <div className="rf-attach-grid">
+            <label className="rf-attach" style={{ cursor: "pointer", alignItems: "flex-start" }}>
+              <input type="file" accept="application/pdf,image/*" multiple style={{ display: "none" }}
+                onChange={(e) => { const xs = Array.from(e.target.files || []); if (xs.length) set("attachFiles", [...(f.attachFiles || []), ...xs.map((x) => x.name)]); e.target.value = ""; }} />
+              <I name={attachOk ? "check_circle" : "upload_file"} size={16} color={attachOk ? "var(--color-primary)" : "var(--text-secondary)"} fill={attachOk} />
+              <span>إرفاق المستندات (يمكن اختيار أكثر من ملف)</span>
             </label>
-          ))}
-        </div>
+            {(f.attachFiles || []).map((fn, i) => (
+              <label key={fn + i} className="rf-attach" style={{ alignItems: "flex-start" }}>
+                <I name="check_circle" size={16} color="var(--color-primary)" fill />
+                <span>{fn}</span>
+                <button className="link" style={{ marginInlineStart: "auto", fontSize: 12 }} onClick={(e) => { e.preventDefault(); set("attachFiles", (f.attachFiles || []).filter((_, j) => j !== i)); }}><I name="close" size={15} /></button>
+              </label>
+            ))}
+          </div>
+        )}
       </Sec>
 
       <Card className="card pad" style={{ marginTop: 8, borderColor: "var(--green-20)" }}>

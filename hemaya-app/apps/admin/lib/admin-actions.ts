@@ -198,3 +198,25 @@ export async function saveSystemMessage(
   if (!data?.length) return fail("الرسالة غير موجودة أو الكتابة محجوبة.");
   return done();
 }
+
+/* ── تقويم العطل الرسمية ──
+   الدالّتان مقصورتان على sysadmin في القاعدة ومسجَّلتان في التدقيق؛ هنا
+   تمريرٌ فقط. والتقويم يُغذَّى يدوياً لأنّ الأعياد قمريّة ومُدد العطل
+   تُحدَّد بتعميمٍ سنويّ — فلا تُثبَّت في الشيفرة. */
+export async function holidayUpsert(
+  day: string, name: string, kind: "national" | "eid" | "other",
+): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("holiday_upsert", { _day: day, _name: name, _kind: kind });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function holidayRemove(day: string): Promise<R> {
+  const sb = createServerClient();
+  const { error } = await (sb.rpc as CallableFunction)("holiday_remove", { _day: day });
+  if (error) return fail((error as { message: string }).message);
+  revalidatePath("/");
+  return { ok: true };
+}

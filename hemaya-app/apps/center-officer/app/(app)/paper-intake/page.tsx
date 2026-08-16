@@ -4,6 +4,7 @@ import { getLists } from "@hemaya/domain";
 import type { AppRole } from "@hemaya/supabase";
 import { PaperIntakePortal } from "@/components/PaperIntakePortal";
 import { listInbox, listSent, listReferredForEntity } from "@/lib/paper-intake-actions";
+import { getHolidays } from "@/lib/holidays";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function Page() {
   const { user, roles } = await requireRole(ROLES, { denyPath: "/403" });
   const supabase = createServerClient();
 
-  const [lists, inbox, sent, referred] = await Promise.all([
+  const [lists, inbox, sent, referred, holidays] = await Promise.all([
     getLists(supabase, LIST_KEYS),
     listInbox(),
     listSent(),
@@ -38,6 +39,8 @@ export default async function Page() {
       const res = await listReferredForEntity(key);
       return res.ok ? res.rows.map((r) => ({ ...r, entKey: key, entName: label })) : [];
     })).then((xs) => xs.flat()),
+    // التقويم الرسميّ — يُحقن في حاسبة أيام العمل قبل أول حساب مهلة
+    getHolidays(),
   ]);
 
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
@@ -57,7 +60,9 @@ export default async function Page() {
       lists={lists}
       inbox={inbox.rows}
       sent={sent.rows}
+      sentTotal={sent.ok ? sent.total : 0}
       awaiting={referred}
+      holidays={holidays}
     />
   );
 }

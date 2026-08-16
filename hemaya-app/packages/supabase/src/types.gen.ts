@@ -1137,6 +1137,66 @@ export type Database = {
           },
         ]
       }
+      holidays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          day: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          day: string
+          kind?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          day?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      intake_attachments: {
+        Row: {
+          case_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          mime: string | null
+          path: string
+          reg_no: string | null
+          size_bytes: number | null
+          uploaded_by: string
+        }
+        Insert: {
+          case_id?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          mime?: string | null
+          path: string
+          reg_no?: string | null
+          size_bytes?: number | null
+          uploaded_by: string
+        }
+        Update: {
+          case_id?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime?: string | null
+          path?: string
+          reg_no?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       intake_drafts: {
         Row: {
           clerk_id: string
@@ -2784,6 +2844,34 @@ export type Database = {
         Returns: boolean
       }
       intake_draft_clear: { Args: { _reg_no: string }; Returns: undefined }
+      holiday_remove: { Args: { _day: string }; Returns: undefined }
+      holiday_upsert: {
+        Args: { _day: string; _kind?: string; _name: string }
+        Returns: undefined
+      }
+      is_business_day: { Args: { _d: string }; Returns: boolean }
+      intake_attach_record: {
+        Args: {
+          _file_name: string
+          _mime: string
+          _path: string
+          _reg_no: string
+          _size: number
+        }
+        Returns: string
+      }
+      intake_attach_remove: { Args: { _id: string }; Returns: string }
+      intake_case_attachments: {
+        Args: { _case_id: string }
+        Returns: {
+          created_at: string
+          file_name: string
+          id: string
+          mime: string
+          path: string
+          size_bytes: number
+        }[]
+      }
       intake_draft_load: { Args: { _reg_no: string }; Returns: Json }
       intake_draft_save: {
         Args: { _payload: Json; _reg_no: string }
@@ -2819,7 +2907,12 @@ export type Database = {
         Returns: string
       }
       intake_sent_list: {
-        Args: never
+        Args: {
+          _q?: string
+          _dest?: string
+          _limit?: number
+          _offset?: number
+        }
         Returns: {
           arrived_on: string
           case_status: string
@@ -2833,6 +2926,7 @@ export type Database = {
           identity_verified: boolean
           reg_no: string
           secret_code: string
+          total_count: number
         }[]
       }
       is_assigned_assessment: { Args: { _case_id: string }; Returns: boolean }

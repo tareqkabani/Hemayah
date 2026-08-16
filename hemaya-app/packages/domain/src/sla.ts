@@ -45,12 +45,34 @@ export function dueDate(from: Date, rule: SlaRule): Date {
   return d;
 }
 
-// ─────────────── أيام العمل: الأحد–الخميس (الجمعة والسبت عطلة) ───────────────
+// ───── أيام العمل: الأحد–الخميس، والعطل الرسمية مستثناة كذلك ─────
 
 const WEEKEND = new Set([5, 6]); // getDay(): 5 = الجمعة، 6 = السبت
 
+/** العطل الرسمية (YYYY-MM-DD) — تُحقن من جدول holidays في القاعدة.
+ *  سجلٌّ على مستوى الوحدة لا معاملٌ في كل نداء: التوقيعات مستهلَكةٌ في
+ *  عشرات المواضع، وتغييرها كان يفرض تمرير القائمة عبرها جميعاً. */
+let HOLIDAYS: ReadonlySet<string> = new Set<string>();
+
+/** يوم بالتقويم المحلّي — لا toISOString فتُزيحه المنطقة الزمنية يوماً. */
+function localISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** تُستدعى مرّةً عند إقلاع البوابة بما تقرؤه من جدول holidays.
+ *  بلا استدعائها يبقى السلوك كما كان (العطلة الأسبوعية وحدها) — فلا
+ *  تنكسر بوابةٌ لم تُوصَل بالتقويم بعد. */
+export function setHolidays(days: Iterable<string>): void {
+  HOLIDAYS = new Set([...days].map((d) => String(d).slice(0, 10)));
+}
+
+export function getHolidayCount(): number {
+  return HOLIDAYS.size;
+}
+
 export function isBusinessDay(d: Date): boolean {
-  return !WEEKEND.has(d.getDay());
+  if (WEEKEND.has(d.getDay())) return false;
+  return !HOLIDAYS.has(localISO(d));
 }
 
 /** يضيف أيام عملٍ على تاريخ — يتجاوز الجمعة والسبت. */
