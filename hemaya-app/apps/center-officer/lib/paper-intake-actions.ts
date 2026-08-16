@@ -109,6 +109,112 @@ export async function listReferredForEntity(entityKey: string) {
   return { ok: true as const, rows };
 }
 
+/* ── «مُحالة من الفرز» — بحثٌ وترقيمٌ على الخادم (فجوة التسليم ٥) ──
+   كانت الصفحة تنادي list_referred_for_entity **خمس مرّات** (مرّةً لكلّ جهة)
+   وتُسطّح الناتج بلا حدٍّ ولا بحث. هنا نداءٌ واحد مُرقَّم.
+   وlistReferredForEntity أعلاه تبقى: خطوة الربط تحتاج جهةً واحدة معلومة. */
+export type ReferredQuery = {
+  q?: string;
+  entity?: string | null;
+  due?: "over" | "open" | null;
+  limit?: number;
+  offset?: number;
+};
+
+export type ReferredRow = ReferredCase & { entity: string; isOver: boolean };
+
+/* ⚠️ دوالّ هذه الدفعة أُنشئت بعد توليد types.gen.ts، فتُنادى بربطٍ صريح —
+   نمط apps/admin/lib/data.ts نفسه. يُعاد التوليد مع دمج السلسلة.
+   (bind إلزامي: استخراج الدالة بلا ربطٍ يفقدها this فتنهار على rest) */
+type RpcRow = Record<string, unknown>;
+const rpcOf = (sb: ReturnType<typeof createServerClient>) =>
+  (sb.rpc as CallableFunction).bind(sb) as (
+    fn: string, args?: Record<string, unknown>,
+  ) => Promise<{ data: RpcRow[] | null; error: { message: string } | null }>;
+
+export async function listReferred(query: ReferredQuery = {}) {
+  const supabase = createServerClient();
+  const { data, error } = await rpcOf(supabase)("intake_referred_list", {
+    _q: query.q?.trim() || null,
+    _entity: query.entity || null,
+    _due: query.due || null,
+    _limit: query.limit ?? 25,
+    _offset: query.offset ?? 0,
+  });
+  if (error) return { ok: false as const, error: error.message, rows: [] as ReferredRow[], total: 0 };
+  const rows: ReferredRow[] = (data || []).map((r) => ({
+    caseId: r.case_id as string,
+    secret: r.secret_code as string,
+    cat: CAT_AR[r.category as string] || (r.category as string),
+    caseNo: (r.case_no as string) || "",
+    city: (r.city as string) || "",
+    region: (r.region as string) || "",
+    referredAt: r.referred_at as string,
+    dueAt: (r.due_at as string) || null,
+    entity: (r.entity as string) || "",
+    isOver: !!r.is_over,
+  }));
+  const total = Number((data?.[0] as { total_count?: number } | undefined)?.total_count ?? rows.length);
+  return { ok: true as const, rows, total };
+}
+
+/* ── الحالات الورقية بلا حساب (فجوة التسليم ٦) ──
+   قضيةٌ أُدخلت ورقياً لا مالك لها حتى يدخل صاحبها بنفاذ مرّةً فتُضمّ. والآلية
+   سليمة، والمفقود أن يعلم أحدٌ مَن ينتظر. hasContact رايةٌ لا رقم — والرقم
+   يُطلب بنداءٍ مستقلٍّ مُقيَّدٍ في التدقيق. */
+export type UnclaimedRow = {
+  caseId: string;
+  secret: string;
+  refNo: string;
+  channel: string;
+  regNo: string;
+  arrivedOn: string;
+  daysWaiting: number;
+  verified: boolean;
+  hasContact: boolean;
+  outreachCount: number;
+  lastOutreachAt: string | null;
+};
+
+export async function listUnclaimed() {
+  const supabase = createServerClient();
+  const { data, error } = await rpcOf(supabase)("intake_unclaimed_cases");
+  if (error) return { ok: false as const, error: error.message, rows: [] as UnclaimedRow[] };
+  const rows: UnclaimedRow[] = (data || []).map((r) => ({
+    caseId: r.case_id as string,
+    secret: r.secret_code as string,
+    refNo: (r.ref_no as string) || "",
+    channel: (r.channel as string) || "",
+    regNo: (r.reg_no as string) || "",
+    arrivedOn: String(r.arrived_on),
+    daysWaiting: Number(r.days_waiting ?? 0),
+    verified: !!r.identity_verified,
+    hasContact: !!r.has_contact,
+    outreachCount: Number(r.outreach_count ?? 0),
+    lastOutreachAt: (r.last_outreach_at as string) || null,
+  }));
+  return { ok: true as const, rows };
+}
+
+// كشفٌ مقيَّدٌ: كلّ اطّلاعٍ على اسمٍ أو رقمٍ يُقيَّد في audit_log باسم الكاشف.
+export async function revealSubjectContact(caseId: string) {
+  const supabase = createServerClient();
+  const { data, error } = await rpcOf(supabase)("intake_reveal_subject_contact", { _case_id: caseId });
+  if (error) return { ok: false as const, error: error.message };
+  const row = (data || [])[0] as { full_name?: string; contact?: string } | undefined;
+  return { ok: true as const, name: row?.full_name || "", contact: row?.contact || "" };
+}
+
+export async function logOutreach(caseId: string, channel: string, note: string) {
+  const supabase = createServerClient();
+  const { error } = await rpcOf(supabase)("intake_log_outreach", {
+    _case_id: caseId, _channel: channel, _note: note,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/paper-intake");
+  return { ok: true as const };
+}
+
 export type PaperRecommendationInput = {
   caseId: string;          // الطلب المُحال المختار في خطوة الربط
   provide: boolean;        // توفير | عدم توفير

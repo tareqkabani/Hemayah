@@ -3,7 +3,7 @@ import { createServerClient } from "@hemaya/supabase";
 import { getLists } from "@hemaya/domain";
 import type { AppRole } from "@hemaya/supabase";
 import { PaperIntakePortal } from "@/components/PaperIntakePortal";
-import { listInbox, listSent, listReferredForEntity } from "@/lib/paper-intake-actions";
+import { listInbox, listSent, listReferred, listUnclaimed } from "@/lib/paper-intake-actions";
 import { getHolidays } from "@/lib/holidays";
 
 export const dynamic = "force-dynamic";
@@ -11,14 +11,8 @@ export const dynamic = "force-dynamic";
 // حارس الشاشة: منسوبو الوحدة وحدهم — مطابقٌ لـis_intake_staff في القاعدة.
 const ROLES = ["intake_clerk", "case_officer", "hotline_operator"] as AppRole[];
 
-// الجهات المختصّة — الترتيب والمسمّى موحّدان مع جهات الإحالة في الفرز.
-const ENTS: [string, string][] = [
-  ["prosecution", "النيابة العامة"],
-  ["state_security", "رئاسة أمن الدولة"],
-  ["moi", "وزارة الداخلية"],
-  ["nazaha", "هيئة الرقابة ومكافحة الفساد"],
-  ["moj", "وزارة العدل"],
-];
+// الجهات المختصّة ومسمّياتها: مصدرها الواحد components/intake/parts.jsx —
+// كانت مكرّرةً هنا لحلقة النداءات الخمس، وقد سقطت الحلقة بنداء listReferred.
 
 // بنود النماذج من طبقة المحتوى — لا ثوابت مكرّرة في الشيفرة.
 const LIST_KEYS = [
@@ -30,15 +24,15 @@ export default async function Page() {
   const { user, roles } = await requireRole(ROLES, { denyPath: "/403" });
   const supabase = createServerClient();
 
-  const [lists, inbox, sent, referred, holidays] = await Promise.all([
+  const [lists, inbox, sent, referred, unclaimed, holidays] = await Promise.all([
     getLists(supabase, LIST_KEYS),
     listInbox(),
     listSent(),
     // إحالات الفرز بانتظار توصية الجهة — قسم «الواردة» الثاني (قرار ٩).
-    Promise.all(ENTS.map(async ([key, label]) => {
-      const res = await listReferredForEntity(key);
-      return res.ok ? res.rows.map((r) => ({ ...r, entKey: key, entName: label })) : [];
-    })).then((xs) => xs.flat()),
+    // نداءٌ واحد مُرقَّم بعد فجوة ٥ — كان خمسةً (واحداً لكلّ جهة) بلا حدٍّ ولا بحث.
+    listReferred(),
+    // الورقيّة التي لم تُضمّ لحساب صاحبها بعد — قسم «الواردة» الثالث (فجوة ٦).
+    listUnclaimed(),
     // التقويم الرسميّ — يُحقن في حاسبة أيام العمل قبل أول حساب مهلة
     getHolidays(),
   ]);
@@ -61,7 +55,9 @@ export default async function Page() {
       inbox={inbox.rows}
       sent={sent.rows}
       sentTotal={sent.ok ? sent.total : 0}
-      awaiting={referred}
+      awaiting={referred.rows}
+      awaitingTotal={referred.ok ? referred.total : 0}
+      unclaimed={unclaimed.rows}
       holidays={holidays}
     />
   );
