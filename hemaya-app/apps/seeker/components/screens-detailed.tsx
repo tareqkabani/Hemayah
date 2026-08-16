@@ -27,12 +27,12 @@ export const STATUS_AR: Record<string, { t: string; tone: string }> = {
 
 /* المراحل الست لرحلة الطلب — تُستخدم في طلباتي ومؤشر لوحة المعلومات */
 export const STAGES = [
-  { t: "تمّ استلام الطلب", d: "سُجِّل الطلب وأُسند الرمز السري." },
-  { t: "الفرز المبدئي", d: "يتواصل المركز للتحقّق ويطلب الاستيفاء عند الحاجة." },
+  { t: "تمّ استلام الطلب", d: "سُجِّل الطلب." },
+  { t: "الفرز المبدئي", d: "المرحلة المبدئية لدراسة الطلب." },
   { t: "الإحالة إلى الجهة المختصة", d: "لرفع التوصية خلال 5 أيام عمل." },
-  { t: "الدراسة والتقييم", d: "تُدرس عوامل المادة (9) ويُصنَّف الخطر." },
-  { t: "قرار إدارة البرنامج", d: "يصدر بالأغلبية ويُشعَر خلال 3 أيام." },
-  { t: "تفعيل الحماية", d: "عند صدور قرار المركز بالشمول: توقيع وثيقة الحماية ودخول دورة الحياة." },
+  { t: "الدراسة والتقييم", d: "مرحلة الدراسة و التقييم وفقاً لعوامل المادة (٩) من النظام و المادة (٦) من اللائحة التنفيذية." },
+  { t: "قرار إدارة البرنامج", d: "مرحلة اصدار القرار و الاشعار خلال ٣ ايام من تاريخ اكتمال شروط الطلب." },
+  { t: "تفعيل الحماية", d: "توقيع وثيقة الحماية والدخول الي البرنامج." },
 ];
 /* عدد المراحل المُنجزة لكل حالة قاعديّة — المصدر الواحد STAGE_DONE في الدومين
    (كانت هنا نسخة متعارضة مع نظيرتها في real-detail). */
@@ -229,7 +229,7 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
               <div className="tl-t">طلبك القائم</div>
               <div className="muted mono" style={{ marginTop: 4 }}>{activeReq.ref_no} · {activeReq.secret_code}</div>
             </div>
-            <button className="btn btn-primary" onClick={() => go && go("requests")}><Ic name="visibility" size={18} /> متابعة الطلب في البوابة</button>
+            <button className="btn btn-primary" onClick={() => go && go("requests")}><Ic name="visibility" size={18} /> متابعة الطلب</button>
           </div>
         </Card>
         <p className="muted" style={{ marginTop: 14 }}>عند إغلاق الطلب أو رفضه نهائياً، تُفتح إمكانية تقديم طلب جديد بمستجدات جديدة. والاعتراض على القرار يكون عبر التظلّم لا بطلب جديد.</p>
@@ -259,11 +259,10 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
       <Card padding="lg" style={{ textAlign: "center" }}>
         <div style={{ width: 72, height: 72, margin: "0 auto 16px", borderRadius: "50%", background: "var(--green-10)", display: "grid", placeItems: "center" }}><Ic name="task_alt" size={40} color="var(--color-primary)" fill /></div>
         <h2 style={{ margin: "0 0 8px", fontSize: 23, fontWeight: 700, color: "var(--text-strong)" }}>تمّ استلام طلب الحماية</h2>
-        <p style={{ margin: "0 auto 20px", maxWidth: 520, fontSize: 14.5, color: "var(--text-body)", lineHeight: 1.65 }}>سُجِّل طلبك وأُسند له رقم مرجعي ورمز سري. سيُحال إلى الجهة المختصة لرفع التوصية خلال 5 أيام، ويمكنك متابعة الحالة بالرمز السري.</p>
+        <p style={{ margin: "0 auto 20px", maxWidth: 520, fontSize: 14.5, color: "var(--text-body)", lineHeight: 1.65 }}>سُجِّل طلبك وأُسند له رقم مرجعي لدى المركز وسيتم التواصل معكم.</p>
         <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: 16, background: "var(--surface-subtle)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)" }}>
           <SecretCode code={code} canReveal={false} />
           <Tag tone="neutral" size="md" iconLeft={<Ic name="tag" size={14} />}>{ref}</Tag>
-          <Tag tone="warning" size="md" iconLeft={<Ic name="schedule" size={14} />}>بانتظار توصية الجهة (5 أيام)</Tag>
         </div>
         <div style={{ marginTop: 22 }}>
           <button className="btn btn-ghost" onClick={() => go && go("requests")}><Ic name="assignment" size={18} /> متابعة الطلب في «طلباتي»</button>
@@ -283,12 +282,12 @@ export function NewRequest({ go }: { go?: (id: string) => void }) {
       <Section icon="assignment" iconBg="var(--green-10)" iconColor="var(--color-primary)" title="بيانات الطلب" note="الرجاء إدخال البيانات المطلوبة">
         <div className="grid2">
           <div className="fld">
-            <span className="fld-label">صفة مقدم الطلب <span className="req">*</span></span>
+            <span className="fld-label">مقدم الطلب <span className="req">*</span></span>
             <select value={f.role} onChange={set("role")}><option value="">الرجاء اختيار عنصر</option>{labelsOf("applicant_role").map((o) => <option key={o} value={o}>{o}</option>)}</select>
             {onBehalf && <span className="hint">تقدّم نيابةً عن المشمول — أدخل بياناته الأساسية أدناه.</span>}
           </div>
           <div className="fld">
-            <span className="fld-label">دور مقدم الطلب <span className="req">*</span></span>
+            <span className="fld-label">صفة مقدم الطلب <span className="req">*</span></span>
             <select value={f.category} onChange={set("category")}><option value="">الرجاء اختيار عنصر</option>{(LISTS["app_category"] || []).filter((x) => x.key !== "related").map((x) => <option key={x.key} value={x.label}>{x.label}</option>)}</select>
           </div>
           <div className="fld">
@@ -476,8 +475,8 @@ export function RealRequests({ go, onOpen }: { go?: (id: string) => void; onOpen
                       <div style={{ padding: "0 18px 16px", display: "grid", gap: 10 }}>
                         {([
                           ["تاريخ التقديم", new Date(submitted).toLocaleDateString("ar-SA", { dateStyle: "long" })],
-                          ["صفة مقدم الطلب", r.applicant_role],
-                          ["دور مقدم الطلب", CATEGORY_AR[r.category] || r.category],
+                          ["مقدم الطلب", r.applicant_role],
+                          ["صفة مقدم الطلب", CATEGORY_AR[r.category] || r.category],
                           ["الجهة المختصة", d.entity],
                           ["نوع الجريمة محل الحماية", d.crime],
                           ["سبب الطلب ومسوّغاته", d.reason],

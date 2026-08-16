@@ -98,7 +98,7 @@ export function Messages({ msgs, sendMsg, msgReadIds, markThreadRead }: {
             <Ic name={th.icon} size={18} color="var(--color-primary)" />
             <b style={{ fontSize: 14, color: "var(--text-strong)" }}>{th.officer}</b>
           </div>
-          <Tag tone="info" size="sm" iconLeft={<Ic name="lock" size={12} />}>هويتك تظهر لهم بالرمز السري</Tag>
+          <Tag tone="info" size="sm" iconLeft={<Ic name="lock" size={12} />}>هويتك تظهر برقم سري</Tag>
         </div>
         {shown.length === 0 ? (
           <div className="ntf-empty" style={{ margin: "14px 0" }}>
@@ -130,7 +130,7 @@ export function Messages({ msgs, sendMsg, msgReadIds, markThreadRead }: {
           </div>
         ) : (
           <div className="composer">
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === "body" ? "ردّك للجهة يمرّ عبر المركز…" : "اكتب ردّك المؤمّن…"} dir="auto" onKeyDown={(e) => e.key === "Enter" && send()} />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === "body" ? "ردّك للجهة يمرّ عبر المركز…" : "اكتب هنا…"} dir="auto" onKeyDown={(e) => e.key === "Enter" && send()} />
             <button className="send" disabled={!text.trim()} onClick={send}><Ic name="send" size={20} /></button>
           </div>
         )}

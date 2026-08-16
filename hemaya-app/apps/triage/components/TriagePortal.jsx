@@ -64,13 +64,18 @@ function SrcChip({ source }) {
   const s = SRC[source];
   return <span className="src" style={{ color: s.c }}><I name={s.icon} size={15} /> {source}</span>;
 }
+// ترتيب تنازليّ بطابعٍ زمنيّ ISO (نصّاً — الطوابع من القاعدة UTC بصيغة قابلة للمقارنة)
+const byNewestOn = (key) => (a, b) => (String(a[key] || '') < String(b[key] || '') ? 1 : -1);
+
 // ===== القائمة المشتركة =====
 function Queue({ rows, open, viewOnly, acct, regInfo }) {
   const [filter, setFilter] = useState('all');
+  // الأحدث وروداً في الأعلى — ترتيبٌ صريحٌ لا يتوكّل على ترتيب الاستعلام وحده
   const shown = rows.filter((r) => filter === 'all'
     || (filter === 'triage' && r.status === 'triage')
     || (filter === 'replied' && r.status === 'replied')
-    || (filter === 'closed' && (r.status === 'closed' || r.status === 'study')));
+    || (filter === 'closed' && (r.status === 'closed' || r.status === 'study')))
+    .slice().sort(byNewestOn('createdAt'));
   return (
     <div>
       <h2 className="h2">{viewOnly ? 'سجلّ الفرز المبدئي' : 'الطلبات الواردة — قائمة مشتركة'}</h2>
@@ -94,8 +99,8 @@ function Queue({ rows, open, viewOnly, acct, regInfo }) {
               <th>الرمز السري</th><th>الفئة</th><th>المصدر</th>{viewOnly && <th>موظف الفرز</th>}<th>الحالة</th><th>الورود</th><th></th>
             </tr></thead>
             <tbody>
-              {shown.map((r, i) => (
-                <tr key={i} onClick={() => open(r)}>
+              {shown.map((r) => (
+                <tr key={r.caseId || r.secret} onClick={() => open(r)}>
                   <td><span className="mono" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{r.secret}</span></td>
                   <td>{r.cat}</td>
                   <td><SrcChip source={r.source} />{r.paper && <span className="src" style={{ color: '#7c6338', marginInlineStart: 6 }}><I name="description" size={14} /> ورقيّ</span>}</td>
@@ -655,7 +660,7 @@ function Dashboard({ cfg, rows, viewOnly, openCase, go, notifs, onOpenNotif }) {
   return (
     <div>
       <h2 className="h2">لوحة المعلومات</h2>
-      <p className="lede">{viewOnly ? 'نظرة شاملة على أعباء الفرز ومآلات الطلبات عبر موظفي المركز.' : 'نظرة على قائمة الفرز المشتركة ومآلات الطلبات، وكل المؤشرات تحفظ السرية.'}</p>
+      {viewOnly && <p className="lede">نظرة شاملة على أعباء الفرز ومآلات الطلبات عبر موظفي المركز.</p>}
       {hero ? (
         <div className="card pad" style={{ marginBottom: 16 }}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
@@ -753,12 +758,18 @@ function notifsOf(rows, cfg, viewOnly, readIds) {
   const out = [];
   rows.forEach((r) => {
     const created = r.createdAt || new Date().toISOString();
+    // كلُّ إشعارٍ يُؤرَّخ بوقت واقعته لا بوقت ورود الطلب: التوصية بوقت ورودها،
+    // والإحالة بوقت رفعها — وإلا رُتِّبت التحديثات بميلاد القضية فبدت قديمة.
+    const referred = r.referredAt || created;
+    const replied = r.repliedAt || created;
     const over = r.status === 'pending' && r.sla && r.sla.daysElapsed >= r.sla.totalDays;
     const act = cfg.nextAction(r);
-    if (over) out.push({ id: 'dl:' + r.secret, cat: 'deadline', crit: true, title: viewOnly ? 'تصعيد: تجاوز مهلة الجهة' : 'تجاوز مهلة توصية الجهة', body: r.secret + ' — انقضت مهلة ' + (r.entity || 'الجهة المختصة') + ' (5 أيام عمل) والانتظار مستمر (لا حفظ تلقائي).', created_at: created, dest: 'queue', deadline: { label: 'مهلة توصية الجهة — ' + r.secret, total: r.sla.totalDays, elapsed: r.sla.daysElapsed, ref: 'م5/4' } });
-    if (act && r.status !== 'pending') out.push({ id: 'act:' + r.secret + ':' + r.status, cat: r.status === 'replied' ? 'reco' : 'incoming', title: r.status === 'replied' ? 'وردت توصية الجهة' : 'طلب وارد جديد', body: r.secret + ' — ' + (r.cat || '') + '. الإجراء المطلوب منك: ' + act.t, created_at: created, dest: 'queue' });
-    if (r.status === 'pending' && !over) out.push({ id: 'ref:' + r.secret, cat: viewOnly ? 'incoming' : 'reco', title: 'أُحيل طلب لجهة مختصة', body: r.secret + ' — أُحيل إلى ' + (r.entity || 'الجهة المختصة') + ' لطلب توصية خلال 5 أيام عمل.', created_at: created, dest: 'queue' });
+    if (over) out.push({ id: 'dl:' + r.secret, cat: 'deadline', crit: true, title: viewOnly ? 'تصعيد: تجاوز مهلة الجهة' : 'تجاوز مهلة توصية الجهة', body: r.secret + ' — انقضت مهلة ' + (r.entity || 'الجهة المختصة') + ' (5 أيام عمل) والانتظار مستمر (لا حفظ تلقائي).', created_at: referred, dest: 'queue', deadline: { label: 'مهلة توصية الجهة — ' + r.secret, total: r.sla.totalDays, elapsed: r.sla.daysElapsed, ref: 'م5/4' } });
+    if (act && r.status !== 'pending') out.push({ id: 'act:' + r.secret + ':' + r.status, cat: r.status === 'replied' ? 'reco' : 'incoming', title: r.status === 'replied' ? 'وردت توصية الجهة' : 'طلب وارد جديد', body: r.secret + ' — ' + (r.cat || '') + '. الإجراء المطلوب منك: ' + act.t, created_at: r.status === 'replied' ? replied : created, dest: 'queue' });
+    if (r.status === 'pending' && !over) out.push({ id: 'ref:' + r.secret, cat: viewOnly ? 'incoming' : 'reco', title: 'أُحيل طلب لجهة مختصة', body: r.secret + ' — أُحيل إلى ' + (r.entity || 'الجهة المختصة') + ' لطلب توصية خلال 5 أيام عمل.', created_at: referred, dest: 'queue' });
   });
+  // الأحدث أولاً — لا يُتَّكل على ترتيب الصفوف لأنّ طابع الإشعار قد يسبق/يلي ورود طلبه
+  out.sort(byNewestOn('created_at'));
   return out.map((n) => ({ ...n, read: readIds.includes(n.id) }));
 }
 
