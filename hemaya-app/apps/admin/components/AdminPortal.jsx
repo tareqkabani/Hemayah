@@ -13,6 +13,7 @@ import {
   updateItemLabel, saveItemOrder, setItemActive, addItem,
   submitChangeRequest, saveTemplate, setTemplateActive, saveSystemMessage, setSetting,
   grantRole, revokeRole, addBranchUnit, updateUnit,
+  holidayUpsert, holidayRemove,
 } from "@/lib/admin-actions";
 import "./admin.css";
 
@@ -21,7 +22,7 @@ const I = ({ name, size = 20, fill = false, color = "currentColor", style }) => 
 );
 
 /* شاشات البوابة العشر — القشرة تقرأ التسميات من screenMeta */
-const SCREENS = ["overview", "content", "users", "roles", "entities", "settings", "flags", "audit", "health", "profile"];
+const SCREENS = ["overview", "content", "users", "roles", "entities", "settings", "holidays", "flags", "audit", "health", "profile"];
 const SCREEN_META = {
   overview: { t: "النظرة العامة", icon: "dashboard" },
   content: { t: "القوائم والمحتوى", icon: "library_books" },
@@ -29,6 +30,7 @@ const SCREEN_META = {
   roles: { t: "الأدوار والصلاحيات", icon: "admin_panel_settings" },
   entities: { t: "الجهات ووحداتها", icon: "account_balance" },
   settings: { t: "الإعدادات والمدد", icon: "tune" },
+  holidays: { t: "تقويم العطل", icon: "event_busy" },
   flags: { t: "أعلام الميزات", icon: "flag" },
   audit: { t: "سجل التدقيق التقني", icon: "receipt_long" },
   health: { t: "صحة النظام", icon: "monitor_heart" },
@@ -55,7 +57,7 @@ const TONE = {
 const vars = (s) => (s.match(/\{[^}]+\}/g) || []).filter((v, i, a) => a.indexOf(v) === i);
 const hit = (q, ...f) => !q.trim() || f.join(" ").toLowerCase().includes(q.trim().toLowerCase());
 
-export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health, staff, org }) {
+export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, legalTexts, changeRequests, settings, techAudit, health, staff, org, holidays }) {
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [toast, setToast] = useState("");
@@ -95,6 +97,7 @@ export function AdminPortal({ me, lists, itemsByList, templates, sysMessages, le
       {active === "roles" && <RolesScreen staff={staff} />}
       {active === "entities" && <EntitiesScreen org={org} say={say} />}
       {active === "settings" && <SettingsScreen settings={settings} say={say} />}
+      {active === "holidays" && <HolidaysScreen rows={holidays || []} say={say} />}
       {active === "flags" && <FlagsScreen settings={settings} say={say} />}
       {active === "audit" && <AuditScreen rows={techAudit} />}
       {active === "health" && <HealthScreen health={health} />}
@@ -856,6 +859,127 @@ const KNOWN_SETTINGS = {
   },
 };
 const FLAG_KEYS = new Set(Object.keys(KNOWN_FLAGS));
+
+/* ── تقويم العطل الرسمية ──
+   تُستثنى من حساب أيام العمل في **كل** مؤقّتات المنصّة: مهلة توصية الجهة
+   (م5/4) ومُقفِل الميعاد (م10) وحارس التوقّف وسائر SLA. فإدخال يومٍ هنا
+   يُطيل مُهلاً قائمة — ولذلك التنبيه ظاهرٌ في الشاشة لا في التعليقات.
+
+   يُغذّى يدوياً بقصد: الأعياد قمريّة يتبع تاريخها الرؤية، ومُدد عطل
+   الجهات الحكومية تُحدَّد بتعميمٍ سنويّ — فلا تُثبَّت في الشيفرة. */
+const HOLIDAY_KINDS = [
+  ["national", "وطنية"],
+  ["eid", "عيد"],
+  ["other", "أخرى"],
+];
+const kindLabel = (k) => (HOLIDAY_KINDS.find(([v]) => v === k) || ["", k])[1];
+
+function HolidaysScreen({ rows: initial, say }) {
+  const [rows, setRows] = useState(initial);
+  const [f, setF] = useState({ day: "", name: "", kind: "national" });
+  const [busy, setBusy] = useState(false);
+  const ready = f.day && f.name.trim() && !busy;
+
+  const add = async () => {
+    setBusy(true);
+    const r = await holidayUpsert(f.day, f.name.trim(), f.kind);
+    setBusy(false);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => [...xs.filter((x) => x.day !== f.day), { day: f.day, name: f.name.trim(), kind: f.kind }]
+      .sort((a, b) => (a.day < b.day ? -1 : 1)));
+    setF({ day: "", name: "", kind: "national" });
+    say("أُضيفت العطلة — مُسجَّلة في التدقيق");
+  };
+
+  const drop = async (day) => {
+    setBusy(true);
+    const r = await holidayRemove(day);
+    setBusy(false);
+    if (!r.ok) return say("⚠ " + r.error);
+    setRows((xs) => xs.filter((x) => x.day !== day));
+    say("حُذفت العطلة — مُسجَّل في التدقيق");
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = rows.filter((r) => r.day >= today);
+  const past = rows.filter((r) => r.day < today);
+
+  return (
+    <div>
+      <h2 className="h2">تقويم العطل الرسمية</h2>
+      <p className="lede">أيامٌ تُستثنى من حساب أيام العمل في كل مؤقّتات المنصّة — مهلة توصية الجهة (م5/4) ومُقفِل الميعاد (م10) وحارس التوقّف. وكل إضافةٍ أو حذفٍ مُسجَّل في التدقيق باسمك.</p>
+
+      <InlineAlert kind="warning" title="الإدخال هنا يُطيل مُهلاً قائمة" style={{ marginBottom: 14 }}>
+        إضافة يومٍ تجعله غير محسوبٍ في المهل، فقد يتحوّل طلبٌ موسومٌ <b>«متجاوزة المهلة»</b> إلى <b>«ضمن المهلة»</b> وتتغيّر أرقام تقارير القيادة. أدخِل ما اعتُمد بتعميمٍ رسميّ لا ما هو متوقَّع.
+      </InlineAlert>
+
+      <InlineAlert kind="info" title="لماذا يدويّاً" style={{ marginBottom: 16 }}>
+        الأعياد قمريّة يتبع تاريخها الميلاديّ رؤيةَ الهلال وتُعلَن سنوياً، ومُدد عطل الجهات الحكومية تُحدَّد بتعميمٍ سنويّ — فلا تُثبَّت في الشيفرة. المبذور ابتداءً: يوم التأسيس واليوم الوطني (تاريخان ثابتان)، ويوما العيدين من تقويم أم القرى — <b>يوم العيد نفسه لا مدّة العطلة</b>.
+      </InlineAlert>
+
+      <Card className="card pad" style={{ marginBottom: 18 }}>
+        <div className="row" style={{ gap: 9, marginBottom: 12 }}>
+          <I name="event_available" size={20} color="var(--color-primary)" />
+          <b style={{ color: "var(--text-strong)" }}>إضافة عطلة</b>
+        </div>
+        <div className="ad-2col">
+          <label>
+            <span className="ad-fl">التاريخ الميلادي</span>
+            <input className="ad-input" type="date" value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })} />
+          </label>
+          <label>
+            <span className="ad-fl">الاسم</span>
+            <input className="ad-input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} dir="auto" placeholder="مثال: عطلة عيد الفطر — اليوم الثاني" />
+          </label>
+          <label>
+            <span className="ad-fl">النوع</span>
+            <select className="ad-input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
+              {HOLIDAY_KINDS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="row" style={{ justifyContent: "flex-end", marginTop: 10 }}>
+          <button className="btn btn-primary" disabled={!ready} onClick={add}>
+            <I name="add" size={18} /> إضافة
+          </button>
+        </div>
+        <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>تاريخٌ موجودٌ مسبقاً يُحدَّث اسمه ونوعه بدل أن يتكرّر.</p>
+      </Card>
+
+      <HolidayTable title={`القادمة (${upcoming.length})`} rows={upcoming} onDrop={drop} busy={busy} />
+      {past.length > 0 && <HolidayTable title={`المنقضية (${past.length})`} rows={past} onDrop={drop} busy={busy} muted />}
+    </div>
+  );
+}
+
+function HolidayTable({ title, rows, onDrop, busy, muted }) {
+  return (
+    <>
+      <div className="row" style={{ gap: 8, margin: "18px 0 10px" }}>
+        <b style={{ color: muted ? "var(--text-secondary)" : "var(--text-strong)" }}>{title}</b>
+      </div>
+      {rows.length ? (
+        <div className="ad-tblwrap"><table className="ad-tbl">
+          <thead><tr><th>التاريخ</th><th>الاسم</th><th>النوع</th><th /></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.day}>
+              <td className="mono">{String(r.day).slice(0, 10)}</td>
+              <td>{r.name}</td>
+              <td>{kindLabel(r.kind)}</td>
+              <td style={{ textAlign: "end" }}>
+                <button className="ad-link" disabled={busy} onClick={() => onDrop(String(r.day).slice(0, 10))}>
+                  <I name="delete" size={16} /> حذف
+                </button>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      ) : (
+        <p className="muted" style={{ fontSize: 13 }}>لا عطل في هذا القسم.</p>
+      )}
+    </>
+  );
+}
 
 function SettingsScreen({ settings, say }) {
   const [rows, setRows] = useState(settings);
