@@ -1,7 +1,8 @@
 /* ============================================================
-   مخزن مرحلة القرار والإشعار (CO-3) — تحديث 15 يوليو 2026.
-   آلة الحالة: preparing → pending_deputy → approved → voting → issued
-   (المعدّ يُعِدّ من الدراسات والتقييمات ← اعتماد نائب الرئيس ← يعود
+   مخزن مرحلة القرار والإشعار (CO-3) — تحديث 11 أغسطس 2026.
+   آلة الحالة: collecting → preparing → pending_deputy → approved → voting → issued
+   (يُفتح الملفّ بأوّل دراسة أو تقييم فتتراكم المخرجات ويطّلع المعدّ عليها
+    ← عند اكتمال التجميع يُعِدّ القرار ← اعتماد نائب الرئيس ← يعود
     للمعدّ فيطرحه للتصويت ← إصدار الرئيس وإشعار الطرفين م10).
    مصدر الحقيقة: Supabase (hydrate؛ الطفرات تُوجَّه لأفعال الخادم وتُحدَّث تفاؤليّاً).
    ============================================================ */
@@ -63,7 +64,7 @@ export const HemayaDecision = (function () {
   function allCases() { return store.requests.slice(); }
   function getDecision(secret) { return store.decisions[secret] || null; }
   function dOf(secret) {
-    return store.decisions[secret] || { status: "preparing", mine: false, unclaimed: true, types: [], duration: "", reasoning: "", scope: "", scopeNote: "", approvals: { deputy: null, chair: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
+    return store.decisions[secret] || { status: "preparing", intake: null, mine: false, unclaimed: true, types: [], duration: "", reasoning: "", scope: "", scopeNote: "", approvals: { deputy: null, chair: null }, rejections: [], votingStartedAt: null, deadlineClosed: false, voteOpen: false, issued: null };
   }
 
   // حصيلة التصويت (للقيادة — العضو لا يرى أصوات غيره فتُحسب له من voteOpen فقط)

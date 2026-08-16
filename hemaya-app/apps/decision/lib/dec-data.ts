@@ -40,8 +40,11 @@ export async function getDecisionData() {
       studies(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
       assessments(recommendation, partial_reason, reject_reasons, proposed_type, proposed_duration, notes, found_recommendation, found_request, submitted_at, superseded_at),
       recommendations(source_body, decision, proposed_type, proposed_duration, factors9, received_at, channel, notes)`)
-    // تشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
-    .in("status", ["in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
+    // under_study تدخل لأجل طور التجميع: ملفّ القرار يُفتح بأوّل مخرَج فتبلغ
+    // القضية معدّ القرار وتتراكم عليها المخرجات (20260811000007)؛ والقضايا
+    // بلا مخرَج بعدُ لا صفّ council_decisions لها فيُسقطها فلتر withDecision.
+    // وتشمل ما بعد الإصدار (وقّع/فعّل/…) كي يبقى سجلّ القرارات كاملاً — RLS تحسم الرؤية
+    .in("status", ["under_study", "in_decision", "accepted", "rejected", "signed", "active", "under_review", "terminating", "closed"])
     .order("created_at", { ascending: false })
     // ترتيب ثابت للمخرجات كي لا تتبادل «دراسة (١)/(٢)» أرقامها بين الجلبات
     .order("submitted_at", { referencedTable: "studies", ascending: true })
@@ -151,8 +154,18 @@ export async function getDecisionData() {
       createdAt: fmt(c.created_at),
     });
 
+    // عدّاد التجميع: المُسلَّم من المُسنَد الحيّ (المُلغى بانقضاء الميعاد خارج
+    // المقام والبسط معاً — لم يعد مُنتظَراً). يُبيّن للمعدّ ما وصل وما بقي.
+    const liveStudies = ((c.studies as any[]) || []).filter((s) => !s.superseded_at);
+    const liveAssessments = ((c.assessments as any[]) || []).filter((a) => !a.superseded_at);
+    const intake = {
+      studies: { done: liveStudies.filter((s) => s.submitted_at).length, total: liveStudies.length },
+      assessments: { done: liveAssessments.filter((a) => a.submitted_at).length, total: liveAssessments.length },
+    };
+
     decisions[secret] = {
       status: cd.status,
+      intake,
       mine: !!meUid && cd.preparer_id === meUid,
       unclaimed: !cd.preparer_id,
       types: Array.isArray(cd.types) ? cd.types : [],

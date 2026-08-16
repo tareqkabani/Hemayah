@@ -7,6 +7,7 @@
 // ============================================================
 
 export const DECISION_STATUS = {
+  collecting: "قيد تجميع الدراسات والتقييمات",
   preparing: "قيد إعداد القرار",
   pending_deputy: "بانتظار اعتماد نائب الرئيس",
   pending_chair: "بانتظار اعتماد رئيس المركز",
@@ -17,6 +18,7 @@ export const DECISION_STATUS = {
 export type DecisionStatus = keyof typeof DECISION_STATUS;
 
 export const DECISION_TRANSITIONS: Record<DecisionStatus, DecisionStatus[]> = {
+  collecting: ["preparing"],                     // اكتمال التجميع (تسليم الجميع أو إقفال ميعاد م10) — آليّ
   preparing: ["pending_deputy"],                 // submitForApproval — المعدّ
   pending_deputy: ["pending_chair", "preparing"], // approve — النائب · rejectApproval بملاحظة إلزامية
   pending_chair: ["approved", "preparing"],       // approveChair — الرئيس · rejectApproval بملاحظة إلزامية
@@ -42,8 +44,9 @@ export const DECISION_ACTION_ROLE = {
 } as const;
 export type DecisionAction = keyof typeof DECISION_ACTION_ROLE;
 
-/** مراحل الشريط الست (تُعرض «المرحلة N من 6»). */
+/** مراحل الشريط السبع (تُعرض «المرحلة N من 7»). */
 export const DECISION_STAGES = [
+  "تجميع الدراسات والتقييمات",
   "إعداد القرار",
   "اعتماد نائب الرئيس",
   "اعتماد رئيس المركز",
@@ -52,9 +55,9 @@ export const DECISION_STAGES = [
   "إصدار القرار والإشعار",
 ] as const;
 
-/** فهرس المرحلة الجارية (issued = 6 أي ما بعد الأخيرة — اكتمل المسار). */
+/** فهرس المرحلة الجارية (issued = 7 أي ما بعد الأخيرة — اكتمل المسار). */
 export function decisionStageOf(status: DecisionStatus): number {
-  return { preparing: 0, pending_deputy: 1, pending_chair: 2, approved: 3, voting: 4, issued: 6 }[status] ?? 0;
+  return { collecting: 0, preparing: 1, pending_deputy: 2, pending_chair: 3, approved: 4, voting: 5, issued: 7 }[status] ?? 0;
 }
 
 export const DECISION_MAJORITY = 4; // أغلبية حاسمة من مقاعد التصويت السبعة
@@ -86,6 +89,8 @@ export interface DecisionSnapshot {
 export function nextDecisionAction(scope: DecisionScope, d: DecisionSnapshot): string | null {
   if (scope === "preparer") {
     if (!d.mine) return null;
+    // التجميع اطّلاعٌ بلا بتّ: المخرجات ترد تباعاً ولا يُفتح الإعداد قبل اكتمالها
+    if (d.status === "collecting") return null;
     if (d.status === "preparing")
       return d.returned
         ? "تعديل القرار المُعاد إليك من القيادة وإعادة رفعه"
