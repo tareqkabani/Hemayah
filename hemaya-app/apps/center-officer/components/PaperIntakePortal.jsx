@@ -52,7 +52,7 @@ const SOURCES = [
     d: "خطاب رسمي تنشئ به الجهة طلباً ابتدائياً نيابةً عن الشخص (لا طلب قائم). الهوية تُدخَل يدوياً — غير موثّقة." },
 ];
 
-export function PaperIntakePortal({ me, lists, inbox, sent, sentTotal, awaiting, holidays }) {
+export function PaperIntakePortal({ me, lists, inbox, sent, sentTotal, awaiting, awaitingTotal, unclaimed, holidays }) {
   // التقويم الرسميّ يُحقن قبل أوّل حساب مهلة (انظر نظيرتها في بوابة الفرز).
   setHolidays(holidays || []);
   const router = useRouter();
@@ -128,7 +128,9 @@ export function PaperIntakePortal({ me, lists, inbox, sent, sentTotal, awaiting,
   // فتح «مُحالة من الفرز»: قيد الورود يُدخَل الآن (الخطاب وصل)، والربط تلقائيّ.
   const onOpenRec = (r) => {
     setErr("");
-    setPreset({ inboxId: null, channel: "mail", docKind: "rec", entity: r.entKey, caseId: r.caseId });
+    // r.entity مفتاح الجهة من intake_referred_list (كان r.entKey تُركّبه الصفحة
+    // في حلقة النداءات الخمس، وقد سقطت الحلقة بفجوة ٥).
+    setPreset({ inboxId: null, channel: "mail", docKind: "rec", entity: r.entity, caseId: r.caseId });
     setMeta({ receivedDate: todayISO(), regNo: "" });
     setDone(null); setEntityMode("rec"); setStage("entity"); setActive("intake"); top();
   };
@@ -359,7 +361,8 @@ export function PaperIntakePortal({ me, lists, inbox, sent, sentTotal, awaiting,
       toast={toast}
     >
       {active === "inbox" && (
-        <Inbox rows={inbox} awaiting={awaiting} busy={busy} err={err}
+        <Inbox rows={inbox} awaiting={awaiting} awaitingTotal={awaitingTotal} unclaimed={unclaimed}
+          busy={busy} err={err}
           onRegister={onRegister} onClaim={onClaim} onOpen={onOpen} onOpenRec={onOpenRec} onDirect={onDirect} />
       )}
       {active === "sent" && <SentList rows={sent} total={sentTotal} />}
