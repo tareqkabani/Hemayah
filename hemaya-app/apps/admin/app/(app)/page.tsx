@@ -19,6 +19,7 @@ export default async function Page() {
       health={data.health}
       staff={data.staff}
       org={data.org}
+      holidays={data.holidays}
     />
   );
 }
