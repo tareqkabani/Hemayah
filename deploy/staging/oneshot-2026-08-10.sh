@@ -103,6 +103,14 @@ MIGRATIONS=(
   "20260811000003_recommendation_approval_chain.sql"
   # إنهاء مفتاح الخدمة من عرض حزمة القرار (دالّتا قراءةٍ مقيَّدتان)
   "20260811000004_decision_parties_no_service_role.sql"
+  # ── دفعة 11 أغسطس المتأخّرة (كانت خارج القائمة حتى فحص 16 أغسطس) ──
+  # صياغتان في رسائل المستفيد، ثمّ طور التجميع وسُلّم التصعيد.
+  # ⚠️ الترتيب مقصود: 000007 و000008 كلاهما يُعيد تعريف study_eval_watchdog
+  #    — والأخير هو النهائيّ.
+  "20260811000005_seeker_welcome_message_wording.sql"
+  "20260811000006_received_notification_wording.sql"
+  "20260811000007_decision_collecting_stage.sql"
+  "20260811000008_stall_escalation_and_visibility.sql"
   # وحدة الإدخال اليدوي (تسليم 13 أغسطس)
   # ⚠️ الترتيب مقصود: قيمة intake_clerk تُضاف وحدها أوّلاً، ثمّ الوحدة —
   #    والقائمة صريحة لا glob، فما لا يُدرج هنا لا يصل التجريبية إطلاقاً.
@@ -112,14 +120,6 @@ MIGRATIONS=(
   # نقلت الهوية إلى subjects مشفّرةً وبترتها من details، وclaim_paper_cases
   # ما زالت تطابق في details. لا يظهر بنفاذ المحاكاة ويظهر فور نفاذ الحقيقي.
   "20260813000003_paper_case_claim_repair.sql"
-  # ── دفعة 11 أغسطس المتأخّرة (كانت خارج القائمة حتى فحص 16 أغسطس) ──
-  # صياغتان في رسائل المستفيد، ثمّ طور التجميع وسُلّم التصعيد.
-  # ⚠️ الترتيب مقصود: 000007 و000008 كلاهما يُعيد تعريف study_eval_watchdog
-  #    — والأخير هو النهائيّ.
-  "20260811000005_seeker_welcome_message_wording.sql"
-  "20260811000006_received_notification_wording.sql"
-  "20260811000007_decision_collecting_stage.sql"
-  "20260811000008_stall_escalation_and_visibility.sql"
   # ── إتمام تسليم الإدخال اليدوي (#121 خلَف #120، ثمّ #122) ──
   # ⚠️ الترتيب مقصود: 000004 يُعيد كتابة submit_paper_intake
   #    وrecord_recommendation فوق نسختَي 000002 — لا تُقدَّم عليه.
