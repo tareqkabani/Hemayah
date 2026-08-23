@@ -58,3 +58,4 @@ deploy/staging/.bridge-password
 
 # حُرّاس git المشتركة (تُثبَّت بـ git config core.hooksPath .githooks)
 !/.githooks/
+deploy/staging/offline-bundle.sql
