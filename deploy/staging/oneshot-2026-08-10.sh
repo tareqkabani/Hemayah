@@ -130,6 +130,10 @@ MIGRATIONS=(
   "20260813000006_intake_realtime_and_search.sql"
   "20260813000007_unclaimed_case_outreach.sql"
   "20260813000008_referred_list_search.sql"
+  "20260825000001_fix_rc_insert_forge.sql"
+  "20260825000002_notifications_read_only_update.sql"
+  "20260825000003_drop_stray_seed_tables.sql"
+  "20260825000004_linter_hardening.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
