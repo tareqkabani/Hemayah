@@ -17,12 +17,12 @@ jobs:
         working-directory: hemaya-app
     steps:
       - uses: actions/checkout@v4
+      # لا نثبّت نسخة pnpm صراحةً: action-setup يقرأ packageManager (pnpm@11.1.2)
+      # من hemaya-app/package.json. تثبيت "11" كان يجلب 11.23 الذي يتطلّب Node 22.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: hemaya-app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
@@ -43,4 +43,5 @@ jobs:
       - name: فحص تسرّب الأسرار
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
