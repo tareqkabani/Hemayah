@@ -1,0 +1,46 @@
+# ============================================================
+#  تكامل مستمرّ — بوّابةُ جودةٍ وأمنٍ على كل طلب دمج (HMY-19)
+#  يفحص: تعارض الأنواع · قواعد ESLint · ثغرات التبعيّات · تسرّب الأسرار.
+#  حتى تُصلَح الثغرات القائمة عالية الخطورة، audit يُحذّر ولا يُفشِل (continue).
+# ============================================================
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hemaya-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: hemaya-app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: تعارض الأنواع
+        run: pnpm run typecheck
+      - name: قواعد ESLint
+        run: pnpm -r --if-present run lint
+      - name: ثغرات التبعيّات (عالية+)
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: فحص تسرّب الأسرار
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
