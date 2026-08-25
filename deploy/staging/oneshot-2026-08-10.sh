@@ -134,6 +134,7 @@ MIGRATIONS=(
   "20260825000002_notifications_read_only_update.sql"
   "20260825000003_drop_stray_seed_tables.sql"
   "20260825000004_linter_hardening.sql"
+  "20260825000005_subjects_restrictive_pii_guard.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)

@@ -5,5 +5,5 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": { "@hemaya/supabase": "workspace:*" },
-  "peerDependencies": { "next": "^14" }
+  "peerDependencies": { "next": "^14.2.35" }
 }

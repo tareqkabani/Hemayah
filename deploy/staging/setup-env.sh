@@ -29,24 +29,29 @@ if [ ! -f "$BRIDGE_FILE" ]; then
 fi
 BRIDGE=$(cat "$BRIDGE_FILE")
 
+# HMY-07 (أقلّ امتياز): مفتاح service_role يتجاوز RLS بالكامل، فلا يُكتب إلّا
+# للبوّابة التي تحتاجه فعلاً — landing (جسر نفاذ) وحدها. بقيّةُ البوّابات تعمل
+# بمفتاح anon وجلسة المستخدم (RLS يحرسها) فلا تلمس service_role.
 write_env() {
-  local app="$1" extra="$2" file="hemaya-app/apps/$1/.env.local"
-  cat > "$file" <<ENV
-# ولّده deploy/staging/setup-env.sh — لا يُتتبَّع في git
-NEXT_PUBLIC_SUPABASE_URL=${SUPA_URL}
-NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}
-SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
-NEXT_PUBLIC_GATEWAY_URL=${GATEWAY}
-SERVER_ACTIONS_ALLOWED_ORIGINS=${HOST}:3000
-NAFATH_BRIDGE_PASSWORD=${BRIDGE}
-INTG_MODE=mock
-${extra}
-ENV
-  echo "✓ $file"
+  local app="$1" file="hemaya-app/apps/$1/.env.local"
+  local needs_service="$2"   # "1" لمن يحتاج service_role فقط
+  {
+    echo "# ولّده deploy/staging/setup-env.sh — لا يُتتبَّع في git"
+    echo "NEXT_PUBLIC_SUPABASE_URL=${SUPA_URL}"
+    echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}"
+    [ "$needs_service" = "1" ] && echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}"
+    echo "NEXT_PUBLIC_GATEWAY_URL=${GATEWAY}"
+    echo "SERVER_ACTIONS_ALLOWED_ORIGINS=${HOST}:3000"
+    echo "NAFATH_BRIDGE_PASSWORD=${BRIDGE}"
+    echo "INTG_MODE=mock"
+  } > "$file"
+  echo "✓ $file$([ "$needs_service" = "1" ] && echo "  (+service_role)")"
 }
 
-for app in landing seeker center-officer competent-entities attorney-general technical-office health hr interior security-admin decision; do
-  write_env "$app" ""
+# landing وحدها تحصل على service_role (جسر نفاذ)
+write_env "landing" 1
+for app in seeker center-officer competent-entities attorney-general technical-office health hr interior security-admin decision; do
+  write_env "$app" 0
 done
 
 # واجهة REST (Hono) — تقرأ .env لا .env.local
