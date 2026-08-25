@@ -22,6 +22,8 @@ const API_URL = zone("ZONE_API_URL", "http://localhost:3020");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // اللِنت يُشغَّل في CI منفصلاً (HMY-19)؛ لا يُفشِل البناء (سلوك Next 14)
+  eslint: { ignoreDuringBuilds: true },
   transpilePackages: ["@hemaya/supabase", "@hemaya/auth"],
   async rewrites() {
     return [
