@@ -57,14 +57,9 @@ auth.post("/nafath/confirm", zValidator("json", NafathConfirmSchema, validationH
   if (created.error && !/registered|already/i.test(created.error.message)) {
     throw new HTTPException(500, { message: created.error.message });
   }
-  if (created.error) {
-    // موجودٌ مسبقاً (ربما أُنشئ من الويب بكلمة سرّ مختلفة) — نوائم كلمة السرّ لإصدار جلسة.
-    const { data: list } = await admin.auth.admin.listUsers();
-    const existing = list.users.find((u) => u.email === email);
-    if (existing) {
-      await admin.auth.admin.updateUserById(existing.id, { password: BRIDGE_PASSWORD });
-    }
-  }
+  // موجودٌ مسبقاً: لا نُعيد ضبط كلمة سرّه (HMY-02 — ثغرة استيلاء: دهسُ كلمة
+  // سرّ أيّ حساب عبر نداءٍ للمسار). الدخول يعتمد كلمة الجسر التي أُنشئ بها؛
+  // تعارضٌ نادرٌ (كلمة جسر بُدّلت) يُرفَض عند الدخول بدل أن يُصلَّح ذاتياً.
 
   const anon = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

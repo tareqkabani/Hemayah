@@ -24,8 +24,13 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: "https://${PUBLIC_HOST}/supabase"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
         NEXT_PUBLIC_GATEWAY_URL: "https://${PUBLIC_HOST}"
+    # HMY-06: لا نشرَ 3000 على المضيف — الوكيلُ يصل الواجهةَ عبر شبكة Compose
+    # باسم الخدمة (hemaya-frontend:3000)، فلا يعبر كوكي الجلسة والتوكن بالنصّ
+    # الصريح خارج الوكيل. للتشخيص المحليّ فقط يُربَط بالعنوان المحلّي.
+    expose:
+      - "3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       # جانب الخادم يصل القاعدة داخلياً مباشرة بالـIP وقت التشغيل — غير مخبوز،
       # فلا يتأثر بالنطاق ولا بشهادته (هذا ما أسقط الدخول بـfetch failed سابقاً)

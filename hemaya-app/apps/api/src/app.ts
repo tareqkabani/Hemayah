@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "./types";
 import { audit } from "./middleware/audit";
 import { authenticate } from "./middleware/auth";
@@ -19,6 +20,9 @@ import { notifications } from "./routes/notifications";
 export const app = new Hono<Env>();
 
 app.onError(onError);
+
+// ترويسات أمان (HMY-08) — دفاعٌ في العمق لو وصل الـAPI مباشرةً دون الوكيل.
+app.use("*", secureHeaders());
 
 // تدقيق ثم تحديد معدّل — لكل طلب، بما فيه الصحّة والمسارات غير المعروفة.
 app.use("*", audit);

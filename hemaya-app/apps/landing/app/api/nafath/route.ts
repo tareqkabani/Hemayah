@@ -183,13 +183,11 @@ export async function POST(req: Request) {
 
     // 3) تسجيل الدخول — يضبط كوكي جلسة Supabase على localhost (مشتركة بين المنافذ)
     const supabase = createServerClient();
-    let { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD() });
-    // معالجة ذاتية: حساب مزروع/قديم بكلمة جسر مختلفة (مثل بذور nafath-staff-2026
-    // مع NAFATH_BRIDGE_PASSWORD مخصّصة) — نوحّد كلمته ثم نعيد المحاولة مرة واحدة
-    if (sErr && /invalid login credentials/i.test(sErr.message) && userId) {
-      await admin.auth.admin.updateUserById(userId, { password: DEV_PASSWORD() });
-      ({ error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD() }));
-    }
+    // لا «معالجة ذاتية» تُعيد ضبط كلمة سرّ حسابٍ قائم عند فشل الدخول (HMY-02):
+    // كانت ثغرةَ استيلاء — أيّ نداءٍ للمسار يدهس كلمة سرّ أيّ حساب. الحسابُ
+    // أُنشئ للتوّ بكلمة الجسر أعلاه، فالدخول يعتمدها؛ وتعارضٌ نادرٌ (كلمة جسر
+    // بُدّلت) يُرفَض بدل أن يُصلَّح ذاتياً بدهس كلمة السرّ.
+    const { error: sErr } = await supabase.auth.signInWithPassword({ email, password: DEV_PASSWORD() });
     if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 });
 
     return NextResponse.json({ ok: true, portal: spec.portal, role: spec.role, label: spec.label });

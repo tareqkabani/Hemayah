@@ -24,9 +24,17 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 function clientKey(c: Parameters<Parameters<typeof createMiddleware<Env>>[0]>[0]): string {
+  // HMY-05: X-Real-IP يضبطه الوكيلُ العكسيّ من عنوان الاتصال ($remote_addr)،
+  // فهو غيرُ منتحَل. نفضّله أوّلاً. أمّا X-Forwarded-For فأوّلُ عنصرٍ فيه هو ما
+  // كتبه العميلُ (منتحَل) — فنأخذ **آخر** عنصرٍ (أضافه الوكيل) لا أوّله.
+  const real = c.req.header("x-real-ip");
+  if (real) return real.trim();
   const fwd = c.req.header("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return c.req.header("x-real-ip") ?? "unknown";
+  if (fwd) {
+    const parts = fwd.split(",");
+    return parts[parts.length - 1]!.trim();
+  }
+  return "unknown";
 }
 
 export const rateLimit = createMiddleware<Env>(async (c, next) => {
