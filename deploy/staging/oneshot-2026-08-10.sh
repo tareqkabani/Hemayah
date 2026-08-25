@@ -130,6 +130,7 @@ MIGRATIONS=(
   "20260813000006_intake_realtime_and_search.sql"
   "20260813000007_unclaimed_case_outreach.sql"
   "20260813000008_referred_list_search.sql"
+  "20260825000005_subjects_restrictive_pii_guard.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
