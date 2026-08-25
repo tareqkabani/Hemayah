@@ -3,12 +3,21 @@ const nextConfig = {
   basePath: "/center",
   experimental: { serverActions: { allowedOrigins: [...(process.env.NODE_ENV !== "production" ? ["localhost:3000"] : []), ...(process.env.SERVER_ACTIONS_ALLOWED_ORIGINS?.split(",") ?? [])] } },
   transpilePackages: ["@hemaya/ui", "@hemaya/recommendation", "@hemaya/auth", "@hemaya/supabase", "@hemaya/domain"],
-  // مسار القرار القديم أُزيل (تحديث 15 يوليو) — من يقصده يُوجَّه لبوابة القرار الموحّدة
+  // مسارات أُزيلت وانتقلت وظائفها إلى بواباتها الموحّدة — من يقصدها يُوجَّه إليها:
+  //   · القرار (15 يوليو) → منطقة /decision
+  //   · الفرز            → منطقة /triage
+  //   · الدراسة والتقييم (نسخة 7 يوليو، تجاوزتها @hemaya/study-eval في 19 يوليو)
+  //     → منطقتا /studier و/evaluator
   // basePath:false كي تكون الوجهة حرفيّة خارج منطقة /center (منطقة /decision في الشاشة الموحّدة)
   // (basePath:false يجعل المصدر والوجهة حرفيّين — لذا المصدر مكتوب ببادئة /center الصريحة)
   async redirects() {
-    return ["/center/decision", "/center/decision-lead", "/center/decision-vote", "/center/triage"].map((source) => ({
-      source, destination: source === "/center/triage" ? "/triage" : "/decision", basePath: false, permanent: false,
+    const MOVED = {
+      "/center/decision": "/decision", "/center/decision-lead": "/decision",
+      "/center/decision-vote": "/decision", "/center/triage": "/triage",
+      "/center/study": "/studier", "/center/assessment": "/evaluator",
+    };
+    return Object.entries(MOVED).map(([source, destination]) => ({
+      source, destination, basePath: false, permanent: false,
     }));
   },
 };

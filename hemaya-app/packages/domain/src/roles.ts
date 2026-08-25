@@ -41,8 +41,11 @@ export interface Portal {
  *  الشاشة الموحّدة (landing:3000) بمسارات Multi-Zones. */
 export const PORTALS: Portal[] = [
   { app: "landing", title: "الشاشة الموحّدة (بوابة الدخول)", port: 3000, roles: [] },
-  { app: "center-officer", title: "موظف المركز (فرز · دراسة · قرار)", port: 3002,
-    roles: ["case_officer", "studier", "evaluator", "board_member", "board_chair", "deputy_chair", "hotline_operator", "intake_clerk"] },
+  // ⚠️ العنوان صُحّح ليصف ما في البوابة فعلاً: الفرز والدراسة والتقييم والقرار
+  // انتقلت إلى بواباتها الموحّدة (triage · studier · evaluator · decision)،
+  // وبقي العنوان يَعِد بها شهراً فكان السجلّ نفسه مصدرَ التباس.
+  { app: "center-officer", title: "موظف المركز (إدخالٌ يدويّ · تنفيذ · إشراف)", port: 3002,
+    roles: ["case_officer", "board_chair", "deputy_chair", "hotline_operator", "intake_clerk"] },
   { app: "competent-entities", title: "الجهات المختصة", port: 3006, roles: ["competent_body"] },
   { app: "attorney-general", title: "بوابة النائب العام", port: 3007, roles: ["prosecutor_general"] },
   { app: "technical-office", title: "المكتب الفني (التظلّمات)", port: 3008, roles: ["advisor", "tech_manager"] },
