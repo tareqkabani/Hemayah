@@ -22,6 +22,7 @@
 !/CLAUDE.md
 !/src/
 !/public/
+!/.github/
 
 # تجاهلات معتادة داخل المستثنَيات
 .DS_Store
