@@ -215,5 +215,9 @@ const HTML = `
 `;
 
 export default function GatewayPage() {
+  // HMY-16 (مقبولٌ موثَّق): HTML أعلاه ثابتٌ وقتَ البناء — سلسلةٌ حرفيّةٌ بلا
+  // أيّ استيفاءٍ ولا مدخلِ مستخدم، فلا سطحَ XSS. أيُّ تعديلٍ مستقبليٍّ يُدخِل
+  // قيمةً ديناميّةً في HTML يُبطل هذا الأمان ويوجب التحويلَ إلى JSX.
+  // eslint-disable-next-line react/no-danger -- ثابتٌ وقت البناء، لا مدخل مستخدم
   return <div dangerouslySetInnerHTML={{ __html: HTML }} />;
 }
