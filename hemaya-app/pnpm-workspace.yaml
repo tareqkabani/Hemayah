@@ -7,3 +7,10 @@ allowBuilds:
 onlyBuiltDependencies:
   - esbuild
   - sharp
+# التثبيتات القسريّة — كانت في package.json (pnpm.overrides) ولم يكن pnpm 11 يقرأها هناك
+overrides:
+  next: "15.5.23"
+  react: "19.2.0"
+  react-dom: "19.2.0"
+  postcss: "^8.5.28"
+  sharp: "^0.35.4"

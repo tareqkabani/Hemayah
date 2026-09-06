@@ -5,7 +5,7 @@
   "scripts": { "dev": "next dev -p 3012", "build": "next build", "start": "next start -p 3012", "typecheck": "tsc --noEmit" },
   "dependencies": {
     "@hemaya/ui": "workspace:*", "@hemaya/supabase": "workspace:*", "@hemaya/auth": "workspace:*", "@hemaya/domain": "workspace:*",
-    "next": "16.3.4", "react": "19.2.0", "react-dom": "19.2.0"
+    "next": "15.5.23", "react": "19.2.0", "react-dom": "19.2.0"
   },
   "devDependencies": { "typescript": "^5.5.4", "@types/node": "^20.14.10", "@types/react": "^19", "@types/react-dom": "^19" }
 }
