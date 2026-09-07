@@ -170,7 +170,8 @@ function AwaitingSection({ rows: initialRows, total: initialTotal, busy, onOpenR
             <tbody>{rows.map((r) => {
               const left = REC_DEADLINE_DAYS - bizDaysSince(r.referredAt);
               return (
-                <tr key={r.caseId}>
+                // هويّة الصفّ توصيةٌ لا قضية — القضية تُحال لأكثر من جهة
+                <tr key={r.recId}>
                   <td className="mono" style={{ fontWeight: 700, color: "var(--text-strong)" }}>{r.secret}</td>
                   <td>{r.cat}</td>
                   <td style={{ fontSize: 12.5 }}>{entName(r.entity)}</td>
@@ -269,6 +270,8 @@ function UnclaimedSection({ rows: initial, busy }) {
         <div className="card"><div className="tbl-wrap"><table className="pi-tbl">
           <thead><tr><th>الرمز</th><th>القناة</th><th>قيد الورود</th><th>الانتظار</th><th>الهوية</th><th>وسيلة الاتصال</th><th>المحاولات</th><th /></tr></thead>
           <tbody>{rows.map((r) => (
+            // صفٌّ واحدٌ لكلّ قضية — intake_unclaimed_cases تنتقي مستند الطلب
+            // وحده، فلا تتضاعف القضية بعدد مستنداتها الواردة.
             <React.Fragment key={r.caseId}>
               <tr>
                 <td className="mono" style={{ fontWeight: 700, color: "var(--text-strong)" }}>{r.secret}</td>
