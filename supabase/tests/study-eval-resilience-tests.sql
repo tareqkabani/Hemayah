@@ -236,17 +236,21 @@ begin
     raise exception 'اختبار 6ج فشل: وُسم مؤلّف والقضية بلا نصاب'; end if;
 
   select count(*) into _n from notifications
-   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
+   where case_id = c.c3 and recipient_id = i.deputy and title like '%انقضاء الميعاد%بلا نصاب%';
   if _n < 1 then raise exception 'اختبار 6د فشل: لا إنذار للنائب'; end if;
-  select count(*) into _n from audit_log where action='study_eval_deadline_no_quorum' and target='REF-RSL-9913';
+  -- سلّم التصعيد (20260811000008) يبدّل فعل التدقيق بحسب التأخّر:
+  --   <3 أيام عمل no_quorum · >=3 escalated · >=5 critical
+  select count(*) into _n from audit_log
+   where action in ('study_eval_deadline_no_quorum','study_eval_stall_escalated','study_eval_stall_critical')
+     and target='REF-RSL-9913';
   if _n < 1 then raise exception 'اختبار 6هـ فشل: لا تدقيق للعجز'; end if;
 
   -- الإنذار غير مُغرِق: جولة ثانية خلال اليوم لا تكرّره
   select count(*) into _n from notifications
-   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
+   where case_id = c.c3 and recipient_id = i.deputy and title like '%انقضاء الميعاد%بلا نصاب%';
   perform study_eval_watchdog();
   select count(*) into _n2 from notifications
-   where case_id = c.c3 and recipient_id = i.deputy and title = 'انقضاء الميعاد النظامي بلا نصاب';
+   where case_id = c.c3 and recipient_id = i.deputy and title like '%انقضاء الميعاد%بلا نصاب%';
   if _n2 <> _n then raise exception 'اختبار 6و فشل: إنذار العجز يتكرر كل جولة (إغراق)'; end if;
 
   -- أول نصابٍ بعد الميعاد: الجولة التالية تُقفِل
