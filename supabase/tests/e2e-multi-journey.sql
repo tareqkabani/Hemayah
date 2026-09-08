@@ -38,16 +38,43 @@ create temp table who as select
   (select id from auth.users where email='2000000009@nafath.local') as deputy,
   (select id from auth.users where email='2000000008@nafath.local') as chair,
   (select id from auth.users where email='1000000001@nafath.local') as sub1,
-  (select id from auth.users where email='1099887744@nafath.local') as sub2,
-  (select id from auth.users where email='1099887755@nafath.local') as sub3,
-  (select id from auth.users where email='1099887766@nafath.local') as sub4;
+  (select id from auth.users where email='1000000001@nafath.local') as sub1_dup;
 
 do $$ begin
   if exists (select 1 from who where officer is null or clerk is null or head is null
     or intake is null or preparer is null or deputy is null or chair is null
-    or sub1 is null or sub2 is null or sub3 is null or sub4 is null) then
+    or sub1 is null) then
     raise exception 'هويات البذور ناقصة — شغّل seed.sql أولاً';
   end if;
+end $$;
+
+
+-- ─── مستفيدٌ بهويةٍ محدّدة: يُنشأ إن لم يوجد (تُنشئه بوابة نفاذ عادةً) ───
+-- بها يصير الاختبار مكتفياً بذاته على قاعدةٍ وليدة، ولا يتّكئ على درِفت
+-- قاعدة التطوير. الإنشاء داخل معاملة المسار فيُرجَع معها بلا أثر.
+create or replace function pg_temp.subject_by_nid(_nid text) returns uuid
+language plpgsql as $$
+declare _u uuid;
+begin
+  select id into _u from auth.users where email = _nid || '@nafath.local';
+  if _u is null then
+    _u := gen_random_uuid();
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, created_at, updated_at,
+      raw_app_meta_data, raw_user_meta_data,
+      confirmation_token, recovery_token, email_change_token_new, email_change)
+    values ('00000000-0000-0000-0000-000000000000', _u, 'authenticated', 'authenticated',
+      _nid || '@nafath.local', crypt('nafath-staff-2026', gen_salt('bf')),
+      now(), now(), now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      jsonb_build_object('name', 'طالب حماية ' || _nid, 'national_id', _nid, 'source', 'e2e'),
+      '', '', '', '');
+  end if;
+  insert into user_roles (user_id, role, attributes)
+  values (_u, 'subject'::app_role, '{}'::jsonb)
+  on conflict (user_id, role) do nothing;
+  return _u;
 end $$;
 
 -- ─── مرحلة: محضر اتصال (موظف الفرز) ───
@@ -357,8 +384,10 @@ rollback;
 --  المسار ٢ — ورقيّ حضوريّ · ضمٌّ بنفاذ · توصية ورقية · قبول → active
 -- ════════════════════════════════════════════════════════════
 begin;
+select pg_temp.subject_by_nid('1099887744');
 update protection_cases set status='closed'
- where submitted_by=(select sub2 from who) and status not in ('closed','rejected');
+ where submitted_by=(select id from auth.users where email='1099887744@nafath.local')
+   and status not in ('closed','rejected');
 do $$
 declare w who; r record; _out text; _asg text; _inf text; _n int; _st case_status;
 begin
@@ -381,9 +410,9 @@ begin
     raise exception 'الإدخال اليدوي: محضر المقابلة الحضورية لم يُقيَّد'; end if;
   raise notice '  ① الإدخال اليدوي (حضوريّ): % · محضر المقابلة يقوم مقام محضر التحقّق', r.ref_no;
 
-  _n := pg_temp.s_claim(w.sub2, '1099887744');
+  _n := pg_temp.s_claim((select id from auth.users where email='1099887744@nafath.local'), '1099887744');
   if _n < 1 then raise exception 'الضمّ: نفاذ لم يضمّ الحالة الورقية'; end if;
-  if (select submitted_by from protection_cases where id=r.case_id) is distinct from w.sub2 then
+  if (select submitted_by from protection_cases where id=r.case_id) is distinct from (select id from auth.users where email='1099887744@nafath.local') then
     raise exception 'الضمّ: القضية لم تُربط بصاحبها'; end if;
   raise notice '  ② الضمّ بنفاذ: % حالة ضُمّت · القضية صارت مملوكةً لصاحبها', _n;
 
@@ -403,10 +432,10 @@ begin
   _out := pg_temp.s_issue(r.case_id, null);
   raise notice '  ⑥ دورة القرار والتصويت: 4/7 قبول ← % · accepted', _out;
 
-  _inf := pg_temp.s_informed(r.case_id, w.sub2, _out);
+  _inf := pg_temp.s_informed(r.case_id, (select id from auth.users where email='1099887744@nafath.local'), _out);
   raise notice '  ⑦ الإبلاغ تحت RLS: %', _inf;
 
-  perform pg_temp.s_sign(r.case_id, w.sub2);
+  perform pg_temp.s_sign(r.case_id, (select id from auth.users where email='1099887744@nafath.local'));
   select count(*) into _n from audit_log where target=r.case_id::text and action like 'notify_%';
   raise notice '  ⑧ التوقيع: active';
   raise notice '  ✓ المسار ٢ تمّ — % · % إشعاراً من القوالب', r.ref_no, _n;
@@ -417,8 +446,10 @@ rollback;
 --  المسار ٣ — ورقيّ بريديّ (خطاب جهة) · سلسلة اعتماد · رفضٌ بالتصويت
 -- ════════════════════════════════════════════════════════════
 begin;
+select pg_temp.subject_by_nid('1099887755');
 update protection_cases set status='closed'
- where submitted_by=(select sub3 from who) and status not in ('closed','rejected');
+ where submitted_by=(select id from auth.users where email='1099887755@nafath.local')
+   and status not in ('closed','rejected');
 do $$
 declare w who; r record; _out text; _asg text; _inf text; _n int;
 begin
@@ -434,7 +465,7 @@ begin
     'REG-M3-' || floor(random()*100000)::text);
   raise notice '  ① الإدخال اليدوي (بريديّ من جهة): % · triage', r.ref_no;
 
-  _n := pg_temp.s_claim(w.sub3, '1099887755');
+  _n := pg_temp.s_claim((select id from auth.users where email='1099887755@nafath.local'), '1099887755');
   if _n < 1 then raise exception 'الضمّ: نفاذ لم يضمّ الحالة'; end if;
   raise notice '  ② الضمّ بنفاذ: % حالة', _n;
 
@@ -458,7 +489,7 @@ begin
   if _out <> 'reject' then raise exception 'المسار ٣: النتيجة % لا reject', _out; end if;
   raise notice '  ⑥ التصويت والإصدار: 4/7 رفض ← % · rejected بتسبيبٍ مكتوب', _out;
 
-  _inf := pg_temp.s_informed(r.case_id, w.sub3, _out);
+  _inf := pg_temp.s_informed(r.case_id, (select id from auth.users where email='1099887755@nafath.local'), _out);
   raise notice '  ⑦ الإبلاغ تحت RLS: %', _inf;
 
   if exists (select 1 from audit_log where action='notify_n_agreement' and target=r.case_id::text) then
@@ -472,8 +503,10 @@ rollback;
 --  المسار ٤ — إلكتروني · توصية «عدم توفير» · المجلس يتبنّى رفضاً مُعَدّاً
 -- ════════════════════════════════════════════════════════════
 begin;
+select pg_temp.subject_by_nid('1099887766');
 update protection_cases set status='closed'
- where submitted_by=(select sub4 from who) and status not in ('closed','rejected');
+ where submitted_by=(select id from auth.users where email='1099887766@nafath.local')
+   and status not in ('closed','rejected');
 do $$
 declare w who; r record; _out text; _inf text; _n int; _just text;
 begin
@@ -481,7 +514,7 @@ begin
   raise notice '';
   raise notice '══════════ المسار ٤: إلكتروني · تبنّي رفضٍ مُعَدّ ══════════';
 
-  perform pg_temp.act(w.sub4); set local role authenticated;
+  perform pg_temp.act((select id from auth.users where email='1099887766@nafath.local')); set local role authenticated;
   select * into r from submit_protection_request(
     'أصيل (عن شخصه)', 'expert', null,
     'تهديدٌ لفظيٌّ عقب تقريرٍ فنّي', 'تخوّفٌ من إيذاءٍ محتمل',
@@ -515,7 +548,7 @@ begin
     raise exception 'المسار ٤: قرار المجلس لم يُقيَّد بنطاق الرفض'; end if;
   raise notice '  ⑤ الإصدار: أصواتُ قبولٍ على مُعَدٍّ نطاقُه الرفض ← % · التسبيب = حيثيات المُعَدّ', _out;
 
-  _inf := pg_temp.s_informed(r.case_id, w.sub4, _out);
+  _inf := pg_temp.s_informed(r.case_id, (select id from auth.users where email='1099887766@nafath.local'), _out);
   select count(*) into _n from audit_log where target=r.case_id::text and action like 'notify_%';
   raise notice '  ⑥ الإبلاغ تحت RLS: %', _inf;
   raise notice '  ✓ المسار ٤ تمّ — % · % إشعاراً من القوالب', r.ref_no, _n;
