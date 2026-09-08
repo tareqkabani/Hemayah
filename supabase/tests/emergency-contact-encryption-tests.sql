@@ -55,6 +55,8 @@ select * from submit_paper_intake(
   'seeker', 'أصيل', 'witness', null, 'التهديد', 'اختبار تشفير جهة الطوارئ', false, null,
   jsonb_build_object(
     'city', 'الرياض', 'channel', 'inperson',
+    -- محضر المقابلة صار إلزاميّاً في الحضوري (20260813000002) — يقوم مقام محضر التحقّق (م7)
+    'interview', jsonb_build_object('note', 'محضر مقابلةٍ حضورية لأغراض الاختبار', 'date', current_date),
     'identity', jsonb_build_object('name', 'مستفيد الاختبار', 'verified', false),
     'emergency_contact', jsonb_build_object('name', 'سالم الاختباري', 'rel', 'أخ', 'phone', '0550001111')),
   current_date, 'REG-EC-1');

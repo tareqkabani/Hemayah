@@ -135,6 +135,9 @@ MIGRATIONS=(
   "20260825000003_drop_stray_seed_tables.sql"
   "20260825000004_linter_hardening.sql"
   "20260825000005_subjects_restrictive_pii_guard.sql"
+  #   إعادة تحصين الدوالّ الداخلية — يجب أن تلي 20260825000004 مباشرةً،
+  #   فهي تُصلح المنح الشامل الذي أحدثته تلك (لا تُقدَّم عليها).
+  "20260907000001_reprivatize_internal_functions.sql"
   #   هويّة صفّ قوائم الوارد: صفٌّ واحدٌ لكلّ قضية في «بلا حساب» ومفتاحٌ
   #   ثابتٌ في «المُحالة» — تُعيد تعريف intake_unclaimed_cases/intake_referred_list.
   "20260907000010_intake_lists_row_identity.sql"
