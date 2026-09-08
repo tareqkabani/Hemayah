@@ -121,7 +121,9 @@ export type ReferredQuery = {
   offset?: number;
 };
 
-export type ReferredRow = ReferredCase & { entity: string; isOver: boolean };
+// recId هويّة الصفّ: القضية الواحدة تُحال لأكثر من جهة، فلكلّ توصيةٍ صفُّها
+// وخطابُها المنتظَر — وcaseId عندئذٍ يتكرّر.
+export type ReferredRow = ReferredCase & { recId: string; entity: string; isOver: boolean };
 
 /* ⚠️ دوالّ هذه الدفعة أُنشئت بعد توليد types.gen.ts، فتُنادى بربطٍ صريح —
    نمط apps/admin/lib/data.ts نفسه. يُعاد التوليد مع دمج السلسلة.
@@ -143,6 +145,7 @@ export async function listReferred(query: ReferredQuery = {}) {
   });
   if (error) return { ok: false as const, error: error.message, rows: [] as ReferredRow[], total: 0 };
   const rows: ReferredRow[] = (data || []).map((r) => ({
+    recId: r.rec_id as string,
     caseId: r.case_id as string,
     secret: r.secret_code as string,
     cat: CAT_AR[r.category as string] || (r.category as string),
