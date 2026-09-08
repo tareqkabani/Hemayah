@@ -135,6 +135,9 @@ MIGRATIONS=(
   "20260825000003_drop_stray_seed_tables.sql"
   "20260825000004_linter_hardening.sql"
   "20260825000005_subjects_restrictive_pii_guard.sql"
+  #   هويّة صفّ قوائم الوارد: صفٌّ واحدٌ لكلّ قضية في «بلا حساب» ومفتاحٌ
+  #   ثابتٌ في «المُحالة» — تُعيد تعريف intake_unclaimed_cases/intake_referred_list.
+  "20260907000010_intake_lists_row_identity.sql"
 )
 
 # حدّ البدء: يُطبَّق ما نسخته أكبر منه فقط (انظر التحذير في الرأس)
