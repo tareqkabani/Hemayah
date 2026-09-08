@@ -119,6 +119,35 @@ from (
              and p.proname in ('claim_paper_cases','submit_paper_intake','triage_decide',
                                'submit_study','submit_assessment','record_recommendation')
              and has_function_privilege('anon', p.oid, 'EXECUTE'))
+  -- حارسٌ دائمٌ ضدّ انحدار «المنح الشامل» (20260825000004 ألغى 21 سحباً متعمَّداً،
+  -- فكشف مفتاحَي التشفير ومحرّك الإشعارات لأيّ موثَّق — أُصلح بـ20260907000001).
+  -- الاصطلاح: ما بدأ اسمه بشرطةٍ سفلية داخليّ. والاستثناء الوحيد
+  -- _intake_path_readable لأنّ سياسة تخزين مرفقات الوارد تناديها بصلاحية
+  -- المستخدم نفسه، فسحبُها يقطع اطّلاع الدارس والمقيّم على خطابات الجهات.
+  union all select 'دوال داخلية (_) ينفّذها أيّ موثَّق',
+         (select count(*) from pg_proc p
+           where p.pronamespace = 'public'::regnamespace
+             and p.proname like '\_%'
+             and p.proname <> '_intake_path_readable'
+             and has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+  union all select 'عمليات ذات امتياز ينفّذها أيّ موثَّق',
+         (select count(*) from pg_proc p
+           where p.pronamespace = 'public'::regnamespace
+             and p.proname in ('notify_from_template','render_template_text','study_eval_watchdog',
+                               'recommendations_watchdog','watchdog_enabled','study_eval_deadline_days',
+                               'assign_study_eval','pick_grievance_advisor','council_tally','claim_paper_cases')
+             and has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+  -- والوجه الآخر: ما تحتاجه الواجهات يجب أن يبقى مفتوحاً — إغلاقه انحدارٌ أيضاً
+  -- (هو عين ما ظهر في التجريبية: permission denied for function submit_study).
+  union all select 'نقاط نداءٍ للواجهة مقفلةٌ خطأً عن الموثَّق',
+         (select count(*) from pg_proc p
+           where p.pronamespace = 'public'::regnamespace
+             and p.proname in ('submit_protection_request','submit_paper_intake','triage_decide',
+                               'submit_study','submit_assessment','seeker_case_view',
+                               'seeker_sign_agreement','submit_recommendation_for_approval',
+                               'decide_recommendation_approval','council_submit','council_vote',
+                               'council_issue','_intake_path_readable')
+             and not has_function_privilege('authenticated', p.oid, 'EXECUTE'))
 ) q order by n desc, label;
 
 \echo ''

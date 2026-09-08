@@ -18,12 +18,12 @@ begin
     select * from (values
       ('1000000001','subject',            '{}'::jsonb,                        'مستفيد تجريبي'),
       ('2000000001','hotline_operator',   '{}'::jsonb,                        'مشغّل الخط الساخن'),
-      ('2000000002','case_officer',       '{}'::jsonb,                        'موظف الفرز'),
+      ('2000000002','case_officer',       '{"authority":"legal"}'::jsonb,                        'موظف الفرز'),
       ('2000000003','studier',            '{}'::jsonb,                        'الباحث القانوني'),
       ('2000000004','evaluator',          '{}'::jsonb,                        'المقيّم النفسي/الاجتماعي'),
-      ('2000000005','case_officer',       '{}'::jsonb,                        'معدّ قرار المركز'),
+      ('2000000005','case_officer',       '{"authority":"legal"}'::jsonb,                        'معدّ قرار المركز'),
       ('2000000006','board_member',       '{}'::jsonb,                        'عضو المجلس (نيابة 1)'),
-      ('2000000007','case_officer',       '{}'::jsonb,                        'موظف التنفيذ'),
+      ('2000000007','case_officer',       '{"authority":"legal"}'::jsonb,                        'موظف التنفيذ'),
       ('2000000008','board_chair',        '{}'::jsonb,                        'رئيس المركز'),
       ('2000000009','deputy_chair',       '{}'::jsonb,                        'نائب رئيس المركز'),
       -- منسوبو وحدة الإدخال اليدوي: «لكل منسوب حسابه» (قرار ٤ في تسليم الوحدة).
@@ -51,12 +51,12 @@ begin
       ('3000000003','hr_specialist',      '{"authority":"hr"}'::jsonb,        'أخصائي الموارد البشرية'),
       ('3000000004','security_manager',   '{"authority":"security"}'::jsonb,  'مدير الإدارة الأمنية'),
       ('3000000005','moi_officer',        '{"authority":"moi"}'::jsonb,       'ضابط وزارة الداخلية'),
-      ('4000000001','prosecutor_general', '{}'::jsonb,                        'النائب العام'),
-      ('5000000001','advisor',            '{"advisor":"a1","spec":"قانوني"}'::jsonb,        'م. عبدالله العتيبي'),
-      ('5000000002','tech_manager',       '{}'::jsonb,                        'م. فهد الدوسري'),
+      ('4000000001','prosecutor_general', '{"authority":"ag"}'::jsonb,                        'النائب العام'),
+      ('5000000001','advisor',            '{"advisor":"a1","spec":"قانوني","authority":"technical"}'::jsonb,        'م. عبدالله العتيبي'),
+      ('5000000002','tech_manager',       '{"authority":"technical"}'::jsonb,                        'م. فهد الدوسري'),
       -- مستشارا مكتبٍ إضافيان: للإسناد الآليّ بالعبء واختبار العزل المتبادل
-      ('5000000003','advisor',            '{"advisor":"a2","spec":"أمني"}'::jsonb,          'د. منى الزهراني'),
-      ('5000000004','advisor',            '{"advisor":"a3","spec":"نفسي/اجتماعي"}'::jsonb,  'أ. سارة القحطاني')
+      ('5000000003','advisor',            '{"advisor":"a2","spec":"أمني","authority":"technical"}'::jsonb,          'د. منى الزهراني'),
+      ('5000000004','advisor',            '{"advisor":"a3","spec":"نفسي/اجتماعي","authority":"technical"}'::jsonb,  'أ. سارة القحطاني')
     ) as t(nid, role, attrs, name)
   loop
     select id into uid from auth.users where email = r.nid || '@nafath.local';
@@ -90,8 +90,12 @@ begin
     end if;
     insert into user_roles (user_id, role, attributes)
     values (uid, r.role::app_role, r.attrs)
-    -- دمجٌ لا استبدال: إعادة تشغيل البذرة يجب ألا تدهس سمات كتبتها مهاجرات
-    -- لاحقة (authority=legal لموظف المركز، ag/technical للإشراف — درس 2026-08-10)
+    -- دمجٌ لا استبدال: إعادة تشغيل البذرة يجب ألا تدهس سمات كتبتها مهاجرات لاحقة.
+    -- ⚠️ لكنّ الدمج وحده لا يكفي على بيئةٍ تُبنى من الصفر: المهاجرات تسبق البذور،
+    -- فتحديث 20260730000002 (authority=legal لموظف المركز) يصادف جدولاً فارغاً
+    -- ويُصيب صفر صفوف بصمت. ولذلك تُكتب السلطات هنا صراحةً — legal لموظفي
+    -- المركز، ag للنائب العام، technical للمكتب الفني — وإلا عميت بوّابةٌ كاملة
+    -- على كل بيئةٍ جديدة (15 سياسة RLS تتوكّأ على has_authority).
     on conflict (user_id, role) do update
       set attributes = coalesce(user_roles.attributes,'{}'::jsonb) || excluded.attributes;
   end loop;
