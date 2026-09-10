@@ -2,17 +2,36 @@
 --  بذور بيئة التطوير — حسابات نفاذ التجريبية + أدوارها + قضايا مرحلة القرار
 --  يُشغَّل آلياً بعد المهاجرات في `supabase db reset` ([db.seed] في config.toml).
 --  الدخول: بوابة الدخول (landing:3000) برقم هوية من 10 أرقام؛
---  البريد = {هوية}@nafath.local وكلمة السر الموحّدة = nafath-staff-2026.
+--  البريد = {هوية}@nafath.local، وكلمة السرّ من app.bridge_pw أدناه.
 --  يُنشئ auth.users + auth.identities + user_roles لكل حساب.
 --  idempotent: يجوز إعادة تشغيله دون تكرار.
 -- ============================================================
+
+-- ── كلمة سرّ جسر نفاذ: مصدرٌ واحدٌ لكلّ الحسابات المبذورة ──
+--  يجب أن تُطابق NAFATH_BRIDGE_PASSWORD في بيئة التشغيل، وإلّا رُفض
+--  **كلُّ** حسابٍ مبذور بـ«Invalid login credentials» — وهي كلّ الحسابات.
+--  (عطبُ 8 سبتمبر 2026: كانت الكلمة ثابتةً هنا والبيئة عشوائية.)
+--
+--  تمريرها على خادمٍ حقيقيّ:
+--    PGOPTIONS="-c app.bridge_pw=$NAFATH_BRIDGE_PASSWORD" psql "$DB_URL" -f seed.sql
+--  وحين لا تُمرَّر تسقط على الافتراضيّ — وهو المقصود في التطوير المحلّي،
+--  إذ لا يضبط أحدٌ المتغيّر فيتطابق الطرفان تلقائياً.
+--
+--  ⚠️ الافتراضيّ منشورٌ في مستودعٍ مفتوح: لا يُعتمد عليه في بيئةٍ يبلغها غيرك.
+--  ولمَ إعدادُ جلسةٍ لا متغيّر psql؟ لأنّ الكلمة تُستعمل داخل do $$…$$،
+--  وpsql لا يُبدّل متغيّراته داخل الاقتباس الدولاريّ — ولأنّ SQL الصِّرف
+--  يعمل سواء نُفّذ الملفّ بـpsql أو بأداة Supabase التي لا تفهم \set.
+select set_config(
+  'app.bridge_pw',
+  coalesce(nullif(current_setting('app.bridge_pw', true), ''), 'nafath-staff-2026'),
+  false);
 
 -- ── 1) الحسابات والأدوار (مطابقة لخريطة DEMO في apps/landing/app/api/nafath/route.ts) ──
 do $$
 declare
   r   record;
   uid uuid;
-  pwd text := crypt('nafath-staff-2026', gen_salt('bf'));
+  pwd text := crypt(current_setting('app.bridge_pw'), gen_salt('bf'));
 begin
   for r in
     select * from (values
@@ -85,8 +104,19 @@ begin
       );
     else
       -- الاسم الظاهر يتبع البذرة (idempotent — يصحّح أسماء الحسابات القائمة)
-      update auth.users set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('name', r.name)
-      where id = uid;
+      -- وكذلك كلمة السرّ: البذرة تَعِد بكلمةٍ موحّدة، والوعد يلزمها للحسابات
+      -- القائمة لا المُنشأة فقط. وبدون هذا السطر تبقى قاعدةٌ بُذرت بكلمةٍ
+      -- قديمة رافضةً كلَّ دخولٍ مهما أُعيد تشغيل البذور (عطبُ 8 سبتمبر 2026).
+      -- الدهس هنا مشروع: تنفيذُ البذور فعلٌ إداريٌّ مقصود، لا مسارُ HTTP
+      -- مكشوفٌ يدهس كلمة أيّ حسابٍ عند كلّ فشل (ثغرة HMY-02 المُزالة).
+      update auth.users
+         set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('name', r.name),
+             encrypted_password = case
+               when encrypted_password = crypt(current_setting('app.bridge_pw'), encrypted_password)
+                 then encrypted_password          -- مطابقةٌ سلفاً: لا تجزئةَ جديدة بلا داعٍ
+                 else pwd end,
+             updated_at = now()
+       where id = uid;
     end if;
     insert into user_roles (user_id, role, attributes)
     values (uid, r.role::app_role, r.attrs)
@@ -228,7 +258,7 @@ end $$;
 do $$
 declare
   r record; uid uuid;
-  pwd text := crypt('nafath-staff-2026', gen_salt('bf'));
+  pwd text := crypt(current_setting('app.bridge_pw'), gen_salt('bf'));
   officer uuid; sid1 uuid; sid2 uuid; sid3 uuid; eid1 uuid; eid2 uuid; eid3 uuid;
   cid uuid;
 begin
@@ -269,6 +299,17 @@ begin
       values (gen_random_uuid(), uid, uid::text,
         jsonb_build_object('sub', uid::text, 'email', r.nid || '@nafath.local', 'email_verified', true),
         'email', now(), now(), now());
+    else
+      -- مصالحة كلمة السرّ كما في الكتلة الأولى: وعدُ البذرة كلمةٌ موحّدة،
+      -- والأقران المساندون منها. (بدونه بقيت أربعةُ حساباتٍ رافضةً للدخول
+      -- بينما صُولحت الثلاثون — خللٌ كشفه العدّ لا المراجعة.)
+      update auth.users
+         set encrypted_password = case
+               when encrypted_password = crypt(current_setting('app.bridge_pw'), encrypted_password)
+                 then encrypted_password
+                 else pwd end,
+             updated_at = now()
+       where id = uid;
     end if;
     insert into user_roles (user_id, role) values (uid, r.role::app_role)
     on conflict (user_id, role) do nothing;

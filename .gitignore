@@ -60,3 +60,6 @@ deploy/staging/.bridge-password
 # حُرّاس git المشتركة (تُثبَّت بـ git config core.hooksPath .githooks)
 !/.githooks/
 deploy/staging/offline-bundle.sql
+
+# حزمة البيانات المولَّدة — تُبنى عند الحاجة ولا تُودَع (قد تحوي بيانات عرضٍ حسّاسة)
+deploy/staging/data-bundle.sql
